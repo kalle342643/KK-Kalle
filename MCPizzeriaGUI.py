@@ -1,9 +1,9 @@
 # Dit bestand zorgt voor de gebruikersinterface (GUI)van onze programma.
 # Vul hier de naam van je programma in:
+# MCMDB
 #
-#
-# Vul hier jullie namen in:
-#
+# Vul hier jullie namen in: 
+# Kimo en Kalle
 #
 #
 
