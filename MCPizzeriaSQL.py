@@ -61,6 +61,11 @@ def voegKlantToe(naam_nieuwe_klant):
     printTabel("tbl_klanten")
 
 
+def zoekKlantInTabel(ingevoerde_klantnaam):
+ cursor.execute("SELECT * FROM tbl_klanten WHERE klantAchternaam = ?", (ingevoerde_klantnaam,))
+ zoek_resultaat = cursor.fetchall()
+ return zoek_resultaat
+
 ### --------- Hoofdprogramma  ---------------
 
 # maakTabellenAan () 

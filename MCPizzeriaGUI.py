@@ -14,6 +14,10 @@ import MCPizzeriaSQL
 
 
 ### ---------  Functie definities  -----------------
+def zoekKlantInTabel(ingevoerde_klantnaam):
+ cursor.execute("SELECT * FROM tbl_klanten WHERE klantAchternaam = ?", (ingevoerde_klantnaam,))
+ zoek_resultaat = cursor.fetchall()
+ return zoek_resultaat
 
 
 ### --------- Hoofdprogramma  ---------------
@@ -36,17 +40,6 @@ invoerveldKlantNr.grid(row=2, column=1, sticky="W")
 
 knopSluit = Button(venster, text="Sluiten", width=12, command=venster.destroy)
 knopSluit.grid(row=17, column=4)
-
-#reageert op gebruikersinvoer, deze regel als laatste laten staan
-venster.mainloop()
-
-
-
-
-
-
-
-
 
 
 #reageert op gebruikersinvoer, deze regel als laatste laten staan
