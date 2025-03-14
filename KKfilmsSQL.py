@@ -43,7 +43,7 @@ def maakNieuweTabellenAan ():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tbl_movies(
         Director_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-        Movie_id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+        Movie_id INTEGER NOT NULL PRIMARY KEY,
         Genre TEXT NOT NULL,
         Year INTEGER,
         Rating REAL NOT NULL,
@@ -59,7 +59,7 @@ def printTabel(tbl_actors):
 
 ### --------- Hoofdprogramma  ---------------
 
-maakTabellenAan()
+maakNieuweTabellenAan()
 printTabel("tbl_actors")
 
 
