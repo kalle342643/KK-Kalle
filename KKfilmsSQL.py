@@ -109,6 +109,12 @@ def MovieGegevens():
     printTabel("tbl_movies")
 db.commit()
 
+def vraagOpGegevensMovietabel():
+    cursor.execute("SELECT * FROM tbl_movies")
+    resultaat = cursor.fetchall()
+    print("Tabel tbl_movies:", resultaat)
+    return resultaat
+
 def zoekMovie(ingevoerde_moviename):
     cursor.execute("SELECT * FROM tbl_movies WHERE Movie_name = ?", ( ingevoerde_moviename, ) )
     zoek_resultaat = cursor.fetchall()
@@ -127,7 +133,9 @@ printTabel("tbl_actors")
 RolesGegevens()
 ActorGegevens()
 DirectorGegevens()
-zoekMovie()
+MovieGegevens()
+vraagOpGegevensMovietabel()
+zoekMovie("Pulp Fiction")
 
 
 
