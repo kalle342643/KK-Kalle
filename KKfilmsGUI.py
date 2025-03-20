@@ -15,9 +15,13 @@ import KKfilmsSQL
 
 ### ---------  Functie definities  -----------------
 
-
 ### --------- Hoofdprogramma  ---------------
+
+
+
+
 venster = Tk()
 venster.wm_title("KK Moviedatabase")
 venster.iconbitmap("IMDB logo.ico")
 venster.config(bg="yellow")
+
