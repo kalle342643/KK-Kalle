@@ -14,7 +14,7 @@ with sqlite3.connect("Kkfilms.db") as db:
 def maakNieuweTabellenAan ():
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS tbl_roles(
-        Actor_id INTEGER NOT NULL, 
+        Actor_id INTEGER NOT NULL,
         Movie_id INTEGER NOT NULL,
         Role_name TEXT NOT NULL,
         FOREIGN KEY (Actor_id) REFERENCES tbl_actors(Actor_id)
