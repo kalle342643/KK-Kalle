@@ -1,79 +1,226 @@
-# Dit bestand zorgt voor de gebruikersinterface (GUI)van onze programma.
-# Vul hier de naam van je programma in:
-# KKfilms
-#
-# Vul hier jullie namen in: 
-# Kimo en Kalle
-
+# Dit bestand zorgt voor de gebruikersinterface (GUI) van ons programma.
+# Programma: KKfilms
+# Namen: Kimo en Kalle
 
 ### --------- Bibliotheken en globale variabelen -----------------
-
 from tkinter import *
+import json
+import os
 import KKfilmsSQL
 
-### ---------  Functie definities  -----------------
+# Configuratiebestand voor modus opslag
+CONFIG_FILE = "config.json"
+
+# 🎨 Kleuren voor de modes
+THEMES = {
+    "light": {"bg": "#fbffbc", "fg": "#000000", "btn_bg": "#ffffff"},  
+    "dark": {"bg": "#7d7070", "fg": "#000000", "btn_bg": "#ffffff"}
+}
+
+### --------- Functie definities -----------------
+def load_config():
+    #Laadt de modus-instelling uit het JSON-bestand.
+    if os.path.exists(CONFIG_FILE):
+        with open(CONFIG_FILE, "r") as file:
+            return json.load(file).get("theme", "light")
+    return "light"
+
+def save_config(theme):
+    #Slaat de modus-instelling op in het JSON-bestand.
+    with open(CONFIG_FILE, "w") as file:
+        json.dump({"theme": theme}, file)
+
+def apply_theme():
+    #Past de thema-kleuren toe op de GUI.
+    theme = THEMES[current_theme.get()]
+    venster.configure(bg=theme["bg"])
+    labelIntro.configure(bg=theme["bg"], fg=theme["fg"])
+    labelMovie.configure(bg=theme["bg"], fg=theme["fg"])
+    labellistboxMovie.configure(bg=theme["bg"], fg=theme["fg"])
+    listboxMovie.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopZoekOpFilmnaam.configure(bg=theme["btn_bg"])
+    knopToonMovies.configure(bg=theme["btn_bg"])
+    KnopLeegMovies.configure(bg=theme["btn_bg"])
+    knopSluit.configure(bg=theme["btn_bg"])
+    Knopthema.configure(bg=theme["btn_bg"])
+
+def Weizig_thema():
+    #Schakelt tussen Dark en Light mode.
+    new_theme = "dark" if current_theme.get() == "light" else "light"
+    current_theme.set(new_theme)
+    save_config(new_theme)
+    apply_theme()
+
 def zoekFilm(ingevoerde_moviename):
-    listboxMenu.delete(0, END)  # maak de listbox leeg
-    listboxMenu.insert(0, "Director_ID \t Movie_id \t Genre \t Year\t Rating\ Movie") #print de kolomnamen af
+    #Zoekt een film in de database en toont de resultaten in de listbox.
+    listboxMovie.delete(0, END)  # Maak de listbox leeg
+    listboxMovie.insert(0, "Director_ID \t Movie_id \t Genre \t Year\t Rating\t Movie")  # Print kolomnamen
 
     gevonden_movie = KKfilmsSQL.zoekMovie(ingevoerde_moviename.get())
     for rij in gevonden_movie:
-        listboxMenu.insert(END, rij)
+        listboxMovie.insert(END, rij)
 
-def toonMenuInListbox():
-    listboxMenu.delete(0, END)  #maak de listbox leeg
-    listboxMenu.insert(0, "Director_ID \t Movie_id \t Genre \t Year\t Rating\ Movie")
+def zoekActeur(ingevoerde_Acteurname):
+    #Zoekt een film in de database en toont de resultaten in de listbox.
+    listboxActors.delete(0, END)  # Maak de listbox leeg
+    listboxActors.insert(0, "Actor_ID \t actor_birth \t last_name \t first_naam")  # Print kolomnamen
+
+    gevonden_acteur = KKfilmsSQL.zoekactor(ingevoerde_Acteurname.get())
+    for rij in gevonden_acteur:
+        listboxActors.insert(END, rij)
+
+def toonMenuInListboxMovie():
+    #Toont alle films in de database.
+    listboxMovie.delete(0, END)  # Maak de listbox leeg
+    listboxMovie.insert(0, "Director_ID \t Movie_id \t Genre \t Year\t Rating\t Movie")
+
     Movie_tabel = KKfilmsSQL.vraagOpGegevensMovietabel()
     for regel in Movie_tabel:
-        listboxMenu.insert(END, regel) #voeg elke regel uit resultaat in listboxMenu
+        listboxMovie.insert(END, regel)  # Voeg elke regel uit het resultaat in de listbox
 
-def haalGeselecteerdeRijOp(event):
-    #bepaal op welke regel er geklikt is
-    geselecteerdeRegelInLijst = listboxMenu.curselection()[0]
-    #haal tekst uit die regel
-    geselecteerdeTekst = listboxMenu.get(geselecteerdeRegelInLijst)
-    #verwijder tekst uit veld waar je in wilt schrijven, voor het geval er al iets staat
-    invoerveldmoviesname.delete(0, END)
-    #zet tekst in veld
-    invoerveldmoviesname.insert(0, geselecteerdeTekst)
+def toonMenuInListboxActor():
+    #Toont alle acteurs in de database.
+    listboxActors.delete(0, END)  # Maak de listbox leeg
+    listboxActors.insert(0, "Actor_ID \t actor_birth \t last_name \t first_naam")
+    
+    Actor_tabel = KKfilmsSQL.vraagOpGegevensActortabel()
+    for regel in Actor_tabel:
+        listboxActors.insert(END, regel)  # Voeg elke regel uit het resultaat in de listbox
 
+def haalGeselecteerdeRijOpMovie(event):
+    try:
+        geselecteerdeRegelInLijst = listboxMovie.curselection()[0]
+        geselecteerdeTekst = listboxMovie.get(geselecteerdeRegelInLijst)
+        invoerveldmoviesname.delete(0, END)
+        invoerveldmoviesname.insert(0, geselecteerdeTekst)
+    except IndexError:
+        pass  # Voorkomt crash als er niets is geselecteerd
 
-### --------- Hoofdprogramma  ---------------
-venster = Tk ()
+def haalGeselecteerdeRijOpActor(event):
+    try:
+        geselecteerdeRegelInLijst = listboxActors.curselection()[0]
+        geselecteerdeTekst = listboxActors.get(geselecteerdeRegelInLijst)
+        invoerveldactorname.delete(0, END)
+        invoerveldactorname.insert(0, geselecteerdeTekst)
+    except IndexError:
+        pass  # Voorkomt crash als er niets is geselecteerd
+
+#voeg de geselecteerde film toe
+#in de watchlisttabel
+#en toon de film in de listbox op het scherm
+def voegToeAanWatchlist():
+    selected_index = listboxMovie.curselection()  # Haal de geselecteerde index op
+    if selected_index:  # Controleer of er iets geselecteerd is
+        geselecteerde_regel = listboxMovie.get(selected_index[0])  # Haal de geselecteerde film op  
+        
+        if isinstance(geselecteerde_regel, tuple):
+            Year = geselecteerde_regel[3]  # Movie_id (op basis van positie)
+            Movie_name = geselecteerde_regel[5]  # Movie naam (op basis van positie)
+            Rating = geselecteerde_regel[4]  # Rating (op basis van positie)
+
+            KKfilmsSQL.voegToeAanWatchlist(Movie_name, Year, Rating) 
+
+            watchlist_tabel = KKfilmsSQL.vraagOpGegevensWatchlist()  
+
+            listboxWatchlist.delete(0, END)  # Maak de watchlist leeg
+
+            for regel in watchlist_tabel:  
+                listboxWatchlist.insert(END, regel)
+        else:
+            print("Fout: De geselecteerde regel bevat niet genoeg gegevens.")
+    else:
+        print("Geen film geselecteerd")  
+
+def LeegLijstListboxMovie():
+    #Maakt de listbox leeg.
+    listboxMovie.delete(0, END)
+
+def LeegLijstListboxActor():
+    #Maakt de listbox leeg.
+    listboxActors.delete(0, END)
+
+### --------- Hoofdprogramma ---------------
+# Creëer het hoofdvenster
+venster = Tk()
 venster.wm_title("KK Moviedatabase")
 venster.iconbitmap("KK.ico")
-venster.config(bg="#ffde59")
-venster.attributes('-fullscreen', True)
+venster.attributes('-fullscreen', True)  # Zorgt ervoor dat het venster fullscreen is
 
-labelIntro = Label(venster, text="welcome!")
+# Modus laden
+current_theme = StringVar(value=load_config())
+
+# 🎨 Maak alle GUI-elementen aan
+labelIntro = Label(venster, text="Welcome!")
 labelIntro.grid(row=0, column=0, sticky="W")
 
-labelMovie = Label(venster, text="Movies:!")
+labelMovie = Label(venster, text="Movies:")
 labelMovie.grid(row=1, column=0, sticky="W")
 
 ingevoerde_movies = StringVar()
 invoerveldmoviesname = Entry(venster, textvariable=ingevoerde_movies)
-invoerveldmoviesname.grid(row=1, columnspan=6, sticky="W")
+invoerveldmoviesname.grid(row=2, columnspan=6, sticky="W")
 
-knopZoekOpFilmnaam= Button(venster, text="Zoek Film", width=12, command=zoekFilm)
+labelActor = Label(venster, text="Actors:")
+labelActor.grid(row=14, column=0, sticky="W")
+
+ingevoerde_acteurs = StringVar()
+invoerveldactorname = Entry(venster, textvariable=ingevoerde_acteurs)
+invoerveldactorname.grid(row=30, columnspan=6, sticky="W")
+
+knopZoekOpFilmnaam = Button(venster, text="Zoek Film", width=12, command=lambda: zoekFilm(ingevoerde_movies))
 knopZoekOpFilmnaam.grid(row=1, column=4)
 
-labellistboxMenu = Label(venster, text="Resultaten:")
-labellistboxMenu.grid(row=4, column=0, sticky="W")
+knopVoegToeAanWatchlist = Button(venster, text="Ad to watchlist", width=12, command=voegToeAanWatchlist)
+knopVoegToeAanWatchlist.grid(row=8, column=4)
 
-listboxMenu = Listbox(venster, height=6, width=45)
-listboxMenu.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
-listboxMenu.bind('<<ListboxSelect>>', haalGeselecteerdeRijOp)
+knopZoekOpActornaam = Button(venster, text="Zoek acteur", width=12, command=lambda: zoekActeur(ingevoerde_acteurs))
+knopZoekOpActornaam.grid(row=45, column=4)
 
-scrollbarlistboxMenu = Scrollbar(venster)
-scrollbarlistboxMenu.grid(row=4, column=2, rowspan=6, sticky="E")
-listboxMenu.config(yscrollcommand=scrollbarlistboxMenu.set)
-scrollbarlistboxMenu.config(command=listboxMenu.yview)
+labellistboxMovie = Label(venster, text="Resultaten:")
+labellistboxMovie.grid(row=4, column=0, sticky="W")
 
-knopToonMovies = Button(venster, text="Toon alle Films", width=12, command=toonMenuInListbox)
+labellistboxWatchlist = Label(venster, text="Watchlist:")
+labellistboxWatchlist.grid(row=80, column=0, sticky="W")
+
+labellistboxActor = Label(venster, text="Resultaten:")
+labellistboxActor.grid(row=40, column=0, sticky="W")
+
+listboxActors = Listbox(venster, height=6, width=45)
+listboxActors.grid(row=40, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxActors.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpActor)
+
+listboxMovie = Listbox(venster, height=6, width=45)
+listboxMovie.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxMovie.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpMovie)
+
+listboxWatchlist = Listbox(venster, height=6, width=45)
+listboxWatchlist.grid(row=80, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxWatchlist.bind('<<ListboxSelect>>')
+
+scrollbarlistboxMovie = Scrollbar(venster)
+scrollbarlistboxMovie.grid(row=4, column=2, rowspan=6, sticky="E")
+listboxMovie.config(yscrollcommand=scrollbarlistboxMovie.set)
+scrollbarlistboxMovie.config(command=listboxMovie.yview)
+
+knopToonMovies = Button(venster, text="Toon alle Films", width=12, command=toonMenuInListboxMovie)
 knopToonMovies.grid(row=4, column=4)
 
-knopSluit = Button(venster, text="close", width=12, command=venster.destroy)
-knopSluit.grid(row=1, column=1000, sticky="E")
+knopToonActeurs = Button(venster, text="Toon alle acteurs", width=12, command=toonMenuInListboxActor)
+knopToonActeurs.grid(row=40, column=4)
+
+KnopLeegMovies = Button(venster, text="Leeg Lijst", width=12, command=LeegLijstListboxMovie)
+KnopLeegMovies.grid(row=5, column=4)
+
+KnopLeegActors = Button(venster, text="Leeg Lijst", width=12, command=LeegLijstListboxActor)
+KnopLeegActors.grid(row=40, column=4)
+
+knopSluit = Button(venster, text="Close", width=12, command=venster.destroy)
+knopSluit.grid(row=1, column=100, sticky="E")
+
+Knopthema = Button(venster, text="Wissel Modus", width=12, command= Weizig_thema)
+Knopthema.grid(row=1, column=101)
+
+# 🎨 Pas het thema toe na het aanmaken van de widgets
+apply_theme()
 
 venster.mainloop()
