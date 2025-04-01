@@ -61,6 +61,7 @@ def zoekFilm(ingevoerde_moviename):
     for rij in gevonden_movie:
         listboxMovie.insert(END, rij)
 
+
 def zoekActeur(ingevoerde_Acteurname):
     #Zoekt een film in de database en toont de resultaten in de listbox.
     listboxActors.delete(0, END)  # Maak de listbox leeg
@@ -170,6 +171,7 @@ invoerveldactorname.grid(row=30, columnspan=6, sticky="W")
 
 knopZoekOpFilmnaam = Button(venster, text="Zoek Film", width=12, command=lambda: zoekFilm(ingevoerde_movies))
 knopZoekOpFilmnaam.grid(row=1, column=4)
+
 
 knopVoegToeAanWatchlist = Button(venster, text="Ad to watchlist", width=12, command=voegToeAanWatchlist)
 knopVoegToeAanWatchlist.grid(row=8, column=4)
