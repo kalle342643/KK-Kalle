@@ -17,6 +17,13 @@ THEMES = {
     "dark": {"bg": "#7d7070", "fg": "#000000", "btn_bg": "#ffffff"}
 }
 
+# afbeeldingen
+
+def toon_afbeelding(event):
+    geselecteerde_index = listboxMovie.curselection()
+    if geselecteerde_index:  # Controleer of er iets geselecteerd is
+        geselecteerde_film = listboxMovie.get(geselecteerde_index[0])  # Haal de naam van de film op
+
 
 ### --------- Functie definities -----------------
 def load_config():
@@ -234,6 +241,7 @@ labellistboxDirector.grid(row=62, column=0, sticky="W")
 listboxMovie = Listbox(venster, height=6, width=45)
 listboxMovie.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
 listboxMovie.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpMovie)
+listboxMovie.bind("<<ListboxSelect>>", toon_afbeelding)
 
 listboxActors = Listbox(venster, height=6, width=45)
 listboxActors.grid(row=40, column=1, rowspan=6, columnspan=2, sticky="W")
