@@ -17,6 +17,7 @@ THEMES = {
     "dark": {"bg": "#7d7070", "fg": "#000000", "btn_bg": "#ffffff"}
 }
 
+
 ### --------- Functie definities -----------------
 def load_config():
     """Laadt de modus-instelling uit het JSON-bestand."""
@@ -116,6 +117,8 @@ venster.wm_title("KK Moviedatabase")
 venster.iconbitmap("KK.ico")
 venster.attributes('-fullscreen', True)
 
+
+
 # Modus laden
 current_theme = StringVar(value=load_config())
 
@@ -140,6 +143,7 @@ invoerveldactorname.grid(row=30, columnspan=6, sticky="W")
 
 knopZoekOpFilmnaam = Button(venster, text="Zoek Film", width=12, command=lambda: zoekFilm(ingevoerde_movies))
 knopZoekOpFilmnaam.grid(row=1, column=4)
+
 
 knopZoekOpActornaam = Button(venster, text="Zoek acteur", width=12, command=lambda: zoekActeur(ingevoerde_acteurs))
 knopZoekOpActornaam.grid(row=45, column=4)
