@@ -17,6 +17,7 @@ THEMES = {
     "dark": {"bg": "#7d7070", "fg": "#000000", "btn_bg": "#ffffff"}
 }
 
+
 ### --------- Functie definities -----------------
 def load_config():
     #Laadt de modus-instelling uit het JSON-bestand.
