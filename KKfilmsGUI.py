@@ -13,8 +13,8 @@ CONFIG_FILE = "config.json"
 
 # 🎨 Kleuren voor de modes
 THEMES = {
-    "light": {"bg": "#fbffbc", "fg": "#000000", "btn_bg": "#ffffff"},  
-    "dark": {"bg": "#7d7070", "fg": "#000000", "btn_bg": "#ffffff"}
+    "light": {"bg": "#ffee80", "fg": "#000000", "btn_bg": "#ffffff"},  
+    "dark": {"bg": "#303654", "fg": "#000000", "btn_bg": "#ffffff"}
 }
 
 # afbeeldingen
@@ -42,15 +42,30 @@ def apply_theme():
     #Past de thema-kleuren toe op de GUI.
     theme = THEMES[current_theme.get()]
     venster.configure(bg=theme["bg"])
-    labelIntro.configure(bg=theme["bg"], fg=theme["fg"])
-    labelMovie.configure(bg=theme["bg"], fg=theme["fg"])
-    labellistboxMovie.configure(bg=theme["bg"], fg=theme["fg"])
+    labelIntro.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labelMovie.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labelActor.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labelDirector.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labellistboxMovie.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labellistboxWatchlist.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labellistboxActor.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    labellistboxDirector.configure(bg=theme["btn_bg"], fg=theme["fg"])
     listboxMovie.configure(bg=theme["btn_bg"], fg=theme["fg"])
-    knopZoekOpFilmnaam.configure(bg=theme["btn_bg"])
-    knopToonMovies.configure(bg=theme["btn_bg"])
-    KnopLeegMovies.configure(bg=theme["btn_bg"])
-    knopSluit.configure(bg=theme["btn_bg"])
-    Knopthema.configure(bg=theme["btn_bg"])
+    listboxActors.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    listboxWatchlist.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    listboxDirector.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopZoekOpFilmnaam.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopToonMovies.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    KnopLeegMovies.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopSluit.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    Knopthema.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopVoegToeAanWatchlist.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopZoekOpActornaam.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopZoekOpDirector.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopToonActeurs.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopToonDirectors.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    KnopLeegActors.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    KnopLeegDirectors.configure(bg=theme["btn_bg"], fg=theme["fg"])
 
 def Weizig_thema():
     #Schakelt tussen Dark en Light mode.
@@ -184,12 +199,12 @@ def LeegLijstListboxDirector():
 venster = Tk()
 venster.wm_title("KK Moviedatabase")
 venster.iconbitmap("KK.ico")
-venster.attributes('-fullscreen', True)  # Zorgt ervoor dat het venster fullscreen is
+venster.attributes('-fullscreen', False)  
 
-# Modus laden
+
 current_theme = StringVar(value=load_config())
 
-# 🎨 Maak alle GUI-elementen aan
+
 labelIntro = Label(venster, text="Welcome!")
 labelIntro.grid(row=0, column=0, sticky="W")
 
@@ -284,7 +299,7 @@ knopSluit.grid(row=1, column=100, sticky="E")
 Knopthema = Button(venster, text="Wissel Modus", width=12, command= Weizig_thema)
 Knopthema.grid(row=1, column=101)
 
-# 🎨 Pas het thema toe na het aanmaken van de widgets
+
 apply_theme()
 
 venster.mainloop()
