@@ -190,6 +190,12 @@ def vraagOpGegevensActortabel():
     print("Tabel tbl_actors:", resultaat)
     return resultaat
 
+def vraagOpGegevensDirectortabel():
+    cursor.execute("SELECT * FROM tbl_directors")
+    resultaat = cursor.fetchall()
+    print("Tabel tbl_directors:", resultaat)
+    return resultaat
+
 def zoekMovie(ingevoerde_moviename):
     cursor.execute("SELECT * FROM tbl_movies WHERE Movie_name = ?", ( ingevoerde_moviename, ) )
     zoek_resultaat = cursor.fetchall()
@@ -206,6 +212,15 @@ def zoekactor(ingevoerde_acteurs):
         print("Helaas, geen match gevonden met "+ ingevoerde_acteurs)
     else:
         print("Acteur gevonden: ", zoek_resultaat )
+    return zoek_resultaat
+
+def zoekdirector(ingevoerde_director):
+    cursor.execute("SELECT * FROM tbl_directors WHERE Last_name = ?", ( ingevoerde_director, ) )
+    zoek_resultaat = cursor.fetchall()
+    if zoek_resultaat == []: #resultaat is leeg, geen film gevonden
+        print("Helaas, geen match gevonden met "+ ingevoerde_director)
+    else:
+        print("Director gevonden: ", zoek_resultaat )
     return zoek_resultaat
 
 def voegToeAanWatchlist(Movie_name, Year, Rating):

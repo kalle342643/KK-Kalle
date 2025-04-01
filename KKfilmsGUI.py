@@ -70,6 +70,15 @@ def zoekActeur(ingevoerde_Acteurname):
     for rij in gevonden_acteur:
         listboxActors.insert(END, rij)
 
+def zoekDirector(ingevoerde_director):
+    #Zoekt een film in de database en toont de resultaten in de listbox.
+    listboxDirector.delete(0, END)  # Maak de listbox leeg
+    listboxDirector.insert(0, "Director_birth\t Director_ID \t Top_movie \t Last_name \t First_name")  # Print kolomnamen
+
+    gevonden_director = KKfilmsSQL.zoekdirector(ingevoerde_director.get())
+    for rij in gevonden_director:
+        listboxDirector.insert(END, rij)
+
 def toonMenuInListboxMovie():
     #Toont alle films in de database.
     listboxMovie.delete(0, END)  # Maak de listbox leeg
@@ -88,6 +97,15 @@ def toonMenuInListboxActor():
     for regel in Actor_tabel:
         listboxActors.insert(END, regel)  # Voeg elke regel uit het resultaat in de listbox
 
+def toonMenuInListboxDirector():
+    #Toont alle acteurs in de database.
+    listboxDirector.delete(0, END)  # Maak de listbox leeg
+    listboxDirector.insert(0, "Director_birth\t Director_ID \t Top_movie \t Last_name \t First_name")
+    
+    Director_tabel = KKfilmsSQL.vraagOpGegevensDirectortabel()
+    for regel in Director_tabel:
+        listboxDirector.insert(END, regel)  # Voeg elke regel uit het resultaat in de listbox
+
 def haalGeselecteerdeRijOpMovie(event):
     try:
         geselecteerdeRegelInLijst = listboxMovie.curselection()[0]
@@ -103,6 +121,15 @@ def haalGeselecteerdeRijOpActor(event):
         geselecteerdeTekst = listboxActors.get(geselecteerdeRegelInLijst)
         invoerveldactorname.delete(0, END)
         invoerveldactorname.insert(0, geselecteerdeTekst)
+    except IndexError:
+        pass  # Voorkomt crash als er niets is geselecteerd
+
+def haalGeselecteerdeRijOpDirector(event):
+    try:
+        geselecteerdeRegelInLijst = listboxDirector.curselection()[0]
+        geselecteerdeTekst = listboxDirector.get(geselecteerdeRegelInLijst)
+        invoervelddirector.delete(0, END)
+        invoervelddirector.insert(0, geselecteerdeTekst)
     except IndexError:
         pass  # Voorkomt crash als er niets is geselecteerd
 
@@ -140,8 +167,10 @@ def LeegLijstListboxMovie():
     listboxMovie.delete(0, END)
 
 def LeegLijstListboxActor():
-    #Maakt de listbox leeg.
     listboxActors.delete(0, END)
+
+def LeegLijstListboxDirector():
+    listboxDirector.delete(0, END)
 
 ### --------- Hoofdprogramma ---------------
 # Creëer het hoofdvenster
@@ -171,14 +200,24 @@ ingevoerde_acteurs = StringVar()
 invoerveldactorname = Entry(venster, textvariable=ingevoerde_acteurs)
 invoerveldactorname.grid(row=30, columnspan=6, sticky="W")
 
+labelDirector = Label(venster, text="Directors:")
+labelDirector.grid(row=60, column=0, sticky="W")
+
+ingevoerde_Directors = StringVar()
+invoervelddirector = Entry(venster, textvariable=ingevoerde_Directors)
+invoervelddirector.grid(row=61, columnspan=6, sticky="W")
+
 knopZoekOpFilmnaam = Button(venster, text="Zoek Film", width=12, command=lambda: zoekFilm(ingevoerde_movies))
-knopZoekOpFilmnaam.grid(row=1, column=4)
+knopZoekOpFilmnaam.grid(row=2, column=1)
 
 knopVoegToeAanWatchlist = Button(venster, text="Ad to watchlist", width=12, command=voegToeAanWatchlist)
 knopVoegToeAanWatchlist.grid(row=8, column=4)
 
 knopZoekOpActornaam = Button(venster, text="Zoek acteur", width=12, command=lambda: zoekActeur(ingevoerde_acteurs))
-knopZoekOpActornaam.grid(row=45, column=4)
+knopZoekOpActornaam.grid(row=30, column=1)
+
+knopZoekOpDirector = Button(venster, text="Zoek Director", width=12, command=lambda: zoekDirector(ingevoerde_acteurs))
+knopZoekOpDirector.grid(row=61, column=1)
 
 labellistboxMovie = Label(venster, text="Resultaten:")
 labellistboxMovie.grid(row=4, column=0, sticky="W")
@@ -189,17 +228,24 @@ labellistboxWatchlist.grid(row=4, column=9, sticky="E")
 labellistboxActor = Label(venster, text="Resultaten:")
 labellistboxActor.grid(row=40, column=0, sticky="W")
 
-listboxActors = Listbox(venster, height=6, width=45)
-listboxActors.grid(row=40, column=1, rowspan=6, columnspan=2, sticky="W")
-listboxActors.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpActor)
+labellistboxDirector = Label(venster, text="Resultaten:")
+labellistboxDirector.grid(row=62, column=0, sticky="W")
 
 listboxMovie = Listbox(venster, height=6, width=45)
 listboxMovie.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
 listboxMovie.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpMovie)
 
+listboxActors = Listbox(venster, height=6, width=45)
+listboxActors.grid(row=40, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxActors.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpActor)
+
 listboxWatchlist = Listbox(venster, height=6, width=45)
 listboxWatchlist.grid(row=4, column=10, rowspan=6, columnspan=2, sticky="E")
 listboxWatchlist.bind('<<ListboxSelect>>')
+
+listboxDirector = Listbox(venster, height=6, width=45)
+listboxDirector.grid(row=62, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxDirector.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpDirector)
 
 scrollbarlistboxMovie = Scrollbar(venster)
 scrollbarlistboxMovie.grid(row=4, column=2, rowspan=6, sticky="E")
@@ -212,11 +258,17 @@ knopToonMovies.grid(row=4, column=4)
 knopToonActeurs = Button(venster, text="Toon alle acteurs", width=12, command=toonMenuInListboxActor)
 knopToonActeurs.grid(row=40, column=4)
 
+knopToonDirectors = Button(venster, text="Toon alle directors", width=12, command=toonMenuInListboxDirector)
+knopToonDirectors.grid(row=62, column=4)
+
 KnopLeegMovies = Button(venster, text="Leeg Lijst", width=12, command=LeegLijstListboxMovie)
 KnopLeegMovies.grid(row=5, column=4)
 
 KnopLeegActors = Button(venster, text="Leeg Lijst", width=12, command=LeegLijstListboxActor)
-KnopLeegActors.grid(row=40, column=4)
+KnopLeegActors.grid(row=41, column=4)
+
+KnopLeegDirectors = Button(venster, text="Leeg Lijst", width=12, command=LeegLijstListboxDirector)
+KnopLeegDirectors.grid(row=63, column=4)
 
 knopSluit = Button(venster, text="Close", width=12, command=venster.destroy)
 knopSluit.grid(row=1, column=100, sticky="E")
