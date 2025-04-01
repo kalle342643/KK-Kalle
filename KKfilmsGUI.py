@@ -23,6 +23,7 @@ def toon_afbeelding(event):
     geselecteerde_index = listboxMovie.curselection()
     if geselecteerde_index:  # Controleer of er iets geselecteerd is
         geselecteerde_film = listboxMovie.get(geselecteerde_index[0])  # Haal de naam van de film op
+        print("geselecteerd",geselecteerde_film)
 
 
 ### --------- Functie definities -----------------
@@ -299,6 +300,13 @@ knopSluit.grid(row=1, column=100, sticky="E")
 Knopthema = Button(venster, text="Wissel Modus", width=12, command= Weizig_thema)
 Knopthema.grid(row=1, column=101)
 
+# afbeeldingen
+
+fotoPad ="pngfilms/Budapest.png"
+padFotoGeselecteerdeMovie = PhotoImage(file=fotoPad)
+fotoMovie = Label(venster, width=66.7, height=100, 
+image=padFotoGeselecteerdeMovie)
+fotoMovie.grid(row=4, column=40)
 
 apply_theme()
 
