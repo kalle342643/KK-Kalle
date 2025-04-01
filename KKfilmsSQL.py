@@ -8,7 +8,6 @@
 ### --------- Bibliotheken en globale variabelen -----------------
 import sqlite3
 
-from MCPizzeriaSQL import printTabel
 with sqlite3.connect("Kkfilms.db") as db:
     cursor = db.cursor()  #cursor is object waarmee je data uit de database kan halen
 

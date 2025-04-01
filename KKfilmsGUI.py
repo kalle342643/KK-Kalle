@@ -18,6 +18,14 @@ THEMES = {
     "dark": {"bg": "#303654", "fg": "#000000", "btn_bg": "#ffffff"}
 }
 
+# afbeeldingen
+
+def toon_afbeelding(event):
+    geselecteerde_index = listboxMovie.curselection()
+    if geselecteerde_index:  # Controleer of er iets geselecteerd is
+        geselecteerde_film = listboxMovie.get(geselecteerde_index[0])  # Haal de naam van de film op
+        print("geselecteerd",geselecteerde_film)
+
 
 ### --------- Functie definities -----------------
 def custom_popup():
@@ -273,6 +281,7 @@ labellistboxDirector.grid(row=62, column=0, sticky="W")
 listboxMovie = Listbox(venster, height=6, width=45)
 listboxMovie.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
 listboxMovie.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpMovie)
+listboxMovie.bind("<<ListboxSelect>>", toon_afbeelding)
 
 listboxActors = Listbox(venster, height=6, width=45)
 listboxActors.grid(row=40, column=1, rowspan=6, columnspan=2, sticky="W")
@@ -315,6 +324,13 @@ knopSluit.grid(row=1, column=100, sticky="E")
 Knopthema = Button(venster, text="Wissel Modus", width=12, command= Weizig_thema)
 Knopthema.grid(row=1, column=101)
 
+# afbeeldingen
+
+fotoPad ="pngfilms/Budapest.png"
+padFotoGeselecteerdeMovie = PhotoImage(file=fotoPad)
+fotoMovie = Label(venster, width=66.7, height=100, 
+image=padFotoGeselecteerdeMovie)
+fotoMovie.grid(row=4, column=40)
 
 apply_theme()
 
