@@ -1,10 +1,4 @@
 # Vul hier de naam van je programma in:
-# kkmdb
-#
-# Vul hier jullie namen in:
-# Kalle en Kimo
-#
-# Vul hier de naam van je programma in:
 # KKfilms
 #
 # Vul hier jullie namen in:
@@ -13,6 +7,8 @@
 
 ### --------- Bibliotheken en globale variabelen -----------------
 import sqlite3
+
+from MCPizzeriaSQL import printTabel
 with sqlite3.connect("Kkfilms.db") as db:
     cursor = db.cursor()  #cursor is object waarmee je data uit de database kan halen
 
@@ -55,28 +51,45 @@ def maakNieuweTabellenAan ():
         Year INTEGER,
         Rating REAL NOT NULL,
         Movie_name TEXT NOT NULL,
-        PRIMARY KEY(Movie_id, Director_id)
+        PRIMARY KEY(Year, Director_id, rating, Movie_name)
         );""")
     print("Tabel 'tbl_movies' aangemaakt.")
 
-def printTabel(tbl_roles): 
- cursor.execute("SELECT * FROM  tbl_roles") 
- opgehaalde_gegevens = cursor.fetchall() 
- print ( "Tabel" 'tbl_roles' ":", opgehaalde_gegevens)
-
-def printTabel(tbl_actors): 
- cursor.execute("SELECT * FROM  tbl_actors") 
- opgehaalde_gegevens = cursor.fetchall() 
- print ( "Tabel" 'tbl_actors' ":", opgehaalde_gegevens)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS tbl_watchlist(
+        Movie_name TEXT NOT NULL,
+        Year INTEGER,
+        Rating REAL NOT NULL,
+        FOREIGN KEY (Year) REFERENCES tbl_movies(Year)
+        FOREIGN KEY (Rating) REFERENCES tbl_movies(Rating)
+        FOREIGN KEY (Movie_name) REFERENCES tbl_movies(Movie_name)
+        );""")
+    print("Tabel 'tbl_winkelWagen' aangemaakt.") 
 
 def RolesGegevens():
     roles = [
-    ("298","1524","Ellis Redding"),
-    ("670","2965","Vincent Vega"),
-    ("458","6143","Tyler Durden")
+        ("298", "1524", "Ellis Redding"),
+        ("670", "2965", "Vincent Vega"),
+        ("458", "6143", "Tyler Durden"),
+        ("101", "1832", "Henry Hill"),
+        ("102", "2001", "Michael Corleone"),
+        ("103", "2401", "Jordan Belfort"),
+        ("104", "2200", "Forrest Gump"),
+        ("105", "3105", "Denzel Washington"),
+        ("106", "2501", "Captain Jack Sparrow"),
+        ("107", "2900", "Jason Bourne"),
+        ("108", "3140", "Agent J"),
+        ("109", "3430", "Indiana Jones"),
+        ("110", "3302", "Blondie"),
+        ("111", "3500", "Natasha Romanoff"),
+        ("112", "3600", "Lara Croft"),
+        ("113", "3700", "Miranda Priestly"),
+        ("114", "3800", "Cheryl Strayed"),
+        ("115", "3900", "Mona Lisa Vito"),
+        ("116", "4000", "Freddie Quell"),
+        ("117", "4100", "Bruce Wayne")
     ]
     cursor.executemany("INSERT INTO tbl_roles VALUES( ?, ?, ? )", roles)
-    printTabel("tbl_roles")
 db.commit()
 
 def ActorGegevens():
@@ -103,7 +116,6 @@ def ActorGegevens():
         ("117", "1974-01-30", "Bale", "Christian")
     ]
     cursor.executemany("INSERT INTO tbl_actors VALUES( ?, ?, ?, ? )", actors)
-    printTabel("tbl_actors")
 db.commit()
 
 
@@ -131,7 +143,6 @@ def DirectorGegevens():
         ("1957-03-20", "134", "Do the Right Thing", "Lee", "Spike")
     ]
     cursor.executemany("INSERT INTO tbl_directors VALUES( ?, ?, ?, ?, ? )", Directors)
-    printTabel("tbl_directors")
 db.commit()
 
 
@@ -159,14 +170,24 @@ def MovieGegevens():
         ("134", "4800", "Drama",    "1989", "8.0", "Do the Right Thing")
     ]
     cursor.executemany("INSERT INTO tbl_movies VALUES( ?, ?, ?, ?, ?, ? )", movies)
-    printTabel("tbl_movies")
 db.commit()
 
+
+def printTabel(tabel_naam):
+    cursor.execute("SELECT * FROM " + tabel_naam) #SQL om ALLE gegevens te halen
+    opgehaalde_gegevens = cursor.fetchall() #sla gegevens op in een variabele
+    print("Tabel " + tabel_naam + ":", opgehaalde_gegevens) #druk gegevens af
 
 def vraagOpGegevensMovietabel():
     cursor.execute("SELECT * FROM tbl_movies")
     resultaat = cursor.fetchall()
     print("Tabel tbl_movies:", resultaat)
+    return resultaat
+
+def vraagOpGegevensActortabel():
+    cursor.execute("SELECT * FROM tbl_actors")
+    resultaat = cursor.fetchall()
+    print("Tabel tbl_actors:", resultaat)
     return resultaat
 
 def zoekMovie(ingevoerde_moviename):
@@ -187,19 +208,26 @@ def zoekactor(ingevoerde_acteurs):
         print("Acteur gevonden: ", zoek_resultaat )
     return zoek_resultaat
 
+def voegToeAanWatchlist(Movie_name, Year, Rating):
+    cursor.execute("INSERT INTO tbl_watchlist VALUES( ?, ?, ?)", (Movie_name, Year, Rating,))
+    db.commit() 
+    printTabel("tbl_watchlist")
+
+def vraagOpGegevensWatchlist():
+    cursor.execute("SELECT * FROM tbl_watchlist")
+    resultaat = cursor.fetchall()
+    print("Tabel tbl_watchlist:", resultaat)
+    return resultaat
+
 
 ### --------- Hoofdprogramma  ---------------
 
 maakNieuweTabellenAan()
-printTabel("tbl_roles")
-printTabel("tbl_actors")
 RolesGegevens()
 ActorGegevens()
 DirectorGegevens()
 MovieGegevens()
 vraagOpGegevensMovietabel()
+vraagOpGegevensActortabel()
 zoekMovie("Pulp Fiction")
 zoekactor ("Pit")
-
-
-
