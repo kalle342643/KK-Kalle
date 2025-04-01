@@ -112,24 +112,27 @@ def voegToeAanWatchlist():
     selected_index = listboxMovie.curselection()  # Haal de geselecteerde index op
     if selected_index:  # Controleer of er iets geselecteerd is
         geselecteerde_regel = listboxMovie.get(selected_index[0])  # Haal de geselecteerde film op  
-        
-        if isinstance(geselecteerde_regel, tuple):
-            Year = geselecteerde_regel[3]  # Movie_id (op basis van positie)
-            Movie_name = geselecteerde_regel[5]  # Movie naam (op basis van positie)
-            Rating = geselecteerde_regel[4]  # Rating (op basis van positie)
+        Year = geselecteerde_regel[3] 
+        Movie_name = geselecteerde_regel[5] 
+        Rating = geselecteerde_regel[4]
 
-            KKfilmsSQL.voegToeAanWatchlist(Movie_name, Year, Rating) 
+            # Haal de huidige watchlist op
+        huidige_watchlist = [listboxWatchlist.get(i) for i in range(listboxWatchlist.size())]
 
-            watchlist_tabel = KKfilmsSQL.vraagOpGegevensWatchlist()  
+            # Controleer of de film al in de watchlist staat
+        if (Movie_name, Year, Rating) not in huidige_watchlist:
+                KKfilmsSQL.voegToeAanWatchlist(Movie_name, Year, Rating)  # Voeg toe aan database
 
-            listboxWatchlist.delete(0, END)  # Maak de watchlist leeg
+                watchlist_tabel = KKfilmsSQL.vraagOpGegevensWatchlist()  # Haal de bijgewerkte watchlist op
 
-            for regel in watchlist_tabel:  
-                listboxWatchlist.insert(END, regel)
+                listboxWatchlist.delete(0, END)  # Maak de watchlist leeg
+
+                for regel in watchlist_tabel:  
+                    listboxWatchlist.insert(END, regel)
         else:
-            print("Fout: De geselecteerde regel bevat niet genoeg gegevens.")
+                print("Deze film staat al in de watchlist.")
     else:
-        print("Geen film geselecteerd")  
+        print("Geen film geselecteerd")
 
 def LeegLijstListboxMovie():
     #Maakt de listbox leeg.
@@ -180,7 +183,7 @@ labellistboxMovie = Label(venster, text="Resultaten:")
 labellistboxMovie.grid(row=4, column=0, sticky="W")
 
 labellistboxWatchlist = Label(venster, text="Watchlist:")
-labellistboxWatchlist.grid(row=80, column=0, sticky="W")
+labellistboxWatchlist.grid(row=4, column=9, sticky="E")
 
 labellistboxActor = Label(venster, text="Resultaten:")
 labellistboxActor.grid(row=40, column=0, sticky="W")
@@ -194,7 +197,7 @@ listboxMovie.grid(row=4, column=1, rowspan=6, columnspan=2, sticky="W")
 listboxMovie.bind('<<ListboxSelect>>', haalGeselecteerdeRijOpMovie)
 
 listboxWatchlist = Listbox(venster, height=6, width=45)
-listboxWatchlist.grid(row=80, column=1, rowspan=6, columnspan=2, sticky="W")
+listboxWatchlist.grid(row=4, column=10, rowspan=6, columnspan=2, sticky="E")
 listboxWatchlist.bind('<<ListboxSelect>>')
 
 scrollbarlistboxMovie = Scrollbar(venster)
