@@ -8,6 +8,7 @@ import json
 import os
 import KKfilmsSQL
 
+
 # Configuratiebestand voor modus opslag
 CONFIG_FILE = "config.json"
 
@@ -19,6 +20,18 @@ THEMES = {
 
 
 ### --------- Functie definities -----------------
+def custom_popup():
+    popup = Toplevel()
+    popup.title("Niet Gevonden")  
+    popup.geometry("400x100")  
+    popup.resizable(False, False)  
+
+    label = Label(popup, text="We hebben helaas geen resultaten gevonden. \n Controleer de spelling en probeer het opnieuw.", font=("Arial", 12))
+    label.pack(pady=20)
+
+    ok_button = Button(popup, text="OK", command=popup.destroy)
+    ok_button.pack(pady=10)
+
 def load_config():
     #Laadt de modus-instelling uit het JSON-bestand.
     if os.path.exists(CONFIG_FILE):
@@ -73,8 +86,11 @@ def zoekFilm(ingevoerde_moviename):
     listboxMovie.insert(0, "Director_ID \t Movie_id \t Genre \t Year\t Rating\t Movie")  # Print kolomnamen
 
     gevonden_movie = KKfilmsSQL.zoekMovie(ingevoerde_moviename.get())
-    for rij in gevonden_movie:
-        listboxMovie.insert(END, rij)
+    if not gevonden_movie:
+         custom_popup()
+    else: 
+        for rij in gevonden_movie:
+         listboxMovie.insert(END, rij)
 
 def zoekActeur(ingevoerde_Acteurname):
     #Zoekt een film in de database en toont de resultaten in de listbox.
@@ -82,8 +98,13 @@ def zoekActeur(ingevoerde_Acteurname):
     listboxActors.insert(0, "Actor_ID \t actor_birth \t last_name \t first_naam")  # Print kolomnamen
 
     gevonden_acteur = KKfilmsSQL.zoekactor(ingevoerde_Acteurname.get())
-    for rij in gevonden_acteur:
-        listboxActors.insert(END, rij)
+    if not gevonden_acteur:
+         custom_popup()
+    else: 
+        for rij in gevonden_acteur:
+         listboxActors.insert(END, rij)
+
+    
 
 def zoekDirector(ingevoerde_director):
     #Zoekt een film in de database en toont de resultaten in de listbox.
@@ -91,8 +112,11 @@ def zoekDirector(ingevoerde_director):
     listboxDirector.insert(0, "Director_birth\t Director_ID \t Top_movie \t Last_name \t First_name")  # Print kolomnamen
 
     gevonden_director = KKfilmsSQL.zoekdirector(ingevoerde_director.get())
-    for rij in gevonden_director:
-        listboxDirector.insert(END, rij)
+    if not gevonden_director:
+         custom_popup()
+    else: 
+        for rij in gevonden_director:
+         listboxDirector.insert(END, rij)
 
 def toonMenuInListboxMovie():
     #Toont alle films in de database.
