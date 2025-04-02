@@ -9,10 +9,9 @@ import os
 import KKfilmsSQL
 
 
-# Configuratiebestand voor modus opslag
 CONFIG_FILE = "config.json"
 
-# 🎨 Kleuren voor de modes
+# Themas
 THEMES = {
     "light": {"bg": "#ffee80", "fg": "#000000", "btn_bg": "#ffffff"},  
     "dark": {"bg": "#303654", "fg": "#000000", "btn_bg": "#ffffff"}
@@ -40,6 +39,39 @@ def custom_popup():
     ok_button = Button(popup, text="OK", command=popup.destroy)
     ok_button.pack(pady=10)
 
+def custom_inlog():
+    popup = Toplevel()
+    popup.title("Niet Gevonden")  
+    popup.geometry("500x200")  
+    popup.resizable(False, False)  
+
+    Label(popup, text="Gebruikersnaam:", font=("Arial", 10)).pack(pady=5)
+    Entry(popup).pack(pady=5)
+
+    Label(popup, text="Wachtwoord:", font=("Arial", 10)).pack(pady=5)
+    Entry(popup, show="*").pack(pady=5)
+
+    Button(popup, text="Inloggen", command=popup.destroy).pack(pady=10) 
+    
+
+def custom_registratie():
+    popup = Toplevel()
+    popup.title("Niet Gevonden")  
+    popup.geometry("500x300")  
+    popup.resizable(False, False)  
+
+    Label(popup, text="Gebruikersnaam:", font=("Arial", 10)).pack(pady=5)
+    Entry(popup).pack(pady=5)
+
+    Label(popup, text="Wachtwoord:", font=("Arial", 10)).pack(pady=5)
+    Entry(popup, show="*").pack(pady=5)
+
+    Label(popup, text="Herhaal wachtwoord:", font=("Arial", 10)).pack(pady=5)
+    Entry(popup, show="*").pack(pady=5)
+
+    Button(popup, text="Registeren", command=popup.destroy).pack(pady=10) 
+
+
 def load_config():
     #Laadt de modus-instelling uit het JSON-bestand.
     if os.path.exists(CONFIG_FILE):
@@ -52,7 +84,7 @@ def save_config(theme):
     with open(CONFIG_FILE, "w") as file:
         json.dump({"theme": theme}, file)
 
-def apply_theme():
+def pas_thema_toe():
     #Past de thema-kleuren toe op de GUI.
     theme = THEMES[current_theme.get()]
     venster.configure(bg=theme["bg"])
@@ -80,13 +112,15 @@ def apply_theme():
     knopToonDirectors.configure(bg=theme["btn_bg"], fg=theme["fg"])
     KnopLeegActors.configure(bg=theme["btn_bg"], fg=theme["fg"])
     KnopLeegDirectors.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopInlog.configure(bg=theme["btn_bg"], fg=theme["fg"])
+    knopRegistratie.configure(bg=theme["btn_bg"], fg=theme["fg"])
 
 def Weizig_thema():
     #Schakelt tussen Dark en Light mode.
-    new_theme = "dark" if current_theme.get() == "light" else "light"
-    current_theme.set(new_theme)
-    save_config(new_theme)
-    apply_theme()
+    nieuw_thema = "dark" if current_theme.get() == "light" else "light"
+    current_theme.set(nieuw_thema)
+    save_config(nieuw_thema)
+    pas_thema_toe()
 
 def zoekFilm(ingevoerde_moviename):
     #Zoekt een film in de database en toont de resultaten in de listbox.
@@ -257,6 +291,12 @@ invoervelddirector.grid(row=61, columnspan=6, sticky="W")
 knopZoekOpFilmnaam = Button(venster, text="Zoek Film", width=12, command=lambda: zoekFilm(ingevoerde_movies))
 knopZoekOpFilmnaam.grid(row=2, column=1)
 
+knopInlog = Button(venster, text="login", width=12, command=custom_inlog)
+knopInlog.grid(row=0, column=1)
+
+knopRegistratie = Button(venster, text="Registeren", width=12, command=custom_registratie)
+knopRegistratie.grid(row=0, column=2)
+
 knopVoegToeAanWatchlist = Button(venster, text="Ad to watchlist", width=12, command=voegToeAanWatchlist)
 knopVoegToeAanWatchlist.grid(row=8, column=4)
 
@@ -265,6 +305,10 @@ knopZoekOpActornaam.grid(row=30, column=1)
 
 knopZoekOpDirector = Button(venster, text="Zoek Director", width=12, command=lambda: zoekDirector(ingevoerde_acteurs))
 knopZoekOpDirector.grid(row=61, column=1)
+
+labellistboxgebruikernaam = Label (venster, text= "Naam:")
+labellistboxgebruikernaam.grid (row=0, column=5, sticky="W")
+
 
 labellistboxMovie = Label(venster, text="Resultaten:")
 labellistboxMovie.grid(row=4, column=0, sticky="W")
@@ -332,6 +376,6 @@ fotoMovie = Label(venster, width=66.7, height=100,
 image=padFotoGeselecteerdeMovie)
 fotoMovie.grid(row=4, column=40)
 
-apply_theme()
+pas_thema_toe()
 
 venster.mainloop()

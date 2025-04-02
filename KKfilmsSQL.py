@@ -65,6 +65,9 @@ def maakNieuweTabellenAan ():
         );""")
     print("Tabel 'tbl_winkelWagen' aangemaakt.") 
 
+    
+
+
 def RolesGegevens():
     roles = [
         ("298", "1524", "Ellis Redding"),
