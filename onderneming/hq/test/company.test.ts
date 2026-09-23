@@ -72,14 +72,24 @@ describe("bootstrap naar Paperclip", () => {
     expect(weekly.assigneeAgentId).toBe(atlas.id);
     expect(weekly.triggers?.[0]).toMatchObject({ cronExpression: "0 7 * * 1", timezone: "Europe/Amsterdam" });
 
+    // Tweede run zonder wijzigingen: niets nieuws, en agents blijven onaangeroerd.
     const second = await bootstrap(deps, def);
     expect(second.companyCreated).toBe(false);
     expect(second.companyId).toBe(first.companyId);
     expect(second.agents.created).toEqual([]);
-    expect(second.agents.updated.sort()).toEqual(["Argus", "Atlas"]);
+    expect(second.agents.updated).toEqual([]);
     expect(second.skills.created).toEqual([]);
+    expect(second.skills.updated).toEqual([]);
     expect(second.routines.created).toEqual([]);
-    expect(formatBootstrapReport(second)).toContain("Agents: 0 nieuw, 2 bijgewerkt");
+    expect(second.routines.updated).toEqual([]);
+    expect(formatBootstrapReport(second)).toContain("Agents: 0 nieuw, 0 bijgewerkt");
+
+    // Jij verhoogde het budget van Atlas; een instructiewijziging mag dat niet terugdraaien.
+    await env.paperclip.setAgentBudget(atlas.id, 9999);
+    const changed = { ...def, agents: def.agents.map((a) => (a.name === "Atlas" ? { ...a, instructions: `${a.instructions}\n\nNieuwe regel.` } : a)) };
+    const third = await bootstrap(deps, changed);
+    expect(third.agents.updated).toEqual(["Atlas"]);
+    expect(env.paperclip.agents.get(atlas.id)!.budgetMonthlyCents).toBe(9999);
   });
 });
 
@@ -122,6 +132,29 @@ describe("Agent Factory", () => {
     const approvals = await listApprovals(env.db, { status: ["approved"], limit: 100 });
     expect(approvals.filter((a) => a.kind === "hire_agent").length).toBe(6);
     expect(env.notifier.last()!.text).toContain("Tak ComplyScan staat klaar");
+  });
+
+  it("werkt tak-agents bij als hun sjabloon verandert", async () => {
+    const def = loadCompany();
+    const factory = new AgentFactory(def, "http://127.0.0.1:8080");
+    await factory.createBranchFromTemplate(env.ctx, {
+      slug: "shop",
+      name: "Shop",
+      template: "generiek",
+      pitch: "x".repeat(60),
+      evidence: ["https://example.com"],
+      approvalId: 1,
+    });
+    expect((await factory.refreshBranchAgents(env.ctx)).updated).toEqual([]);
+
+    const tweaked = {
+      ...def,
+      agentTemplates: def.agentTemplates.map((t) => (t.key === "bouwer" ? { ...t, model: "claude-opus-5" } : t)),
+    };
+    const refreshed = await new AgentFactory(tweaked, "http://127.0.0.1:8080").refreshBranchAgents(env.ctx);
+    expect(refreshed.updated).toEqual(["Smid"]);
+    const smid = [...env.paperclip.agents.values()].find((a) => a.name === "Smid")!;
+    expect(smid.adapterConfig).toMatchObject({ model: "claude-opus-5" });
   });
 
   it("geeft namen een achtervoegsel als ze al bestaan", async () => {

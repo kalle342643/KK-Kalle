@@ -468,6 +468,7 @@ export class FakePaperclip implements PaperclipApi {
       title: input.title,
       description: input.description ?? null,
       assigneeAgentId: input.assigneeAgentId ?? null,
+      priority: input.priority ?? "medium",
       status: input.status ?? "active",
       triggers: [] as PcRoutineTrigger[],
     };

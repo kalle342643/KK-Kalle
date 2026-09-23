@@ -1,6 +1,7 @@
+import { createHash } from "node:crypto";
 import { mirrorApproval, markApplied, notifyApproval } from "../domain/approvals.js";
 import { audit, countRecent } from "../domain/audit.js";
-import { DomainError, requireBranch, updateBranch, type Branch } from "../domain/branches.js";
+import { DomainError, getBranchBySlug, requireBranch, updateBranch, type Branch } from "../domain/branches.js";
 import { errorMessage, type Actor, type AppContext } from "../domain/context.js";
 import { eurToUsdCents, formatEur } from "../domain/money.js";
 import { getSetting } from "../domain/settings.js";
@@ -82,7 +83,7 @@ export class AgentFactory {
       BRANCH: opts.branch?.slug ?? "holding",
       BRANCH_NAME: opts.branch?.name ?? "Holding",
     };
-    return {
+    const hire: HireAgentInput = {
       name: opts.name,
       role: spec.role,
       title: opts.branch ? `${spec.title} · ${opts.branch.name}` : spec.title,
@@ -106,8 +107,31 @@ export class AgentFactory {
       },
       budgetMonthlyCents: eurToUsdCents(spec.budgetEur, ctx.config.money.usdToEur),
       permissions: { canCreateAgents: spec.canCreateAgents },
-      metadata: { hq: { template: spec.key, branch: vars.BRANCH, hqRole: spec.hqRole ?? null } },
     };
+    // Vingerafdruk van de configuratie, zodat een latere bootstrap alleen bijwerkt wat echt veranderde.
+    const configHash = createHash("sha256")
+      .update(
+        JSON.stringify({
+          title: hire.title,
+          reportsTo: hire.reportsTo,
+          adapterConfig: hire.adapterConfig,
+          instructions: hire.instructionsBundle,
+          skills: hire.desiredSkills,
+          runtime: hire.runtimeConfig,
+        }),
+      )
+      .digest("hex")
+      .slice(0, 16);
+    hire.metadata = {
+      hq: {
+        template: spec.key,
+        branch: vars.BRANCH,
+        hqRole: spec.hqRole ?? null,
+        configHash,
+        templateBudgetCents: hire.budgetMonthlyCents,
+      },
+    };
+    return hire;
   }
 
   /**
@@ -148,6 +172,62 @@ export class AgentFactory {
       approvalId = record.id;
     }
     return { agentId: agent.id, approvalId };
+  }
+
+  /**
+   * Brengt een bestaande agent in lijn met zijn (mogelijk gewijzigde) sjabloon: instructies, model, skills.
+   * Doet niets als er sinds de vorige keer niets veranderde (vingerafdruk in metadata), zodat Paperclip
+   * geen lege configuratieversies krijgt. Het budget wordt alleen aangepast als het sjabloonbudget zelf
+   * veranderde; een budget dat de eigenaar verhoogde blijft dus staan.
+   */
+  async syncAgentToSpec(
+    ctx: AppContext,
+    agent: PcAgent,
+    spec: AgentSpec,
+    opts: { branch: Branch | null; reportsTo: string | null },
+  ): Promise<"updated" | "unchanged"> {
+    const hire = this.buildHire(ctx, spec, { name: agent.name, branch: opts.branch, reportsTo: opts.reportsTo });
+    const next = (hire.metadata?.hq ?? {}) as Record<string, unknown>;
+    const previous = (agent.metadata?.hq ?? {}) as Record<string, unknown>;
+    const templateBudget = hire.budgetMonthlyCents ?? 0;
+    if (previous.configHash === next.configHash && previous.templateBudgetCents === templateBudget) return "unchanged";
+
+    await ctx.paperclip.updateAgent(agent.id, {
+      title: hire.title,
+      reportsTo: hire.reportsTo,
+      adapterConfig: hire.adapterConfig,
+      instructionsBundle: hire.instructionsBundle,
+      runtimeConfig: hire.runtimeConfig,
+      metadata: { ...(agent.metadata ?? {}), hq: { ...previous, ...next } },
+    });
+    await ctx.paperclip.syncAgentSkills(agent.id, "add", hire.desiredSkills ?? spec.skills);
+    if (previous.templateBudgetCents !== templateBudget) await ctx.paperclip.setAgentBudget(agent.id, templateBudget);
+    return "updated";
+  }
+
+  /** Werkt alle agents van takken bij naar hun sjabloon (na een wijziging in company/templates). */
+  async refreshBranchAgents(ctx: AppContext): Promise<{ updated: string[]; warnings: string[] }> {
+    const updated: string[] = [];
+    const warnings: string[] = [];
+    for (const agent of await ctx.paperclip.listAgents(ctx.companyId)) {
+      if (agent.status === "terminated") continue;
+      const hq = (agent.metadata?.hq ?? {}) as { template?: string; branch?: string };
+      if (!hq.template || !hq.branch || hq.branch === "holding") continue;
+      const spec = this.def.agentTemplates.find((t) => t.key === hq.template);
+      if (!spec) {
+        warnings.push(`${agent.name}: sjabloon '${hq.template}' bestaat niet meer`);
+        continue;
+      }
+      try {
+        const branch = (await getBranchBySlug(ctx.db, hq.branch)) ?? null;
+        if ((await this.syncAgentToSpec(ctx, agent, spec, { branch, reportsTo: agent.reportsTo })) === "updated") {
+          updated.push(agent.name);
+        }
+      } catch (err) {
+        warnings.push(`${agent.name}: ${errorMessage(err)}`);
+      }
+    }
+    return { updated, warnings };
   }
 
   private async uniqueName(ctx: AppContext, wanted: string, branch: Branch | null): Promise<string> {

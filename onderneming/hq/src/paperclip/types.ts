@@ -171,6 +171,7 @@ export interface PcRoutine {
   title: string;
   description: string | null;
   assigneeAgentId: string | null;
+  priority?: "critical" | "high" | "medium" | "low";
   status: "active" | "paused" | "archived";
   triggers?: PcRoutineTrigger[];
 }

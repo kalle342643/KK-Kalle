@@ -107,24 +107,15 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
   const ids = new Map<string, string>();
   for (const spec of ordered) {
     const reportsTo = spec.role === "ceo" ? null : (spec.reportsTo ? ids.get(spec.reportsTo) : undefined) ?? roles.ceo ?? null;
-    const hire = factory.buildHire(ctx, spec, { name: spec.name, branch: null, reportsTo });
     const existing = byName(spec.name);
     try {
       if (existing) {
-        await paperclip.updateAgent(existing.id, {
-          title: hire.title,
-          capabilities: hire.capabilities,
-          reportsTo: hire.reportsTo,
-          adapterConfig: hire.adapterConfig,
-          instructionsBundle: hire.instructionsBundle,
-          runtimeConfig: hire.runtimeConfig,
-          metadata: hire.metadata,
-        });
-        await paperclip.setAgentBudget(existing.id, hire.budgetMonthlyCents ?? 0);
-        await paperclip.syncAgentSkills(existing.id, "add", hire.desiredSkills ?? spec.skills);
+        if ((await factory.syncAgentToSpec(ctx, existing, spec, { branch: null, reportsTo })) === "updated") {
+          report.agents.updated.push(spec.name);
+        }
         ids.set(spec.name, existing.id);
-        report.agents.updated.push(spec.name);
       } else {
+        const hire = factory.buildHire(ctx, spec, { name: spec.name, branch: null, reportsTo });
         const { agent, approval } = await paperclip.hireAgent(companyId, hire);
         if (approval) await paperclip.approve(approval.id, "Bootstrap door de eigenaar (hq bootstrap).");
         ids.set(spec.name, agent.id);
@@ -145,14 +136,24 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
     try {
       const existing: PcRoutine | undefined = routines.find((x) => x.title === r.title);
       if (existing) {
-        await paperclip.updateRoutine(existing.id, { description, assigneeAgentId: assignee, priority: r.priority });
+        let changed = false;
+        if (
+          (existing.description ?? "").trim() !== description.trim() ||
+          existing.assigneeAgentId !== assignee ||
+          (existing.priority !== undefined && existing.priority !== r.priority)
+        ) {
+          await paperclip.updateRoutine(existing.id, { description, assigneeAgentId: assignee, priority: r.priority });
+          changed = true;
+        }
         const trigger = existing.triggers?.find((t) => t.kind === "schedule");
         if (trigger && (trigger.cronExpression !== r.cron || trigger.timezone !== config.timezone)) {
           await paperclip.updateRoutineTrigger(trigger.id, { cronExpression: r.cron, timezone: config.timezone, label: r.cron });
+          changed = true;
         } else if (!trigger) {
           await paperclip.addRoutineTrigger(existing.id, { kind: "schedule", label: r.cron, enabled: true, cronExpression: r.cron, timezone: config.timezone });
+          changed = true;
         }
-        report.routines.updated.push(r.title);
+        if (changed) report.routines.updated.push(r.title);
       } else {
         const routine = await paperclip.createRoutine(companyId, {
           title: r.title,
@@ -176,6 +177,11 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
       report.warnings.push(`routine ${r.title}: ${errorMessage(err)}`);
     }
   }
+
+  // 5. Agents van bestaande takken bijwerken als hun sjabloon veranderde.
+  const refreshed = await factory.refreshBranchAgents(ctx);
+  report.agents.updated.push(...refreshed.updated);
+  report.warnings.push(...refreshed.warnings);
 
   await audit(deps.db, "owner", "bootstrap", {
     companyId,

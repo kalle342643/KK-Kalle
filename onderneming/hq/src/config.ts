@@ -109,7 +109,9 @@ export interface Config {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  const e = envSchema.parse(env);
+  // Lege regels in het env-bestand (bv. `PAPERCLIP_COMPANY_ID=`) betekenen "niet ingesteld".
+  const cleaned = Object.fromEntries(Object.entries(env).filter(([, v]) => v !== undefined && v.trim() !== ""));
+  const e = envSchema.parse(cleaned);
   if (e.HQ_HOST !== "127.0.0.1" && e.HQ_HOST !== "localhost" && !e.HQ_ADMIN_TOKEN) {
     throw new Error(
       "HQ_ADMIN_TOKEN is verplicht als HQ niet alleen op localhost luistert (HQ_HOST=" + e.HQ_HOST + ").",

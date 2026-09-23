@@ -1,0 +1,6 @@
+[Unit]
+Description=Back-up van de HQ-database
+
+[Service]
+Type=oneshot
+ExecStart=%h/KK-Kalle/onderneming/deploy/backup.sh

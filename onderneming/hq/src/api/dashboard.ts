@@ -158,6 +158,8 @@ button.secondary { background:var(--line); color:var(--text); } button.danger { 
 .pill { font-size:12px; border-radius:99px; padding:1px 8px; background:var(--line); }
 .agent.running .pill { background:var(--ok); color:#fff; } .agent.paused .pill, .agent.error .pill { background:var(--warn); color:#fff; }
 .banner { background:var(--bad); color:#fff; border-radius:10px; padding:10px 14px; grid-column:1 / -1; }
+details.csv { margin-top:12px; } details.csv summary { cursor:pointer; color:var(--accent); }
+input[type=file] { max-width:100%; }
 </style>
 </head>
 <body>
@@ -183,7 +185,13 @@ button.secondary { background:var(--line); color:var(--text); } button.danger { 
   </section>
   <section><h2>Lopende experimenten (${running.length})</h2>${running.length ? `<ul>${experimentRows.join("")}</ul>` : `<p class="muted">Geen.</p>`}</section>
   <section><h2>Takken (30 dagen)</h2><div class="table-wrap"><table><tr><th>Tak</th><th>Budget</th><th>Vast</th><th>Omzet</th><th>Kosten</th><th>ROI</th></tr>${branchRows}</table></div></section>
-  <section><h2>Grootboek</h2><div class="table-wrap"><table>${ledgerRows || "<tr><td class='muted'>Nog niets geboekt.</td></tr>"}</table></div></section>
+  <section><h2>Grootboek</h2><div class="table-wrap"><table>${ledgerRows || "<tr><td class='muted'>Nog niets geboekt.</td></tr>"}</table></div>
+    <details class="csv"><summary>Omzet importeren (CSV)</summary>
+      <p class="muted small">Kolommen: date, amount_eur, branch, source (crazygames, affiliate, csv, stripe of owner), en optioneel experiment_id, external_id, description.</p>
+      <input type="file" id="csv" accept=".csv,text/csv"> <button id="csv-upload">Importeren</button>
+      <pre id="csv-result"></pre>
+    </details>
+  </section>
   <section><h2>Lessen</h2>${lessons ? `<ul>${lessons}</ul>` : `<p class="muted">Nog geen lessen.</p>`}</section>
   <section><h2>Logboek</h2><ul>${auditRows}</ul></section>
 </main>
@@ -204,6 +212,15 @@ if (haltBtn) haltBtn.addEventListener("click", async () => {
 });
 const resumeBtn = document.getElementById("resume");
 if (resumeBtn) resumeBtn.addEventListener("click", async () => { if (await post("/api/owner/resume")) location.reload(); });
+document.getElementById("csv-upload").addEventListener("click", async () => {
+  const file = document.getElementById("csv").files[0];
+  const out = document.getElementById("csv-result");
+  if (!file) { out.textContent = "Kies eerst een bestand."; return; }
+  const res = await fetch("/api/owner/revenue/csv", { method: "POST", headers: { "content-type": "text/csv" }, body: await file.text() });
+  const j = await res.json().catch(() => ({}));
+  out.textContent = res.ok ? "Geïmporteerd: " + j.imported + (j.errors && j.errors.length ? "\\n" + j.errors.join("\\n") : "") : (j.error || res.statusText);
+  if (res.ok && j.imported) setTimeout(() => location.reload(), 1500);
+});
 </script>
 </body>
 </html>`;
