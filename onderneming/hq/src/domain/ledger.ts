@@ -48,6 +48,11 @@ export async function recordLedger(db: Db, e: LedgerInput): Promise<void> {
   );
 }
 
+export async function ledgerExists(db: Db, source: string, externalId: string): Promise<boolean> {
+  const rows = await db.query("select 1 from ledger where source = $1 and external_id = $2", [source, externalId]);
+  return rows.length > 0;
+}
+
 export interface Totals {
   revenue: number;
   tokenCost: number;

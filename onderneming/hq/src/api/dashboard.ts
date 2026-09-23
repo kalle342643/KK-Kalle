@@ -8,7 +8,7 @@ import { recentLedger, totals } from "../domain/ledger.js";
 import { searchLessons } from "../domain/lessons.js";
 import { formatEur, usdCentsToEur } from "../domain/money.js";
 import { computePortfolio } from "../domain/portfolio.js";
-import { addLocalDays, startOfLocalDay, startOfLocalMonth } from "../domain/time.js";
+import { addLocalDays, localDayKey, startOfLocalDay, startOfLocalMonth } from "../domain/time.js";
 import type { PcAgent } from "../paperclip/types.js";
 
 const esc = (s: unknown): string =>
@@ -31,7 +31,7 @@ function bar(fraction: number, tone: "ok" | "warn" = "ok"): string {
 
 function approvalRow(a: ApprovalRecord): string {
   return `<li class="approval" data-id="${a.id}">
-    <div><strong>#${a.id} ${esc(a.title)}</strong>${a.amountEur !== null ? ` · ${esc(formatEur(a.amountEur))}` : ""}</div>
+    <div><strong>#${a.id} ${esc(a.title)}</strong>${a.amountEur !== null && !a.title.includes("€") ? ` · ${esc(formatEur(a.amountEur))}` : ""}</div>
     ${a.summary ? `<pre>${esc(a.summary.slice(0, 700))}</pre>` : ""}
     <div class="actions">
       <button data-decide="approve">✅ ${a.kind === "budget_override" ? "Verhoog en hervat" : "Goedkeuren"}</button>
@@ -84,8 +84,8 @@ export async function renderDashboard(ctx: AppContext): Promise<string> {
       return `<li class="agent ${esc(a.status)}">
         <div class="agent-head"><strong>${esc(a.name)}</strong><span class="pill">${esc(status)}</span></div>
         <div class="muted">${esc(a.title ?? a.role)}${hq.branch ? ` · ${esc(hq.branch)}` : ""}</div>
-        <div class="row"><span>vandaag ${esc(formatEur(costToday.get(a.id) ?? 0))}</span><span class="muted">maand ${esc(formatEur(usdCentsToEur(a.spentMonthlyCents, ctx.config.money.usdToEur)))} / ${esc(formatEur(usdCentsToEur(a.budgetMonthlyCents, ctx.config.money.usdToEur)))}</span></div>
-        <div class="muted small">laatste heartbeat: ${a.lastHeartbeatAt ? esc(new Date(a.lastHeartbeatAt).toLocaleString("nl-NL", { timeZone: tz })) : "nog nooit"}</div>
+        <div>vandaag ${esc(formatEur(costToday.get(a.id) ?? 0))}</div>
+        <div class="muted small">maand ${esc(formatEur(usdCentsToEur(a.spentMonthlyCents, ctx.config.money.usdToEur)))} van ${esc(formatEur(usdCentsToEur(a.budgetMonthlyCents, ctx.config.money.usdToEur)))} · laatst actief ${a.lastHeartbeatAt ? esc(new Date(a.lastHeartbeatAt).toLocaleString("nl-NL", { timeZone: tz, dateStyle: "short", timeStyle: "short" })) : "nog nooit"}</div>
       </li>`;
     })
     .join("");
@@ -97,9 +97,11 @@ export async function renderDashboard(ctx: AppContext): Promise<string> {
     )
     .join("");
 
-  const ledgerRows = (await recentLedger(ctx.db, 12))
+  const ledgerRows = (await recentLedger(ctx.db, 30))
+    .filter((l) => l.amountEur > 0)
+    .slice(0, 12)
     .map(
-      (l) => `<tr><td>${esc(l.occurredAt.toISOString().slice(0, 10))}</td><td>${esc(l.kind === "revenue" ? "omzet" : l.kind === "spend" ? "uitgave" : "AI")}</td>
+      (l) => `<tr><td>${esc(localDayKey(l.occurredAt, tz).slice(5))}</td><td>${esc(l.kind === "revenue" ? "omzet" : l.kind === "spend" ? "uitgave" : "AI")}</td>
       <td class="num ${l.kind === "revenue" ? "pos" : ""}">${esc(formatEur(l.amountEur))}</td><td>${esc(branchName.get(l.branchId ?? -1) ?? "")}</td><td class="muted">${esc(l.source)}</td></tr>`,
     )
     .join("");
@@ -108,8 +110,14 @@ export async function renderDashboard(ctx: AppContext): Promise<string> {
     .map((l) => `<li>${esc(l.lesson)}${l.tags.length ? ` <span class="muted">#${l.tags.map(esc).join(" #")}</span>` : ""}</li>`)
     .join("");
 
+  const agentName = new Map(agents.map((a) => [a.id, a.name]));
+  const who = (actor: string) =>
+    actor.startsWith("agent:") ? agentName.get(actor.slice(6)) ?? "agent" : actor === "owner" ? "jij" : actor;
   const auditRows = (await recentAudit(ctx.db, 15))
-    .map((a) => `<li><span class="muted">${esc(a.at.toISOString().slice(5, 16).replace("T", " "))}</span> ${esc(a.actor)} · ${esc(a.action)}</li>`)
+    .map(
+      (a) =>
+        `<li><span class="muted">${esc(a.at.toLocaleString("nl-NL", { timeZone: tz, day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" }))}</span> ${esc(who(a.actor))} · ${esc(a.action)}</li>`,
+    )
     .join("");
 
   return `<!doctype html>
@@ -123,7 +131,7 @@ export async function renderDashboard(ctx: AppContext): Promise<string> {
 @media (prefers-color-scheme: dark) { :root { --bg:#11141a; --card:#1a1f27; --text:#e7eaf0; --muted:#9aa3b2; --line:#2a313c; --accent:#6d9cff; } }
 * { box-sizing:border-box; }
 body { margin:0; background:var(--bg); color:var(--text); font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; }
-main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); }
+main { max-width:1100px; margin:0 auto; padding:16px; display:grid; gap:16px; grid-template-columns:repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
 header { max-width:1100px; margin:0 auto; padding:16px 16px 0; display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
 h1 { font-size:20px; margin:0; } h2 { font-size:15px; margin:0 0 10px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); }
 section { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px; min-width:0; }

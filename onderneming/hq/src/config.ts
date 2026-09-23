@@ -74,7 +74,8 @@ export interface Config {
     boardToken: string | undefined;
     companyId: string | undefined;
   };
-  telegram: { botToken: string; ownerChatId: string } | undefined;
+  /** Zonder ownerChatId draait de bot in installatiemodus (hij vertelt je alleen je chat-id). */
+  telegram: { botToken: string; ownerChatId: string | undefined } | undefined;
   whatsapp:
     | {
         token: string;
@@ -128,10 +129,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       boardToken: e.PAPERCLIP_BOARD_TOKEN,
       companyId: e.PAPERCLIP_COMPANY_ID,
     },
-    telegram:
-      e.TELEGRAM_BOT_TOKEN && e.TELEGRAM_OWNER_CHAT_ID
-        ? { botToken: e.TELEGRAM_BOT_TOKEN, ownerChatId: e.TELEGRAM_OWNER_CHAT_ID }
-        : undefined,
+    telegram: e.TELEGRAM_BOT_TOKEN
+      ? { botToken: e.TELEGRAM_BOT_TOKEN, ownerChatId: e.TELEGRAM_OWNER_CHAT_ID || undefined }
+      : undefined,
     whatsapp:
       e.WHATSAPP_TOKEN && e.WHATSAPP_PHONE_NUMBER_ID && e.WHATSAPP_TO
         ? {

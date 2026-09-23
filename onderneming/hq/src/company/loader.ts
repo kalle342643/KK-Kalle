@@ -11,11 +11,19 @@ import { z } from "zod";
 
 const ROLES = ["ceo", "cto", "cmo", "cfo", "security", "engineer", "designer", "pm", "qa", "devops", "researcher", "general"] as const;
 
+/** Iconen die Paperclip accepteert (Paperclip 2026.916.1). */
+export const AGENT_ICONS = [
+  "bot", "cpu", "brain", "zap", "rocket", "code", "terminal", "shield", "eye", "search", "wrench", "hammer",
+  "lightbulb", "sparkles", "star", "heart", "flame", "bug", "cog", "database", "globe", "lock", "mail",
+  "message-square", "file-code", "git-branch", "package", "puzzle", "target", "wand", "atom", "circuit-board",
+  "radar", "swords", "telescope", "microscope", "crown", "gem", "hexagon", "pentagon", "fingerprint",
+] as const;
+
 export const agentFrontmatter = z.object({
   name: z.string().min(1),
   role: z.enum(ROLES),
   title: z.string().min(1),
-  icon: z.string().optional(),
+  icon: z.enum(AGENT_ICONS).optional(),
   description: z.string().min(1),
   model: z.string().min(1),
   effort: z.enum(["low", "medium", "high"]).optional(),

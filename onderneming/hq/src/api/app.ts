@@ -34,6 +34,7 @@ import {
   spendRequestSchema,
 } from "../domain/workflows.js";
 import { importRevenueCsv } from "../importers/csv.js";
+import { runJob, type JobDefinition } from "../jobs/scheduler.js";
 import { PaperclipError } from "../paperclip/client.js";
 import type { PcAgent } from "../paperclip/types.js";
 import { AgentAuthenticator } from "./agentAuth.js";
@@ -43,6 +44,8 @@ type Env = { Variables: { agent: PcAgent; agentToken: string } };
 
 export interface AppDeps {
   factory?: AgentFactory;
+  /** Geplande taken die de eigenaar ook met de hand kan starten. */
+  jobs?: JobDefinition[];
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -342,6 +345,17 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     return c.json({ ok: true }, 201);
   });
   ownerApi.post("/revenue/csv", async (c) => c.json(await importRevenueCsv(ctx, await c.req.text(), "owner")));
+  ownerApi.get("/jobs", async (c) =>
+    c.json({
+      available: (deps.jobs ?? []).map((j) => ({ name: j.name, cron: j.cron })),
+      runs: await ctx.db.query("select * from job_runs order by name"),
+    }),
+  );
+  ownerApi.post("/jobs/:name/run", async (c) => {
+    const job = (deps.jobs ?? []).find((j) => j.name === c.req.param("name"));
+    if (!job) throw new DomainError(`Onbekende taak '${c.req.param("name")}'.`, 404);
+    return c.json(await runJob(ctx, job));
+  });
   ownerApi.post("/metrics", async (c) => {
     const input = await body(c, metricSchema.extend({ experimentId: z.number().int().positive(), source: z.string().min(2) }));
     await recordMetric(

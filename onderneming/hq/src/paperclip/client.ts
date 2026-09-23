@@ -94,6 +94,7 @@ export interface PaperclipApi {
   ): Promise<PcRoutineTrigger>;
 
   listSkills(companyId: string): Promise<PcSkill[]>;
+  getSkill(companyId: string, skillId: string): Promise<PcSkill>;
   createSkill(companyId: string, input: { name: string; slug: string; markdown: string; tagline?: string }): Promise<PcSkill>;
   updateSkillFile(companyId: string, skillId: string, path: string, content: string): Promise<void>;
 }
@@ -105,8 +106,11 @@ export class PaperclipError extends Error {
     readonly path: string,
     readonly body: unknown,
   ) {
-    const detail =
-      body && typeof body === "object" && "error" in body ? String((body as { error: unknown }).error) : JSON.stringify(body);
+    let detail = JSON.stringify(body);
+    if (body && typeof body === "object" && "error" in body) {
+      const b = body as { error: unknown; details?: unknown };
+      detail = String(b.error) + (b.details ? ` ${JSON.stringify(b.details).slice(0, 500)}` : "");
+    }
     super(`Paperclip ${method} ${path} gaf ${status}: ${detail}`);
     this.name = "PaperclipError";
   }
@@ -309,6 +313,9 @@ export class HttpPaperclipClient implements PaperclipApi {
 
   listSkills(companyId: string) {
     return this.request<PcSkill[]>("GET", `/companies/${companyId}/skills`);
+  }
+  getSkill(companyId: string, skillId: string) {
+    return this.request<PcSkill>("GET", `/companies/${companyId}/skills/${skillId}`);
   }
   createSkill(companyId: string, input: { name: string; slug: string; markdown: string; tagline?: string }) {
     return this.request<PcSkill>("POST", `/companies/${companyId}/skills`, { ...input, sharingScope: "company" });

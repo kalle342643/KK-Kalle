@@ -78,7 +78,11 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
     if (!found) {
       await paperclip.createSkill(companyId, { name: s.name, slug: s.name, markdown: s.markdown, tagline: s.tagline });
       report.skills.created.push(s.name);
-    } else if ((found.markdown ?? "").trim() !== s.markdown.trim()) {
+      continue;
+    }
+    // De lijst bevat de inhoud niet; haal de skill los op om te vergelijken.
+    const current = await paperclip.getSkill(companyId, found.id);
+    if ((current.markdown ?? "").trim() !== s.markdown.trim()) {
       await paperclip.updateSkillFile(companyId, found.id, "SKILL.md", s.markdown);
       report.skills.updated.push(s.name);
     }
@@ -117,7 +121,7 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
           metadata: hire.metadata,
         });
         await paperclip.setAgentBudget(existing.id, hire.budgetMonthlyCents ?? 0);
-        await paperclip.syncAgentSkills(existing.id, "add", spec.skills);
+        await paperclip.syncAgentSkills(existing.id, "add", hire.desiredSkills ?? spec.skills);
         ids.set(spec.name, existing.id);
         report.agents.updated.push(spec.name);
       } else {

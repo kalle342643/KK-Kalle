@@ -9,6 +9,13 @@ import { PaperclipError } from "../paperclip/client.js";
 import type { HireAgentInput, PcAgent } from "../paperclip/types.js";
 import { render, type AgentSpec, type BranchTemplate, type CompanyDefinition } from "./loader.js";
 
+/**
+ * Paperclips eigen skills die elke agent nodig heeft om met taken en geheugen te werken.
+ * Paperclip voegt ze alleen voor de CEO automatisch toe; wij geven ze iedereen expliciet.
+ */
+export const CORE_SKILLS = ["paperclipai/paperclip/paperclip", "paperclipai/paperclip/para-memory-files"];
+export const HIRING_SKILL = "paperclipai/paperclip/paperclip-create-agent";
+
 export interface TemplateSummary {
   key: string;
   title: string;
@@ -82,7 +89,7 @@ export class AgentFactory {
       icon: spec.icon ?? null,
       reportsTo: opts.reportsTo,
       capabilities: render(spec.description, vars),
-      desiredSkills: spec.skills,
+      desiredSkills: [...CORE_SKILLS, ...(spec.canCreateAgents ? [HIRING_SKILL] : []), ...spec.skills],
       adapterType: "claude_local",
       adapterConfig: {
         model: spec.model,

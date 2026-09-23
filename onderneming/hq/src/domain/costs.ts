@@ -1,7 +1,7 @@
 import { holdingBranch } from "./branches.js";
 import type { AppContext } from "./context.js";
 import { halt, isHalted } from "./killswitch.js";
-import { recordLedger, totals } from "./ledger.js";
+import { ledgerExists, recordLedger, totals } from "./ledger.js";
 import { formatEur, round2, usdCentsToEur } from "./money.js";
 import { markNotified } from "./settings.js";
 import { addLocalDays, localDayKey, startOfLocalDay } from "./time.js";
@@ -52,16 +52,20 @@ export async function syncCosts(ctx: AppContext, days = 3): Promise<{ entries: n
       entries += 1;
     }
     const rest = Math.max(0, summary.spendCents - attributedCents);
-    await recordLedger(ctx.db, {
-      kind: "token_cost",
-      amountEur: usdCentsToEur(rest, rate),
-      source: "paperclip",
-      externalId: `unattributed:${day}`,
-      occurredAt: from,
-      branchId: holding.id,
-      description: `AI-kosten zonder project (${day})`,
-    });
-    entries += 1;
+    const restId = `unattributed:${day}`;
+    // Geen lege €0-regels, maar een eerder geboekt bedrag wel bijwerken (bv. na een correctie in Paperclip).
+    if (rest > 0 || (await ledgerExists(ctx.db, "paperclip", restId))) {
+      await recordLedger(ctx.db, {
+        kind: "token_cost",
+        amountEur: usdCentsToEur(rest, rate),
+        source: "paperclip",
+        externalId: restId,
+        occurredAt: from,
+        branchId: holding.id,
+        description: `AI-kosten zonder project (${day})`,
+      });
+      entries += 1;
+    }
     if (i === 0) todayEur = usdCentsToEur(summary.spendCents, rate);
   }
   await checkSpendAlarm(ctx, todayEur);

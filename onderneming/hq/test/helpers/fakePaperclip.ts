@@ -504,7 +504,13 @@ export class FakePaperclip implements PaperclipApi {
   }
 
   async listSkills(companyId: string) {
-    return [...this.skills.values()].filter((s) => s.companyId === companyId);
+    // Net als de echte API: de lijst bevat geen inhoud.
+    return [...this.skills.values()]
+      .filter((s) => s.companyId === companyId)
+      .map(({ markdown: _markdown, ...rest }) => rest);
+  }
+  async getSkill(_companyId: string, skillId: string) {
+    return this.need(this.skills, skillId, "skills");
   }
   async createSkill(companyId: string, input: { name: string; slug: string; markdown: string }) {
     const s = {

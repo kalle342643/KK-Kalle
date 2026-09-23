@@ -2,7 +2,7 @@
 name: Lead
 role: pm
 title: Tak-lead
-icon: compass
+icon: target
 description: Runt één tak - regelt de ideeënraad, dient experimenten in, stuurt de uitvoering en bewaakt het budget.
 model: claude-sonnet-5
 effort: high
