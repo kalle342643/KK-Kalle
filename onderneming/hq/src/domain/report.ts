@@ -36,6 +36,23 @@ export async function buildDailyReport(ctx: AppContext): Promise<string> {
     .map(({ b, t }) => `• ${b.name}: omzet ${formatEur(t!.revenue)}, kosten ${formatEur(t!.cost)}`);
   if (branchLines.length) lines.push(...branchLines);
 
+  // "Experiment X heeft €42 opgeleverd": omzet van gisteren per experiment, met het totaal tot nu toe.
+  const earners = await ctx.db.query<{ experiment_id: number; title: string; day: string; total: string }>(
+    `select l.experiment_id, e.title,
+       sum(l.amount_eur) filter (where l.occurred_at >= $1 and l.occurred_at < $2) as day,
+       sum(l.amount_eur) as total
+     from ledger l join experiments e on e.id = l.experiment_id
+     where l.kind = 'revenue' group by l.experiment_id, e.title
+     having sum(l.amount_eur) filter (where l.occurred_at >= $1 and l.occurred_at < $2) > 0
+     order by 3 desc limit 5`,
+    [yesterday.toISOString(), today.toISOString()],
+  );
+  for (const r of earners) {
+    lines.push(
+      `💶 ${experimentCode(r.experiment_id)} ${r.title} heeft ${formatEur(Number(r.day))} opgeleverd (totaal ${formatEur(Number(r.total))})`,
+    );
+  }
+
   const allowance = ctx.config.money.globalMonthlyCapEur + ctx.config.money.revenueShareForAi * month.revenue;
   lines.push(
     "",

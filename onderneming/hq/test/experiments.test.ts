@@ -190,6 +190,10 @@ describe("geld aanvragen", () => {
       { amountEur: 30, reason: "Eerste week 800 plays, retentie goed; opschalen met twee extra levels." },
       `agent:${env.lead.id}`,
     );
+    // Een tweede verzoek terwijl het eerste nog openstaat, wordt geweigerd.
+    await expect(
+      requestBudgetIncrease(env.ctx, id, { amountEur: 20, reason: "Nog een keer hetzelfde vragen vanuit een andere run." }, `agent:${env.lead.id}`),
+    ).rejects.toMatchObject({ status: 409 });
     await decide(env.ctx, req.id, "approve", null, "owner");
     const after = (await getExperiment(env.db, id))!;
     expect(after.budgetEur).toBe(50);

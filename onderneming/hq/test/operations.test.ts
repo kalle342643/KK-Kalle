@@ -199,4 +199,22 @@ describe("lessen en rapporten", () => {
     expect(status).toContain("🟢");
     expect(status).toContain("Agents: 3");
   });
+
+  it("noemt per experiment wat het gisteren opleverde", async () => {
+    const { experiment, approval } = await proposeExperiment(env.ctx, proposalSchema.parse(validProposal), `agent:${env.scout.id}`);
+    await decide(env.ctx, approval.id, "approve", null, "owner");
+    for (const [id, day, amount] of [["a", "2026-09-21", 10], ["b", "2026-09-22", 42]] as const) {
+      await recordLedger(env.db, {
+        kind: "revenue",
+        amountEur: amount,
+        source: "stripe",
+        externalId: id,
+        occurredAt: new Date(`${day}T12:00:00Z`),
+        branchId: env.games.id,
+        experimentId: experiment.id,
+      });
+    }
+    const text = (await buildDailyReport(env.ctx)).replace(/ /g, " ");
+    expect(text).toContain(`💶 EXP-${experiment.id} Fluxgrid prototype op CrazyGames heeft € 42,00 opgeleverd (totaal € 52,00)`);
+  });
 });

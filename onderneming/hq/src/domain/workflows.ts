@@ -183,6 +183,13 @@ export async function requestBudgetIncrease(
   if (input.amountEur > ctx.config.money.experimentMaxBudgetEur) {
     throw new DomainError(`Maximaal ${formatEur(ctx.config.money.experimentMaxBudgetEur)} per verzoek.`);
   }
+  // In de praktijk vroeg een lead in twee runs twee keer hetzelfde aan: één open verzoek per experiment is genoeg.
+  const open = (await listApprovals(ctx.db, { status: ["pending"], limit: 200 })).find(
+    (a) => a.kind === "budget_increase" && a.experimentId === exp.id,
+  );
+  if (open) {
+    throw new DomainError(`Er staat al een budgetverzoek open voor ${experimentCode(exp.id)} (#${open.id}). Wacht op de eigenaar.`, 409);
+  }
   return requestApproval(
     ctx,
     {
