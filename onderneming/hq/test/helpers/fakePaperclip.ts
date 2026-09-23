@@ -43,6 +43,8 @@ export class FakePaperclip implements PaperclipApi {
   routines = new Map<string, PcRoutine & { companyId: string }>();
   skills = new Map<string, PcSkill & { companyId: string; files: Record<string, string> }>();
   tokens = new Map<string, string>();
+  /** Agents met permissions.canCreateAgents (bv. de CEO). */
+  canCreateAgents = new Set<string>();
   wakeups: Array<{ agentId: string; reason: string }> = [];
   calls: string[] = [];
 
@@ -218,8 +220,16 @@ export class FakePaperclip implements PaperclipApi {
     if (!id) throw new PaperclipError(401, "GET", "/agents/me", { error: "Unauthorized" });
     return this.need(this.agents, id, "agents");
   }
-  async hireAgent(companyId: string, input: HireAgentInput) {
+  async hireAgent(companyId: string, input: HireAgentInput, opts?: { asAgentToken?: string }) {
     const company = this.need(this.companies, companyId, "companies");
+    let requestedByAgentId: string | null = null;
+    if (opts?.asAgentToken) {
+      const requester = await this.whoAmI(opts.asAgentToken);
+      if (!this.canCreateAgents.has(requester.id)) {
+        throw new PaperclipError(403, "POST", `/companies/${companyId}/agent-hires`, { error: "Missing permission: can create agents" });
+      }
+      requestedByAgentId = requester.id;
+    }
     const needsApproval = company.requireBoardApprovalForNewAgents === true;
     const agent = this.seedAgent(companyId, {
       name: input.name,
@@ -233,7 +243,7 @@ export class FakePaperclip implements PaperclipApi {
     agent.adapterConfig = input.adapterConfig;
     this.calls.push(`hireAgent:${input.name}`);
     if (!needsApproval) return { agent, approval: null };
-    const approval = this.makeApproval(companyId, "hire_agent", { ...input, agentId: agent.id }, null);
+    const approval = this.makeApproval(companyId, "hire_agent", { ...input, agentId: agent.id }, requestedByAgentId);
     return { agent, approval };
   }
   async updateAgent(agentId: string, patch: Record<string, unknown>) {

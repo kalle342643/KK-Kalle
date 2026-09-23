@@ -1,0 +1,27 @@
+# Tak-sjabloon: software/SaaS en B2B-automatisering (bv. ComplyScan). Agents heten naar rivieren.
+name: Software en SaaS
+description: Kleine betaalde tools of B2B-automatiseringen - eerst een landingspagina en gratis versie, dan pas bouwen.
+monthlyBudgetEur: 40
+agents:
+  - { template: tak-lead, name: Maas, lead: true }
+  - { template: verkenner, name: Waal }
+  - { template: verkenner, name: Rijn }
+  - { template: pitcher, name: IJssel }
+  - { template: criticus, name: Schelde }
+  - { template: bouwer, name: Amstel }
+routines:
+  - title: "Weekstart {{BRANCH_NAME}}"
+    assignee: Maas
+    cron: "0 9 * * 1"
+    priority: high
+    description: |
+      Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ. Aanmeldingen en betalende klanten zijn de enige
+      metingen die tellen; verzamel ze via de imports of de eigenaar.
+  - title: "Ideeënraad {{BRANCH_NAME}}"
+    assignee: Maas
+    cron: "0 11 * * 3"
+    priority: medium
+    description: |
+      Draai de ideeënraad. Waal verkent vragen en klachten van ondernemers (fora, Reddit, nieuws); Rijn verkent
+      zoekwoorden en concurrenten met prijzen. Daarna IJssel (top 5) en Schelde (schiet ≥3 af).
+      Experimenten in deze tak beginnen met een landingspagina of gratis scan, niet met een volledig product.

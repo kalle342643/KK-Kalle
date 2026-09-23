@@ -9,6 +9,8 @@ const envSchema = z.object({
   HQ_PORT: z.coerce.number().int().positive().default(8080),
   HQ_HOST: z.string().default("127.0.0.1"),
   HQ_PUBLIC_URL: z.string().optional(),
+  /** Adres waarop agents (Claude Code op dezelfde machine) HQ bereiken; komt als $HQ_URL in hun omgeving. */
+  HQ_AGENT_URL: z.string().optional(),
   /** Token voor het dashboard en de eigenaar-API. Verplicht zodra HQ_HOST niet 127.0.0.1 is. */
   HQ_ADMIN_TOKEN: z.string().optional(),
   HQ_TIMEZONE: z.string().default("Europe/Amsterdam"),
@@ -63,6 +65,7 @@ export interface Config {
   port: number;
   host: string;
   publicUrl: string;
+  agentUrl: string;
   adminToken: string | undefined;
   timezone: string;
   companyDir: string | undefined;
@@ -116,6 +119,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     port: e.HQ_PORT,
     host: e.HQ_HOST,
     publicUrl: e.HQ_PUBLIC_URL ?? `http://${e.HQ_HOST}:${e.HQ_PORT}`,
+    agentUrl: (e.HQ_AGENT_URL ?? `http://127.0.0.1:${e.HQ_PORT}`).replace(/\/+$/, ""),
     adminToken: e.HQ_ADMIN_TOKEN,
     timezone: e.HQ_TIMEZONE,
     companyDir: e.HQ_COMPANY_DIR,

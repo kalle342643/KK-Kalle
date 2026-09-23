@@ -40,7 +40,12 @@ export interface PaperclipApi {
   getAgent(agentId: string): Promise<PcAgent>;
   /** Identiteit van de agent achter een token (agent-API-key of run-JWT). */
   whoAmI(agentToken: string): Promise<PcAgent>;
-  hireAgent(companyId: string, input: HireAgentInput): Promise<{ agent: PcAgent; approval: PcApproval | null }>;
+  /** Neemt een agent aan. Met `asAgentToken` gebeurt dat namens die agent (Paperclip checkt dan zijn rechten). */
+  hireAgent(
+    companyId: string,
+    input: HireAgentInput,
+    opts?: { asAgentToken?: string },
+  ): Promise<{ agent: PcAgent; approval: PcApproval | null }>;
   updateAgent(agentId: string, patch: Record<string, unknown>): Promise<PcAgent>;
   pauseAgent(agentId: string): Promise<PcAgent>;
   resumeAgent(agentId: string): Promise<PcAgent>;
@@ -171,11 +176,12 @@ export class HttpPaperclipClient implements PaperclipApi {
   whoAmI(agentToken: string) {
     return this.request<PcAgent>("GET", "/agents/me", undefined, agentToken);
   }
-  async hireAgent(companyId: string, input: HireAgentInput) {
+  async hireAgent(companyId: string, input: HireAgentInput, opts?: { asAgentToken?: string }) {
     const res = await this.request<{ agent: PcAgent; approval?: PcApproval | null } | PcAgent>(
       "POST",
       `/companies/${companyId}/agent-hires`,
       input,
+      opts?.asAgentToken,
     );
     if ("agent" in res) return { agent: res.agent, approval: res.approval ?? null };
     return { agent: res, approval: null };
