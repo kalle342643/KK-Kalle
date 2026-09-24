@@ -1,0 +1,20 @@
+# systemd user-service voor HQ. Staat in ~/.config/systemd/user/hq.service van de gebruiker 'ai'.
+# Starten:  systemctl --user enable --now hq
+# Logs:     journalctl --user -u hq -f
+[Unit]
+Description=HQ - geld, experimenten en goedkeuringen rond Paperclip
+After=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/KK-Kalle/onderneming/hq
+EnvironmentFile=%h/.config/hq/hq.env
+ExecStart=/usr/bin/node dist/main.js serve
+Restart=always
+RestartSec=10
+# Na 5 crashes binnen 5 minuten stoppen we met herstarten (dan klopt er iets structureel niet).
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Install]
+WantedBy=default.target

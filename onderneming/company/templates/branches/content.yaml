@@ -1,0 +1,24 @@
+# Tak-sjabloon: blogs, content en affiliate. Agents heten naar bomen.
+name: Content en affiliate
+description: Nuttige, eerlijke content (vergelijkingen, gidsen) met affiliate-inkomsten of advertenties als verdienmodel.
+monthlyBudgetEur: 30
+agents:
+  - { template: tak-lead, name: Eik, lead: true }
+  - { template: verkenner, name: Beuk }
+  - { template: pitcher, name: Linde }
+  - { template: criticus, name: Wilg }
+  - { template: schrijver, name: Berk }
+routines:
+  - title: "Weekstart {{BRANCH_NAME}}"
+    assignee: Eik
+    cron: "0 9 * * 1"
+    priority: high
+    description: |
+      Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ en plan de schrijftaken van deze week.
+  - title: "Ideeënraad {{BRANCH_NAME}}"
+    assignee: Eik
+    cron: "0 10 * * 3"
+    priority: medium
+    description: |
+      Draai de ideeënraad. Beuk verkent zoekvragen zonder goed antwoord (zoekdata, fora, "vs"-zoekopdrachten)
+      en affiliate-programma's met een eerlijke vergoeding. Daarna Linde (top 5) en Wilg (schiet ≥3 af).

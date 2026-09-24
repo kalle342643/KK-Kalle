@@ -1,0 +1,29 @@
+# Tak-sjabloon: browsergames voor CrazyGames/Poki. Agents heten naar sterren.
+name: Games-studio
+description: HTML5-games voor CrazyGames en Poki - verkennen, bouwen, publiceren (via de eigenaar) en meten.
+monthlyBudgetEur: 40
+agents:
+  - { template: tak-lead, name: Vega, lead: true }
+  - { template: verkenner, name: Rigel }
+  - { template: verkenner, name: Deneb }
+  - { template: pitcher, name: Sirius }
+  - { template: criticus, name: Castor }
+  - { template: bouwer, name: Pollux }
+  - { template: publicist, name: Capella }
+routines:
+  - title: "Weekstart {{BRANCH_NAME}}"
+    assignee: Vega
+    cron: "0 9 * * 1"
+    priority: high
+    description: |
+      Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ ($HQ_URL/api/agent/experiments?status=running&branch={{BRANCH}}).
+      Maak taken voor wat stilstaat en zorg dat elke lopende game deze week een meting krijgt.
+  - title: "Ideeënraad {{BRANCH_NAME}}"
+    assignee: Vega
+    cron: "0 9 * * 3"
+    priority: medium
+    description: |
+      Draai de ideeënraad (skill ideeenraad). Verkenners: Rigel = trending en nieuwe games op CrazyGames/Poki
+      (genres, tags, openbare pagina's); Deneb = klachten en wensen van spelers (Reddit r/WebGames,
+      r/incremental_games, YouTube-comments). Daarna Sirius (top 5), dan Castor (schiet ≥3 af).
+      Dien de 1-2 beste in als experiment via HQ.

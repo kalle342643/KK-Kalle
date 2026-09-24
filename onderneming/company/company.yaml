@@ -1,0 +1,37 @@
+# De holding als code. `hq bootstrap` zet dit in Paperclip (idempotent: opnieuw draaien werkt bij).
+name: KK Holding
+description: >-
+  Een AI-holding die met kleine, meetbare experimenten ontdekt welke online bedrijven echt geld
+  opleveren, en daar budget en agents naartoe verschuift. De eigenaar (Kalle) beslist over geld,
+  publicaties, accounts en nieuwe agents; agents doen het onderzoek en het werk.
+timezone: Europe/Amsterdam
+# Elke nieuwe agent (ook als de CEO hem aanneemt) moet door jou goedgekeurd worden.
+requireBoardApprovalForNewAgents: true
+
+routines:
+  - title: Wekelijkse strategie
+    assignee: Atlas
+    cron: "0 7 * * 1"
+    priority: high
+    description: |
+      Weekstart van de holding. Volg je skill 'hq-strategie':
+      1. Lees GET $HQ_URL/api/agent/overview en GET $HQ_URL/api/agent/portfolio.
+      2. Beoordeel per tak: geld, lopende experimenten, lessen van de afgelopen week.
+      3. Maak per tak hooguit 3 concrete taken voor de tak-lead.
+      4. Dien een kort weekplan in als strategievoorstel (approval type approve_ceo_strategy).
+  - title: Dagelijkse analyse
+    assignee: Argus
+    cron: "15 7 * * *"
+    priority: medium
+    description: |
+      Controleer de cijfers van gisteren in HQ (GET $HQ_URL/api/agent/overview).
+      Schrijf lessen voor experimenten die gisteren zijn afgerond (KEEP/ITERATE/KILL) als dat nog niet gebeurd is,
+      en meld opvallende afwijkingen (kosten zonder resultaat, experimenten die vastlopen) als taak aan Atlas.
+  - title: Maandelijkse kansenverkenning
+    assignee: Atlas
+    cron: "0 9 1 * *"
+    priority: medium
+    description: |
+      Eén keer per maand: kijk of er een nieuwe tak moet komen (e-commerce, content, SaaS, digitale producten,
+      B2B-automatisering, ...). Alleen voorstellen als er echt bewijs is (links, cijfers) en er budget vrij is.
+      Gebruik POST $HQ_URL/api/agent/branches. Hooguit één voorstel per maand.

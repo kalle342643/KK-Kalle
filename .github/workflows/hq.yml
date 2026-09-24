@@ -1,0 +1,37 @@
+# Controleert HQ bij elke PR en push naar main: typecheck, tests, build en de deploy-scripts.
+name: HQ
+
+on:
+  pull_request:
+    paths:
+      - "onderneming/**"
+      - ".github/workflows/hq.yml"
+  push:
+    branches: [main]
+    paths:
+      - "onderneming/**"
+      - ".github/workflows/hq.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: onderneming/hq
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: onderneming/hq/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Deploy-scripts (shellcheck)
+        run: shellcheck -x ../deploy/*.sh

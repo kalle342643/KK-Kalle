@@ -1,0 +1,38 @@
+{
+  "name": "@onderneming/hq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "HQ: geld, experimenten, goedkeuringen en kill switch rond Paperclip-agents",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "bin": {
+    "hq": "dist/main.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/main.js serve",
+    "migrate": "node dist/main.js migrate",
+    "bootstrap": "node dist/main.js bootstrap",
+    "hq": "node dist/main.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^2.1.1",
+    "croner": "^10.0.1",
+    "hono": "^4.13.8",
+    "pg": "^8.23.0",
+    "yaml": "^2.9.1",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
+    "@types/node": "^24.0.0",
+    "@types/pg": "^8.23.1",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
