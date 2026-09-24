@@ -11,9 +11,9 @@ lees het voordat je iets aan het systeem verandert.
   leverde veel op. Een paar details stonden niet in de docs (zie hieronder).
 - **Kleine stappen met tests** (PGlite als in-memory Postgres, een nep-Paperclip) en daarna end-to-end
   tegen een echte Paperclip. De e2e-test vond twee fouten die de unit-tests misten: het icoon en de skills-lijst.
-- **CI startte niet.** De eerste PR kreeg geen enkele GitHub Actions-run, ook niet na een nacht. Waarschijnlijk
-  staat Actions uit voor deze repo (aanzetten: Settings → Actions → General). Draai tot die tijd zelf
-  `npm run typecheck && npm test && npm run build` in `hq/` voordat je iets merget.
+- **CI startte pas bij de tweede push.** De push die de workflow toevoegde, gaf geen GitHub Actions-run; de
+  volgende push wel. Zie je geen run, kijk dan na de volgende push opnieuw voordat je concludeert dat Actions
+  uit staat.
 
 ## Paperclip (getest met versie 2026.916.1)
 - Met `requireBoardApprovalForNewAgents` weigert Paperclip directe aanmaak (`POST /agents`). Gebruik

@@ -49,8 +49,7 @@ npm run build
 node dist/main.js help    # alle commando's
 ```
 
-Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR, als GitHub Actions aan staat voor de
-repo (Settings → Actions → General).
+Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR en elke push naar `main`.
 
 ## Commando's (`node dist/main.js <commando>`)
 | Commando | Wat |
