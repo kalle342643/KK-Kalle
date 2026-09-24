@@ -39,6 +39,8 @@ export class Director {
   private halted = false;
   /** Twee of meer agents die tegelijk aan dezelfde klus werken, zitten samen aan de vergadertafel. */
   private meeting: { groupId: string; title: string | null; members: Set<string> } | null = null;
+  /** Stoelen aan de vergadertafel (stoel → wie). Los van `reserved`: "terug naar je plek" geeft ze niet vrij. */
+  private readonly meetingSeats = new Map<string, string>();
   private readonly reserved = new Map<string, string>();
   private readonly monitorState = new Map<string, string>();
   /** Werkplaats: welke Claude Code-sessie aan welk bureau zit (en andersom). */
@@ -75,6 +77,7 @@ export class Director {
     this.layout = layout;
     this.reserved.clear();
     this.meeting = null;
+    this.meetingSeats.clear();
     this.monitorState.clear();
     this.assignSessionDesks(this.workshopActors());
     this.syncExtras();
@@ -301,9 +304,12 @@ export class Director {
         }
       } else {
         actor.setInfo(info);
-        const moved = home && actor.home && (Math.abs(home.x - actor.home.x) > 0.01 || Math.abs(home.z - actor.home.z) > 0.01);
-        actor.home = home;
-        if (moved && actor.idle) actor.place(home!, true);
+        // Aan de vergadertafel is de tafel zijn plek, tot de klus af is.
+        if (!actor.meeting) {
+          const moved = home && actor.home && (Math.abs(home.x - actor.home.x) > 0.01 || Math.abs(home.z - actor.home.z) > 0.01);
+          actor.home = home;
+          if (moved && actor.idle) actor.place(home!, true);
+        }
       }
       const status = helping || session?.state === "working" ? "running" : session ? "idle" : (agent?.status ?? "idle");
       // Bij binnenkomst niet iedereen tegelijk laten roepen hoe het met ze gaat.
@@ -772,8 +778,10 @@ export class Director {
     );
     if (on) {
       this.meeting = null;
+      this.meetingSeats.clear();
       for (const a of this.actors.values()) {
         a.clear();
+        if (a.meeting) a.home = this.homeOf(a.id);
         a.meeting = null;
         if (a.home) a.queue(walkTo(() => this.grid, a.home, { sit: true, run: announce }));
         if (announce && speakers.has(a.id)) a.say(pick(["⏸ Noodstop!", "😮 Alles stil", "⏸ Oké, ik stop"]), 4, "alert");
@@ -927,16 +935,20 @@ export class Director {
     }
     const seats = this.layout.pois.filter((p) => p.kind === "meeting-seat");
     const leave = (a: Actor) => {
+      for (const [seat, who] of [...this.meetingSeats]) if (who === a.id) this.meetingSeats.delete(seat);
       a.meeting = null;
+      a.home = this.homeOf(a.id);
       a.clear();
       a.queue(...this.goHome(a));
     };
     const join = (a: Actor, groupId: string) => {
-      const seat = seats.find((s) => !this.reserved.has(s.id) || this.reserved.get(s.id) === a.id);
+      const seat = seats.find((s) => !this.meetingSeats.has(s.id) || this.meetingSeats.get(s.id) === a.id);
       if (!seat) return false;
+      this.meetingSeats.set(seat.id, a.id);
       a.meeting = groupId;
+      // Zolang de klus loopt is de tafel zijn plek: na een praatje of iets opzoeken komt hij hier terug.
+      a.home = seat.spot;
       a.clear();
-      this.reserved.set(seat.id, a.id);
       a.queue(standUp(), walkTo(() => this.grid, seat.spot, { sit: true }));
       return true;
     };
