@@ -9,7 +9,8 @@
 #   1. systeemupdates, firewall (alleen SSH + Tailscale), automatische beveiligingsupdates
 #   2. gebruiker 'ai' die alles draait (niet als root)
 #   3. Node.js 24, PostgreSQL (database voor HQ), Tailscale, Claude Code CLI, Paperclip, Graphify
-#   4. HQ (met het 3D-kantoor) bouwen uit deze repository en als service klaarzetten
+#   4. webgereedschap voor de agents: Crawl4AI (pagina's lezen), last30days (trends), hq-commando's
+#   5. HQ (met het 3D-kantoor) bouwen uit deze repository en als service klaarzetten
 # Wat je daarna zelf doet staat in onderneming/docs/SETUP.md (stap 4 en verder).
 set -euo pipefail
 
@@ -80,7 +81,24 @@ if ! command -v graphify >/dev/null; then
   pipx install graphifyy
 fi
 mkdir -p ~/vault
+# ...en is voor elke agent beschikbaar als Claude Code-skill (/graphify), bv. om code te doorgronden.
+graphify install --platform claude >/dev/null
+# Crawl4AI: webpagina's lezen met een echte (headless) browser. Agents gebruiken het via `hq-web`.
+if ! command -v crwl >/dev/null; then
+  pipx install crawl4ai
+fi
+# last30days: wat speelt er de afgelopen 30 dagen (via `hq-trends`, alleen bronnen met een open API).
+# Vaste versie: bij een update eerst nakijken of de bronnen nog binnen de regels blijven.
+if [[ ! -d ~/tools/last30days/.git ]]; then
+  git clone --quiet --depth 1 --branch v3.25.0 https://github.com/mvanhorn/last30days-skill ~/tools/last30days
+fi
 AS_AI
+
+log "Browser voor Crawl4AI"
+C4AI_PY="/home/$AI_USER/.local/share/pipx/venvs/crawl4ai/bin/python"
+# Systeembibliotheken moeten als root; de browser zelf komt in de map van '$AI_USER'.
+"$C4AI_PY" -m playwright install-deps chromium
+sudo -iu "$AI_USER" "$C4AI_PY" -m playwright install --only-shell chromium
 
 log "HQ ophalen en bouwen"
 sudo -iu "$AI_USER" env REPO_URL="$REPO_URL" REPO_BRANCH="$REPO_BRANCH" bash <<'AS_AI'
@@ -103,8 +121,19 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
 fi
 cp ../deploy/hq.service ~/.config/systemd/user/hq.service
 cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ~/.config/systemd/user/
-chmod +x ../deploy/backup.sh ../deploy/update.sh
+chmod +x ../deploy/backup.sh ../deploy/update.sh ../deploy/tools/*
 AS_AI
+
+log "Commando's voor de agents"
+# Paperclip start agents met een kaal PATH (zonder ~/.local/bin en ~/.npm-global/bin). Daarom komen de
+# commando's die agents nodig hebben in /usr/local/bin. De hq-commando's wijzen naar de repository,
+# zodat update.sh ze vanzelf bijwerkt.
+for tool in hq hq-web hq-trends hq-graaf; do
+  ln -sfn "/home/$AI_USER/KK-Kalle/onderneming/deploy/tools/$tool" "/usr/local/bin/$tool"
+done
+for bin in "/home/$AI_USER/.npm-global/bin/claude" "/home/$AI_USER/.local/bin/graphify" "/home/$AI_USER/.local/bin/crwl"; do
+  if [[ -e "$bin" ]]; then ln -sfn "$bin" "/usr/local/bin/$(basename "$bin")"; fi
+done
 
 cat <<'NEXT'
 

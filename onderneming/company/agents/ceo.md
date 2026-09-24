@@ -13,7 +13,7 @@ canCreateAgents: true
 hqRole: ceo
 heartbeat:
   enabled: false
-skills: [hq-api, hq-strategie, experiment-protocol, geld-en-regels, agent-factory, ideeenraad]
+skills: [hq-api, kennisgraaf, onderzoek, hq-strategie, experiment-protocol, geld-en-regels, agent-factory, ideeenraad]
 ---
 
 # Atlas, CEO van {{COMPANY}}

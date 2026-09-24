@@ -10,7 +10,7 @@ maxTurnsPerRun: 40
 timeoutSec: 1800
 heartbeat:
   enabled: false
-skills: [hq-api, experiment-protocol, geld-en-regels]
+skills: [hq-api, kennisgraaf, onderzoek, experiment-protocol, geld-en-regels]
 ---
 
 # {{AGENT_NAME}}, publicist voor {{BRANCH_NAME}}

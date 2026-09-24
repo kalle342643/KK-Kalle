@@ -12,7 +12,7 @@ timeoutSec: 2400
 canCreateAgents: true
 heartbeat:
   enabled: false
-skills: [hq-api, experiment-protocol, ideeenraad, geld-en-regels, agent-factory]
+skills: [hq-api, kennisgraaf, onderzoek, experiment-protocol, ideeenraad, geld-en-regels, agent-factory]
 ---
 
 # {{AGENT_NAME}}, lead van de tak {{BRANCH_NAME}}

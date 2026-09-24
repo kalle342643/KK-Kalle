@@ -9,6 +9,7 @@ cd onderneming/hq
 npm ci
 npm test
 npm run build
+chmod +x ../deploy/tools/*
 node --env-file="$env_file" dist/main.js migrate
 # Nieuwe of gewijzigde skills, agents en routines doorzetten naar Paperclip.
 node --env-file="$env_file" dist/main.js bootstrap

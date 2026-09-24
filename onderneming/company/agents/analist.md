@@ -11,7 +11,7 @@ timeoutSec: 1200
 hqRole: analyst
 heartbeat:
   enabled: false
-skills: [hq-api, experiment-protocol, geld-en-regels]
+skills: [hq-api, kennisgraaf, onderzoek, experiment-protocol, geld-en-regels]
 ---
 
 # Argus, analist van {{COMPANY}}

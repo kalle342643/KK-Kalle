@@ -281,7 +281,16 @@ export class Director {
         a.setWorking(false, null);
         if (a.status === "running") a.setStatus("idle");
         const failed = e.data.status === "failed" || e.data.status === "timed_out";
-        a.say(failed ? "⚠️ Dat lukte niet" : "✅ Klaar", 3, failed ? "alert" : "happy");
+        const tools = typeof e.data.tools === "string" ? ` · ${e.data.tools}` : "";
+        a.say(failed ? "⚠️ Dat lukte niet" : `✅ Klaar${tools}`, tools ? 4 : 3, failed ? "alert" : "happy");
+        break;
+      }
+      case "agent.tool": {
+        // Een agent op het web of in de kennisgraaf: kort in beeld, zonder hem van zijn bureau te halen.
+        if (!a || this.hush > 0) return;
+        a.setWorking(true, a.taskText);
+        a.say(short(text, 64), 3.2, "info");
+        if (e.data.kind === "graph") this.hologram.highlight(String(e.data.detail ?? ""), 2.5);
         break;
       }
       case "talk":

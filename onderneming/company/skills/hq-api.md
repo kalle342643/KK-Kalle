@@ -10,22 +10,25 @@ HQ is het financiële en juridische geweten van de holding. Alles wat geld kost,
 moet worden, loopt via HQ. HQ controleert harde regels en legt verzoeken voor aan de eigenaar (Kalle).
 
 - **Adres:** `$HQ_URL` (staat in je omgeving).
-- **Inloggen:** je eigen Paperclip-token: `Authorization: Bearer $PAPERCLIP_API_KEY`.
+- **Inloggen:** je eigen Paperclip-token (`$PAPERCLIP_API_KEY`). Het commando `hq` regelt dat voor je.
 - **Antwoorden:** JSON. Fouten hebben een `error`-veld in het Nederlands; lees het en pas je aan.
 
 ```bash
-hq() { curl -sS -X "$1" "$HQ_URL/api/agent$2" -H "Authorization: Bearer $PAPERCLIP_API_KEY" -H 'content-type: application/json' ${3:+-d "$3"}; }
 hq GET /overview
+hq POST /notes '{"title": "..."}'        # JSON als derde argument
+echo '{"lesson": "..."}' | hq POST /lessons -   # of via stdin
 ```
+(Zonder het commando: `curl -sS "$HQ_URL/api/agent/overview" -H "Authorization: Bearer $PAPERCLIP_API_KEY"`.)
 
 ## Eerst: de kennisbank
 Wil je iets weten? Vraag het **eerst** aan de kennisbank, voordat je het opnieuw uitzoekt. Daar staat alles wat
 collega's al leerden: lessen, notities, experimenten en de verbanden ertussen (een Graphify-kennisgraaf).
 ```bash
-hq GET "/knowledge?q=retentie+van+puzzelgames+op+mobiel"
+hq kennis "retentie van puzzelgames op mobiel"
 ```
-Je krijgt `lessons`, `notes` en `graph` (knopen en verbanden rond je vraag). Zoek je iets uit wat anderen ook
-kunnen gebruiken? Schrijf het op als notitie (kort, feitelijk, met bron):
+Je krijgt `lessons`, `notes` en `graph` (knopen en verbanden rond je vraag). Meer over de graaf in de skill
+`kennisgraaf`; het web op gaat volgens de skill `onderzoek`. Zoek je iets uit wat anderen ook kunnen gebruiken?
+Schrijf het op als notitie (kort, feitelijk, met bron):
 ```bash
 hq POST /notes '{"title": "Concurrent X op CrazyGames", "body": "40 levels, daily challenge, 1,2M plays. Bron: https://...", "tags": ["concurrentie", "puzzel"], "branch": "games"}'
 ```
@@ -34,7 +37,7 @@ Maximaal 20 notities per dag; liever één goede notitie dan vijf halve.
 ## Lezen
 | Wat | Aanroep |
 |---|---|
-| Kennisbank doorzoeken (lessen, notities, kennisgraaf) | `GET /knowledge?q=...` |
+| Kennisbank doorzoeken (lessen, notities, kennisgraaf) | `hq kennis "vraag"` (= `GET /knowledge?q=...`) |
 | Notities zoeken | `GET /notes?q=...&tag=...` |
 | Overzicht: takken, vrij budget, lopende experimenten, recente lessen, regels | `GET /overview` |
 | Geld per tak (30 dagen), ROI, voorstel budgetverdeling | `GET /portfolio` |

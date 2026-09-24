@@ -10,7 +10,7 @@ maxTurnsPerRun: 20
 timeoutSec: 900
 heartbeat:
   enabled: false
-skills: [hq-api, experiment-protocol, ideeenraad, geld-en-regels]
+skills: [hq-api, kennisgraaf, onderzoek, experiment-protocol, ideeenraad, geld-en-regels]
 ---
 
 # {{AGENT_NAME}}, pitcher voor {{BRANCH_NAME}}

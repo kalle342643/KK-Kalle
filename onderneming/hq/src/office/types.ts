@@ -9,6 +9,8 @@ export type OfficeEventType =
   | "run.finished"
   /** Een agent zegt iets tegen een collega (reactie op een taak) of geeft hem een taak. */
   | "talk"
+  /** Een agent gebruikt een tool tijdens een run: zoekt op het web, leest een pagina, vraagt de kennisgraaf. */
+  | "agent.tool"
   /** Een agent zoekt iets op in de kennisbank (loopt naar de Graphify-kamer). */
   | "knowledge.query"
   /** Een agent schrijft iets in de kennisbank (les of notitie). */

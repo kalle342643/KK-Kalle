@@ -83,6 +83,8 @@ export interface PaperclipApi {
 
   listLiveRuns(companyId: string): Promise<PcRun[]>;
   getRun(runId: string): Promise<PcRunDetail>;
+  /** Een stuk van het logboek van een run (JSONL-regels `{ts, stream, chunk}`), vanaf `offset` bytes. */
+  runLog(runId: string, offset: number, limitBytes?: number): Promise<{ content: string; nextOffset?: number }>;
   cancelRun(runId: string): Promise<void>;
   /** Het activiteitenlogboek, nieuwste eerst. */
   listActivity(companyId: string, limit?: number): Promise<PcActivity[]>;
@@ -292,6 +294,12 @@ export class HttpPaperclipClient implements PaperclipApi {
   }
   async cancelRun(runId: string) {
     await this.request("POST", `/heartbeat-runs/${runId}/cancel`, {});
+  }
+  runLog(runId: string, offset: number, limitBytes = 256_000) {
+    return this.request<{ content: string; nextOffset?: number }>(
+      "GET",
+      `/heartbeat-runs/${runId}/log?offset=${Math.max(0, Math.floor(offset))}&limitBytes=${limitBytes}`,
+    );
   }
   listActivity(companyId: string, limit = 50) {
     return this.request<PcActivity[]>("GET", `/companies/${companyId}/activity?limit=${limit}`);

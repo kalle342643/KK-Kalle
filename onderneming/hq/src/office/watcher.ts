@@ -1,6 +1,7 @@
 import { errorMessage, type AppContext } from "../domain/context.js";
 import type { AgentStatus, PcActivity, PcIssue } from "../paperclip/types.js";
 import { shortText } from "./events.js";
+import { newRunLogState, readRunLogChunk, toolSummary, toolText, type RunLogState, type ToolKind, type ToolUse } from "./runlog.js";
 
 const WAKE_REASON: Record<string, string> = {
   issue_assigned: "Nieuwe taak",
@@ -24,7 +25,15 @@ const STATUS_TEXT: Partial<Record<AgentStatus, string>> = {
 interface LiveRun {
   agentId: string;
   issueTitle: string | null;
+  log: RunLogState;
+  /** Wanneer we per soort tool voor het laatst iets toonden (niet elke zoekopdracht een ballon). */
+  lastShown: Map<ToolKind, number>;
+  shown: number;
 }
+
+/** Per soort tool hooguit één melding per zoveel tijd, en per run een maximum. */
+const TOOL_GAP_MS = 12_000;
+const TOOL_MAX_PER_RUN = 40;
 
 /**
  * Kijkt mee in Paperclip en zet wat daar gebeurt om in kantoorgebeurtenissen:
@@ -113,7 +122,7 @@ export class PaperclipWatcher {
       } catch {
         // Zonder details tonen we alleen dat hij werkt.
       }
-      this.liveRuns.set(run.id, { agentId: run.agentId, issueTitle });
+      this.liveRuns.set(run.id, { agentId: run.agentId, issueTitle, log: newRunLogState(), lastShown: new Map(), shown: 0 });
       await this.ctx.events.emit({
         type: "run.started",
         agentId: run.agentId,
@@ -124,7 +133,12 @@ export class PaperclipWatcher {
       });
     }
     for (const [runId, info] of [...this.liveRuns]) {
-      if (current.has(runId)) continue;
+      if (current.has(runId)) {
+        await this.followLog(runId, info);
+        continue;
+      }
+      // Laatste stuk logboek nog lezen: wat deed hij vlak voor het einde?
+      await this.followLog(runId, info);
       this.liveRuns.delete(runId);
       let status = "finished";
       let usage: Record<string, unknown> = {};
@@ -143,14 +157,45 @@ export class PaperclipWatcher {
       } catch {
         // Onbekend: gewoon klaar.
       }
+      const tools = toolSummary(info.log.counts);
       await this.ctx.events.emit({
         type: "run.finished",
         agentId: info.agentId,
         text: info.issueTitle,
-        data: { runId, status, ...usage },
+        data: { runId, status, ...usage, ...(tools ? { tools, toolCounts: info.log.counts } : {}) },
         sourceKey: `run:${runId}:end`,
       });
     }
+  }
+
+  /** Leest het nieuwe stuk logboek van een run en toont wat de agent op het web en in de kennisbank doet. */
+  private async followLog(runId: string, run: LiveRun): Promise<void> {
+    for (let page = 0; page < 4; page++) {
+      let chunk: { content: string; nextOffset?: number };
+      try {
+        chunk = await this.ctx.paperclip.runLog(runId, run.log.offset);
+      } catch {
+        return; // Geen logboek (nog niet, of een oudere Paperclip): dan alleen de run zelf.
+      }
+      const before = run.log.offset;
+      for (const use of readRunLogChunk(run.log, chunk.content)) await this.showTool(runId, run, use);
+      if (chunk.nextOffset === undefined) return;
+      // Eén regel groter dan een hele pagina: overslaan in plaats van erop vast te lopen.
+      if (run.log.offset === before) run.log.offset = chunk.nextOffset;
+    }
+  }
+
+  private async showTool(runId: string, run: LiveRun, use: ToolUse): Promise<void> {
+    const now = Date.now();
+    if (run.shown >= TOOL_MAX_PER_RUN || now - (run.lastShown.get(use.kind) ?? 0) < TOOL_GAP_MS) return;
+    run.lastShown.set(use.kind, now);
+    run.shown += 1;
+    await this.ctx.events.emit({
+      type: "agent.tool",
+      agentId: run.agentId,
+      text: toolText(use),
+      data: { runId, kind: use.kind, detail: use.detail },
+    });
   }
 
   private async syncActivity(): Promise<void> {

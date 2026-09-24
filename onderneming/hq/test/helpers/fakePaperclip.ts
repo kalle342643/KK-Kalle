@@ -464,6 +464,17 @@ export class FakePaperclip implements PaperclipApi {
   async getRun(runId: string) {
     return this.need(this.runs, runId, "heartbeat-runs");
   }
+  /** Logboeken per run, als JSONL zoals Paperclip ze opslaat. Vul met appendRunLog. */
+  runLogs = new Map<string, string>();
+  appendRunLog(runId: string, stream: "stdout" | "stderr", chunk: string) {
+    const line = JSON.stringify({ ts: new Date().toISOString(), stream, chunk });
+    this.runLogs.set(runId, (this.runLogs.get(runId) ?? "") + `${line}\n`);
+  }
+  async runLog(runId: string, offset: number, limitBytes = 256_000) {
+    const all = Buffer.from(this.runLogs.get(runId) ?? "", "utf8");
+    const end = Math.min(all.length, offset + limitBytes);
+    return { content: all.subarray(offset, end).toString("utf8"), ...(end < all.length ? { nextOffset: end } : {}) };
+  }
   async listActivity(companyId: string, limit = 50) {
     return this.activity
       .filter((a) => a.companyId === companyId)

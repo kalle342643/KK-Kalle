@@ -7,6 +7,8 @@ import { DomainError, getBranch, HOLDING_SLUG, listBranches, requireBranch, type
 import type { Actor, AppContext } from "./context.js";
 import { assertNotHalted } from "./killswitch.js";
 import { totals } from "./ledger.js";
+import { safeProposalKnowledge, knowledgeSummaryLines, type ProposalKnowledge } from "../knowledge/precheck.js";
+import { experimentCode } from "./codes.js";
 import { eurToUsdCents, formatEur, round2 } from "./money.js";
 import { addDays, daysBetween } from "./time.js";
 
@@ -96,9 +98,7 @@ function toExperiment(r: ExperimentRow): Experiment {
   };
 }
 
-export function experimentCode(id: number): string {
-  return `EXP-${id}`;
-}
+export { experimentCode };
 
 export async function getExperiment(db: Db, id: number): Promise<Experiment | undefined> {
   const rows = await db.query<ExperimentRow>("select * from experiments where id = $1", [id]);
@@ -204,7 +204,7 @@ export async function proposeExperiment(
   ctx: AppContext,
   input: Proposal,
   actor: Actor,
-): Promise<{ experiment: Experiment; approval: ApprovalRecord }> {
+): Promise<{ experiment: Experiment; approval: ApprovalRecord; knowledge: ProposalKnowledge | null }> {
   await assertNotHalted(ctx);
   const cfg = ctx.config.money;
   const branch = await requireBranch(ctx.db, input.branch);
@@ -279,6 +279,8 @@ export async function proposeExperiment(
   );
   const experiment = toExperiment(rows[0]!);
   await audit(ctx.db, actor, "experiment.propose", { experimentId: experiment.id, budgetEur, branch: branch.slug });
+  // Vooronderzoek: wat weet de holding hier al over? Staat bij het voorstel, zodat jij het ziet bij het beslissen.
+  const knowledge = await safeProposalKnowledge(ctx, experiment);
 
   const summary = [
     `Tak: ${branch.name}`,
@@ -287,6 +289,7 @@ export async function proposeExperiment(
     input.prediction ? `Voorspelling: ${input.prediction}` : null,
     `Bewijs: ${input.evidence.join(" , ")}`,
     iteration > 0 ? `Iteratie ${iteration} van ${experimentCode(input.parentId!)}` : null,
+    ...(knowledge ? knowledgeSummaryLines(knowledge) : []),
   ]
     .filter(Boolean)
     .join("\n");
@@ -304,7 +307,7 @@ export async function proposeExperiment(
     actor,
   );
   await ctx.db.query("update experiments set approval_id = $2 where id = $1", [experiment.id, approval.paperclipApprovalId]);
-  return { experiment: { ...experiment, approvalId: approval.paperclipApprovalId }, approval };
+  return { experiment: { ...experiment, approvalId: approval.paperclipApprovalId }, approval, knowledge };
 }
 
 /** Na jouw akkoord: project + hard budget in Paperclip, en een taak voor de verantwoordelijke agent. */

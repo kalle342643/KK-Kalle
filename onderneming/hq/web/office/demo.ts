@@ -131,6 +131,17 @@ const TASKS: Record<string, string[]> = {
   schrijver: ["Artikel: beste budget-microfoons 2026", "Vergelijkingstabel bijwerken", "Gids: e-bike verzekeren"],
 };
 
+/** Wat agents in de demo op het web en in de kennisgraaf doen (zoals HQ het uit hun run-logboek haalt). */
+const WEB_STEPS: Record<string, string[]> = {
+  verkenner: ["🔎 zoekt: browser puzzle games trending 2026", "🌐 leest: crazygames.com/t/puzzle", "📈 trends: cookie consent scanner", "🌐 leest: poki.com/en/puzzle", "🔎 zoekt: webshop compliance tool prijzen"],
+  criticus: ["🔎 zoekt: color mixing puzzle game", "🌐 leest: crazygames.com/game/color-flow", "🕸️ kennisgraaf: pad Fluxgrid mobiel", "🌐 leest: g2.com/categories/cookie-consent"],
+  pitcher: ["🕸️ kennisgraaf: uitleg retentie", "🔎 zoekt: idle game retention benchmarks"],
+  bouwer: ["🕸️ kennisgraaf: query LevelLoader", "✍️ bewerkt: levels.ts", "🌐 leest: developer.crazygames.com/sdk", "✍️ bewerkt: scanner.ts"],
+  schrijver: ["🔎 zoekt: AI Act artikel 50 chatbot melding", "🌐 leest: eur-lex.europa.eu/eli/reg/2024/1689"],
+  publicist: ["🌐 leest: docs.crazygames.com/requirements", "🔎 zoekt: crazygames upload thumbnail size"],
+  lead: ["🕸️ kennisgraaf: hubs", "🔎 zoekt: crazygames revenue share 2026"],
+};
+
 const QUESTIONS = [
   "Wat weten we over puzzelgames op CrazyGames?",
   "Welke affiliate-programma's werkten eerder?",
@@ -601,6 +612,15 @@ export class DemoSource implements DataSource {
     this.emit({ type: "run.finished", agentId: a.id, text: run?.task ?? null, data: { status, tokensIn, tokensOut, costUsd: round2(costEur * 1.08), model: a.model } });
   }
 
+  private webStep(): void {
+    const a = this.agent(pick([...this.runs.keys()]));
+    if (!a) return;
+    const steps = WEB_STEPS[a.template === "tak-lead" ? "lead" : (a.template ?? "")] ?? WEB_STEPS.verkenner!;
+    const text = pick(steps);
+    const kind = text.startsWith("🔎") ? "search" : text.startsWith("📈") ? "trends" : text.startsWith("🕸️") ? "graph" : text.startsWith("✍️") ? "code" : "fetch";
+    this.emit({ type: "agent.tool", agentId: a.id, text, data: { kind, detail: text.split(": ").slice(1).join(": ") } });
+  }
+
   private tick(): void {
     this.clock += 1;
     for (const [id, run] of [...this.runs]) {
@@ -612,6 +632,8 @@ export class DemoSource implements DataSource {
       if (this.clock >= run.until) this.finishRun(a, Math.random() < 0.06 ? "failed" : "succeeded");
     }
     if (this.halted) return;
+    // Wie aan het werk is, gaat soms het web op.
+    if (this.runs.size && Math.random() < 0.22) this.webStep();
     // Elke 2 à 3 seconden gebeurt er iets.
     if (this.clock % 2 !== 0 && Math.random() < 0.5) return;
     const roll = Math.random();

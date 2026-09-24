@@ -278,7 +278,11 @@ export class Ui {
       case "run.started":
         return `▶️ ${who} begint${t ? `: ${t}` : ""}`;
       case "run.finished":
-        return e.data.status === "failed" ? `⚠️ ${who}: dat lukte niet` : `✅ ${who} is klaar${t ? ` met ${t}` : ""}`;
+        return e.data.status === "failed"
+          ? `⚠️ ${who}: dat lukte niet`
+          : `✅ ${who} is klaar${t ? ` met ${t}` : ""}${typeof e.data.tools === "string" ? ` (${e.data.tools})` : ""}`;
+      case "agent.tool":
+        return `${who} ${t}`;
       case "talk":
         return e.data.kind === "delegate" ? `📝 ${who} → ${to}: ${t.replace(/^Nieuwe taak voor jou: /, "nieuwe taak: ")}` : `💬 ${who} → ${to}: ${t}`;
       case "notify":

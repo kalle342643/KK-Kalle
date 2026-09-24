@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, relative } from "node:path";
 import type { AppContext } from "../domain/context.js";
-import { experimentCode } from "../domain/experiments.js";
+import { experimentCode } from "../domain/codes.js";
 import { buildHqGraph, HQ_GRAPH } from "./graph.js";
 
 /**

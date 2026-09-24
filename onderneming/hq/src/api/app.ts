@@ -40,6 +40,7 @@ import {
 import { importRevenueCsv } from "../importers/csv.js";
 import { runJob, type JobDefinition } from "../jobs/scheduler.js";
 import { noteSchema, addNote, searchNotes } from "../knowledge/notes.js";
+import { knowledgeAdvice } from "../knowledge/precheck.js";
 import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
 import { profileSchema, setProfile } from "../office/profiles.js";
 import { listProjects, officeStats, projectDetail } from "../office/projects.js";
@@ -223,9 +224,15 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
 
   agentApi.post("/experiments", async (c) => {
     const input = await body(c, proposalSchema);
-    const { experiment, approval } = await proposeExperiment(ctx, input, actorOf(c));
+    const { experiment, approval, knowledge } = await proposeExperiment(ctx, input, actorOf(c));
     return c.json(
-      { experiment, approvalId: approval.id, message: `${experimentCode(experiment.id)} ingediend; wacht op goedkeuring van de eigenaar.` },
+      {
+        experiment,
+        approvalId: approval.id,
+        message: `${experimentCode(experiment.id)} ingediend; wacht op goedkeuring van de eigenaar.`,
+        knowledge,
+        advice: knowledgeAdvice(knowledge),
+      },
       201,
     );
   });

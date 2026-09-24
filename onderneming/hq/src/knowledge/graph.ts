@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import type { Db } from "../db/index.js";
-import { experimentCode } from "../domain/experiments.js";
+import { experimentCode } from "../domain/codes.js";
 import type { KnowledgeEdge, KnowledgeGraph, KnowledgeNode } from "../office/types.js";
 
 /** Het graph.json-formaat van Graphify (networkx node-link). */

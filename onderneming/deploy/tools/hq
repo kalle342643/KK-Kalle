@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# hq: praat met HQ vanuit een agent-run (Paperclip zet HQ_URL en PAPERCLIP_API_KEY klaar).
+#
+#   hq GET /overview
+#   hq kennis "retentie van puzzelgames op mobiel"      (zoekt in lessen, notities en de kennisgraaf)
+#   hq POST /notes '{"title": "...", "body": "...", "tags": ["..."]}'
+#   echo '{"lesson": "..."}' | hq POST /lessons -          (JSON van stdin)
+#
+# Bij een fout (4xx/5xx) stopt hq met een foutcode en toont het antwoord van HQ; daar staat in het
+# Nederlands wat er mis is. 423 betekent: noodstop, stop direct met werken.
+set -euo pipefail
+
+usage() {
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+[[ $# -ge 1 ]] || usage
+: "${HQ_URL:?HQ_URL ontbreekt: hq werkt alleen binnen een agent-run}"
+: "${PAPERCLIP_API_KEY:?PAPERCLIP_API_KEY ontbreekt: hq werkt alleen binnen een agent-run}"
+
+if [[ "$1" == "kennis" ]]; then
+  shift
+  [[ $# -ge 1 ]] || usage
+  q="$(printf '%s' "$*" | jq -sRr @uri)"
+  set -- GET "/knowledge?q=$q"
+fi
+
+[[ $# -ge 2 ]] || usage
+method="$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')"
+path="$2"
+body="${3:-}"
+case "$method" in GET | POST | PUT | PATCH | DELETE) ;; *) usage ;; esac
+[[ "$path" == /* ]] || path="/$path"
+
+args=(-sS --fail-with-body --max-time 60 -X "$method" "$HQ_URL/api/agent$path"
+  -H "Authorization: Bearer $PAPERCLIP_API_KEY" -H "content-type: application/json")
+if [[ "$body" == "-" ]]; then
+  args+=(--data-binary @-)
+elif [[ -n "$body" ]]; then
+  args+=(--data-binary "$body")
+fi
+rc=0
+curl "${args[@]}" || rc=$?
+echo
+exit "$rc"

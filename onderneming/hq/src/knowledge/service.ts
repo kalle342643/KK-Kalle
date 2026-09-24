@@ -1,6 +1,6 @@
 import type { Db } from "../db/index.js";
 import { errorMessage, type AppContext } from "../domain/context.js";
-import { experimentCode } from "../domain/experiments.js";
+import { experimentCode } from "../domain/codes.js";
 import type { KnowledgeGraph } from "../office/types.js";
 import { graphPath, loadKnowledgeGraph } from "./graph.js";
 import { graphifyExtract, graphifyQuery, semanticExtractionEnabled } from "./graphify.js";
@@ -13,12 +13,12 @@ const STOPWORDS = new Set(
 );
 
 /** Woorden uit een vraag, geschikt voor een OF-zoekopdracht in Postgres. */
-export function searchTerms(question: string): string[] {
+export function searchTerms(question: string, max = 10): string[] {
   const words = question
     .toLowerCase()
     .split(/[^\p{L}\p{N}]+/u)
     .filter((w) => w.length >= 3 && !STOPWORDS.has(w));
-  return [...new Set(words)].slice(0, 10);
+  return [...new Set(words)].slice(0, max);
 }
 
 async function rankedSearch<T>(db: Db, sql: (tsquery: string) => string, terms: string[], limit: number): Promise<T[]> {
