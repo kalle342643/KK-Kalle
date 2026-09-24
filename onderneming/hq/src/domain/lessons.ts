@@ -58,6 +58,12 @@ export async function addLesson(ctx: AppContext, input: LessonInput, actor: Acto
     [branchId, input.experimentId ?? null, input.lesson, input.evidence ?? null, input.tags ?? [], actor],
   );
   await audit(ctx.db, actor, "lesson.add", { lessonId: rows[0]!.id });
+  await ctx.events.emit({
+    type: "knowledge.write",
+    agentId: actor.startsWith("agent:") ? actor.slice(6) : null,
+    text: input.lesson,
+    data: { kind: "lesson", lessonId: rows[0]!.id, experimentId: input.experimentId ?? null, tags: input.tags ?? [] },
+  });
   return toLesson(rows[0]!);
 }
 

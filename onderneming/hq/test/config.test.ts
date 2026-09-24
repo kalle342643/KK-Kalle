@@ -16,6 +16,12 @@ describe("configuratie", () => {
     expect(loadConfig({ HQ_HOST: "0.0.0.0", HQ_ADMIN_TOKEN: "x".repeat(32) }).host).toBe("0.0.0.0");
   });
 
+  it("de nut-meter pauzeert automatisch, tenzij je dat uitzet", () => {
+    expect(loadConfig({}).value.autoPause).toBe(true);
+    for (const off of ["uit", "false", "0", "Nee"]) expect(loadConfig({ HQ_AUTO_PAUSE: off }).value.autoPause).toBe(false);
+    expect(loadConfig({}).cron.value).toBe("0 7 * * 1");
+  });
+
   it("Telegram zonder chat-id = installatiemodus", () => {
     expect(loadConfig({ TELEGRAM_BOT_TOKEN: "123:abc" }).telegram).toEqual({ botToken: "123:abc", ownerChatId: undefined });
   });

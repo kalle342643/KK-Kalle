@@ -11,7 +11,7 @@ let shared: { pglite: PGlite; db: Db } | undefined;
 
 const RESET_SQL = `
   truncate table branches, experiments, metrics, ledger, lessons, approvals, settings, audit_log, job_runs,
-    notifications_sent restart identity cascade;
+    notifications_sent, office_events, notes, agent_profiles, code_projects, code_sessions, code_health, code_helpers restart identity cascade;
   insert into branches (slug, name, description, status, monthly_budget_eur)
   values ('holding', 'Holding', 'Overhead: CEO, analist en alles wat niet bij een tak hoort.', 'active', 0);
 `;

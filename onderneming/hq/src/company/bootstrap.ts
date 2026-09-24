@@ -9,6 +9,7 @@ import type { PcAgent, PcRoutine } from "../paperclip/types.js";
 import { AgentFactory } from "./factory.js";
 import { render, type CompanyDefinition } from "./loader.js";
 import { RecordingNotifier } from "../notify/notifier.js";
+import { OfficeEvents } from "../office/events.js";
 
 export interface BootstrapDeps {
   db: Db;
@@ -95,6 +96,7 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
     paperclip,
     notifier: new RecordingNotifier(),
     companyId,
+    events: new OfficeEvents(deps.db, deps.log),
     now: () => new Date(),
     log: deps.log,
   };
@@ -175,6 +177,17 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
       }
     } catch (err) {
       report.warnings.push(`routine ${r.title}: ${errorMessage(err)}`);
+    }
+  }
+  // Routines die we niet meer willen (bv. een dagelijkse run die HQ nu zelf doet): pauzeren, niet weggooien.
+  for (const title of def.company.retiredRoutines) {
+    const old = routines.find((x) => x.title === title && x.status === "active");
+    if (!old) continue;
+    try {
+      await paperclip.updateRoutine(old.id, { status: "paused" });
+      report.routines.updated.push(`${title} (gepauzeerd)`);
+    } catch (err) {
+      report.warnings.push(`routine ${title} pauzeren: ${errorMessage(err)}`);
     }
   }
 

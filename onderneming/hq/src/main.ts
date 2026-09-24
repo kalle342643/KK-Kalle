@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { chmodSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 import { serve } from "@hono/node-server";
 import { createApp } from "./api/app.js";
 import { HqBot, COMMANDS, runPolling } from "./bot/bot.js";
@@ -18,11 +18,20 @@ import { defaultJobs, runJob, Scheduler } from "./jobs/scheduler.js";
 import { ConsoleNotifier, MultiNotifier, type Notifier } from "./notify/notifier.js";
 import { TelegramApi, TelegramNotifier } from "./notify/telegram.js";
 import { WhatsAppNotifier } from "./notify/whatsapp.js";
+import { rebuildKnowledge } from "./knowledge/service.js";
+import { OfficeEvents } from "./office/events.js";
+import { OfficeNotifier } from "./office/notifier.js";
+import { PaperclipWatcher } from "./office/watcher.js";
 import { HttpPaperclipClient } from "./paperclip/client.js";
+import { describePlan, GRATIS_MODEL, OmniRouteClient, parseEnvFile, planGratis, PROVIDERS, setEnvLine, syncGratis } from "./ai/gratis.js";
+import { GitHubClient } from "./code/github.js";
+import { codeReportLines } from "./code/overview.js";
+import { listCodeProjects } from "./code/projects.js";
+import { CodeWatcher } from "./code/watch.js";
 
 const USAGE = `hq <commando>
 
-  serve                     API, dashboard, Telegram-bot en planner starten (dit draait 24/7)
+  serve                     API, kantoor, Telegram-bot en planner starten (dit draait 24/7)
   migrate                   databaseschema bijwerken
   bootstrap                 company/ (holding, skills, CEO, analist, routines) in Paperclip zetten
   branch <sjabloon> <slug> "<Naam>" [budget]
@@ -31,6 +40,11 @@ const USAGE = `hq <commando>
   status | report           status of dagrapport in de terminal
   halt [reden] | resume     noodstop aan/uit
   import-csv <bestand>      omzet importeren (kolommen: date, amount_eur, branch, source, ...)
+  kennis                    kennisbank-map bijwerken en (met GRAPHIFY_API_KEY) de Graphify-graaf opbouwen
+  werkplaats                projecten één keer bij GitHub bijwerken, sites controleren en de stand tonen
+  gratis-ai [--schrijf|test]
+                            gratis AI (OmniRoute): toon welke modellen in de combo komen, zet je sleutels
+                            en de combo in OmniRoute (--schrijf), of stuur een proefvraag (test)
 `;
 
 function die(msg: string): never {
@@ -66,7 +80,18 @@ async function makeContext(config: Config): Promise<{ ctx: AppContext; telegram?
   const companyId = await resolveCompanyId({ db, config });
   if (!companyId) die("Nog geen holding in Paperclip. Draai eerst: hq bootstrap");
   const { notifier, telegram } = makeNotifier(config);
-  const ctx: AppContext = { db, config, paperclip, notifier, companyId, now: () => new Date(), log: consoleLogger };
+  const events = new OfficeEvents(db, consoleLogger);
+  const ctx: AppContext = {
+    db,
+    config,
+    paperclip,
+    // Elk bericht aan jou is in het kantoor te zien bij de HQ-bot.
+    notifier: new OfficeNotifier(notifier, events),
+    companyId,
+    events,
+    now: () => new Date(),
+    log: consoleLogger,
+  };
   return { ctx, telegram };
 }
 
@@ -83,12 +108,20 @@ function factoryFor(ctx: AppContext): AgentFactory {
 async function serveCommand(config: Config): Promise<void> {
   const { ctx, telegram } = await makeContext(config);
   const factory = factoryFor(ctx);
-  const app = createApp(ctx, { factory, jobs: defaultJobs(ctx) });
+  // De werkplaats: je projecten op GitHub volgen en de sites controleren.
+  const github = config.code.githubToken ? new GitHubClient(config.code.githubToken) : null;
+  const codeWatcher = new CodeWatcher(ctx, github);
+  const app = createApp(ctx, { factory, jobs: defaultJobs(ctx), code: { watcher: codeWatcher, github } });
   const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host });
   ctx.log.info("HQ luistert", { url: `http://${config.host}:${config.port}`, agentUrl: config.agentUrl });
 
   const scheduler = new Scheduler(ctx);
   scheduler.start();
+  // Het kantoor: kijk mee in Paperclip wie er werkt en wie met wie praat.
+  const watcher = new PaperclipWatcher(ctx);
+  watcher.start();
+  codeWatcher.start();
+  if (!github) ctx.log.warn("Geen HQ_GITHUB_TOKEN: de werkplaats controleert alleen of je sites bereikbaar zijn");
   // Direct één keer synchroniseren, zodat openstaande verzoeken meteen in Telegram staan.
   for (const job of defaultJobs(ctx).filter((j) => j.name === "approvals-sync" || j.name === "cost-sync")) {
     await runJob(ctx, job);
@@ -111,6 +144,8 @@ async function serveCommand(config: Config): Promise<void> {
     ctx.log.info("HQ stopt", { signal });
     controller.abort();
     scheduler.stop();
+    watcher.stop();
+    codeWatcher.stop();
     server.close();
     await ctx.db.close();
     process.exit(0);
@@ -223,6 +258,67 @@ async function main(argv: string[]): Promise<void> {
       const { ctx } = await makeContext(config);
       const res = command === "halt" ? await halt(ctx, args.join(" ") || "via CLI", "owner") : await resume(ctx, "owner");
       console.log(JSON.stringify(res, null, 2));
+      await ctx.db.close();
+      return;
+    }
+    case "kennis": {
+      const { ctx } = await makeContext(config);
+      console.log(await rebuildKnowledge(ctx));
+      await ctx.db.close();
+      return;
+    }
+    case "gratis-ai": {
+      const g = config.gratisAi;
+      if (args[0] === "test") {
+        if (!g.key) die("HQ_GRATIS_AI_KEY ontbreekt in hq.env. Draai eerst: dist/main.js gratis-ai --schrijf");
+        const started = Date.now();
+        const res = await fetch(`${g.url}/v1/chat/completions`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${g.key}`, "content-type": "application/json" },
+          body: JSON.stringify({ model: GRATIS_MODEL, max_tokens: 8, messages: [{ role: "user", content: "Antwoord met alleen het woord: ok" }] }),
+        }).catch((err: unknown) => die(`OmniRoute niet bereikbaar op ${g.url}: ${errorMessage(err)}. Draait gratis-ai? (systemctl --user status gratis-ai)`));
+        const body = (await res.json().catch(() => ({}))) as { model?: string; choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } };
+        if (!res.ok) die(`OmniRoute gaf ${res.status}: ${body.error?.message ?? "onbekende fout"}`);
+        console.log(`✔ Antwoord in ${Date.now() - started} ms: "${body.choices?.[0]?.message?.content?.trim() ?? ""}" (via ${body.model ?? "?"})`);
+        return;
+      }
+      const env = existsSync(g.envFile) ? parseEnvFile(readFileSync(g.envFile, "utf8")) : {};
+      if (!env.OMNIROUTE_PASSWORD) die(`OMNIROUTE_PASSWORD ontbreekt in ${g.envFile} (setup-vps.sh zet hem daar).`);
+      const api = new OmniRouteClient(g.url, env.OMNIROUTE_PASSWORD);
+      try {
+        if (args[0] !== "--schrijf") {
+          await api.login();
+          console.log(describePlan(await planGratis(api, await api.connections(), g.perProvider)));
+          const missing = PROVIDERS.filter((p) => env[p.envKey]).map((p) => p.name);
+          if (missing.length) console.log(`\nSleutels in gratis-ai.env: ${missing.join(", ")}. Zet ze in OmniRoute en werk de combo bij met: hetzelfde commando met --schrijf erachter.`);
+          return;
+        }
+        const res = await syncGratis(api, env, { hqKey: g.key, perProvider: g.perProvider });
+        if (res.added.length) console.log(`➕ In OmniRoute gezet: ${res.added.join(", ")}`);
+        if (res.updated.length) console.log(`🔁 Sleutel bijgewerkt: ${res.updated.join(", ")}`);
+        console.log(describePlan(res.plan));
+        if (res.newKey) {
+          const current = existsSync(g.hqEnvFile) ? readFileSync(g.hqEnvFile, "utf8") : "";
+          writeFileSync(g.hqEnvFile, setEnvLine(current, "HQ_GRATIS_AI_KEY", res.newKey), { mode: 0o600 });
+          chmodSync(g.hqEnvFile, 0o600);
+          console.log(`\n🔑 Nieuwe sleutel voor de agents staat in ${g.hqEnvFile}. Zet hem bij de agents en herstart HQ:\n   dist/main.js bootstrap && systemctl --user restart hq`);
+        }
+        if (!res.plan.combo.length) console.log("\nNog geen modellen in de combo: zet minstens één sleutel in gratis-ai.env.");
+      } catch (err) {
+        die(errorMessage(err));
+      }
+      return;
+    }
+    case "werkplaats": {
+      const { ctx } = await makeContext(config);
+      const github = config.code.githubToken ? new GitHubClient(config.code.githubToken) : null;
+      const cw = new CodeWatcher(ctx, github);
+      const projects = await listCodeProjects(ctx.db);
+      if (!projects.length) console.log("Nog geen projecten. Voeg ze toe in het kantoor: klik op de werkplaats → Project volgen.");
+      if (!github) console.log("⚠️ Geen HQ_GITHUB_TOKEN: alleen de gezondheidscheck.");
+      await cw.pollAll();
+      await cw.checkAll();
+      console.log((await codeReportLines(ctx)).join("\n").trim() || "Niets te melden.");
       await ctx.db.close();
       return;
     }

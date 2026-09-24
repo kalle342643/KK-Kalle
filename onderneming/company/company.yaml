@@ -8,6 +8,11 @@ timezone: Europe/Amsterdam
 # Elke nieuwe agent (ook als de CEO hem aanneemt) moet door jou goedgekeurd worden.
 requireBoardApprovalForNewAgents: true
 
+# Uitgezet na de controle van september 2026 (docs/ONDERZOEK-AGENTS.md): HQ controleert de cijfers zelf,
+# zonder AI, en geeft Argus pas een taak als er echt lessen te schrijven zijn. `bootstrap` pauzeert ze.
+retiredRoutines:
+  - Dagelijkse analyse
+
 routines:
   - title: Wekelijkse strategie
     assignee: Atlas
@@ -15,18 +20,13 @@ routines:
     priority: high
     description: |
       Weekstart van de holding. Volg je skill 'hq-strategie':
+      0. Kijk eerst of er sinds vorige week iets veranderd is: nieuwe of afgeronde experimenten, omzet, lessen,
+         verzoeken. Niets veranderd? Schrijf dan één regel "Geen nieuws deze week" in de taak en stop.
+         Geen weekplan zonder nieuws: dat kost geld en levert niets op.
       1. Lees GET $HQ_URL/api/agent/overview en GET $HQ_URL/api/agent/portfolio.
       2. Beoordeel per tak: geld, lopende experimenten, lessen van de afgelopen week.
       3. Maak per tak hooguit 3 concrete taken voor de tak-lead.
       4. Dien een kort weekplan in als strategievoorstel (approval type approve_ceo_strategy).
-  - title: Dagelijkse analyse
-    assignee: Argus
-    cron: "15 7 * * *"
-    priority: medium
-    description: |
-      Controleer de cijfers van gisteren in HQ (GET $HQ_URL/api/agent/overview).
-      Schrijf lessen voor experimenten die gisteren zijn afgerond (KEEP/ITERATE/KILL) als dat nog niet gebeurd is,
-      en meld opvallende afwijkingen (kosten zonder resultaat, experimenten die vastlopen) als taak aan Atlas.
   - title: Maandelijkse kansenverkenning
     assignee: Atlas
     cron: "0 9 1 * *"

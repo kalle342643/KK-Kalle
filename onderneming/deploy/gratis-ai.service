@@ -1,0 +1,20 @@
+# Gratis AI-router (OmniRoute) voor HQ, alleen bereikbaar op deze server (127.0.0.1:20128).
+# Staat in ~/.config/systemd/user/gratis-ai.service van de gebruiker 'ai'. Zie docs/SETUP.md, "Gratis AI".
+#   systemctl --user enable --now gratis-ai
+# Logs: journalctl --user -u gratis-ai -f
+[Unit]
+Description=Gratis AI-router (OmniRoute) voor HQ
+After=network-online.target
+ConditionPathExists=%h/.config/hq/gratis-ai.env
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/hq/gratis-ai.env
+# Alleen op deze server, en niets zonder sleutel.
+Environment=PORT=20128 HOSTNAME=127.0.0.1 REQUIRE_API_KEY=true DATA_DIR=%h/.omniroute OMNIROUTE_DATA_DIR=%h/.omniroute
+ExecStart=%h/.npm-global/bin/omniroute serve --no-open --no-tray --no-recovery --port 20128
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target

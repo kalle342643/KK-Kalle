@@ -8,6 +8,7 @@ import { getSetting } from "../domain/settings.js";
 import { ensureBranch, type BranchProposal } from "../domain/workflows.js";
 import { PaperclipError } from "../paperclip/client.js";
 import type { HireAgentInput, PcAgent } from "../paperclip/types.js";
+import { GRATIS_MODEL, gratisAgentEnv } from "../ai/gratis.js";
 import { render, type AgentSpec, type BranchTemplate, type CompanyDefinition } from "./loader.js";
 
 /**
@@ -83,6 +84,9 @@ export class AgentFactory {
       BRANCH: opts.branch?.slug ?? "holding",
       BRANCH_NAME: opts.branch?.name ?? "Holding",
     };
+    // Draait deze rol op de gratis AI-router? Dan praat Claude Code met OmniRoute in plaats van met Anthropic.
+    const gratis = ctx.config.gratisAi;
+    const onGratis = Boolean(gratis.key) && gratis.roles.includes(spec.key);
     const hire: HireAgentInput = {
       name: opts.name,
       role: spec.role,
@@ -93,11 +97,15 @@ export class AgentFactory {
       desiredSkills: [...CORE_SKILLS, ...(spec.canCreateAgents ? [HIRING_SKILL] : []), ...spec.skills],
       adapterType: "claude_local",
       adapterConfig: {
-        model: spec.model,
+        model: onGratis ? GRATIS_MODEL : spec.model,
         ...(spec.effort ? { effort: spec.effort } : {}),
         ...(spec.maxTurnsPerRun ? { maxTurnsPerRun: spec.maxTurnsPerRun } : {}),
         ...(spec.timeoutSec ? { timeoutSec: spec.timeoutSec } : {}),
-        env: { HQ_URL: this.agentUrl, HQ_BRANCH: vars.BRANCH },
+        env: {
+          HQ_URL: this.agentUrl,
+          HQ_BRANCH: vars.BRANCH,
+          ...(onGratis ? gratisAgentEnv({ url: gratis.url, key: gratis.key!, contextTokens: gratis.contextTokens }) : {}),
+        },
       },
       instructionsBundle: { entryFile: "AGENTS.md", files: { "AGENTS.md": render(spec.instructions, vars) } },
       runtimeConfig: {

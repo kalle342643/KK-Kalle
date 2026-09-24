@@ -50,12 +50,56 @@ const envSchema = z.object({
   HQ_MAX_REQUESTS_PER_AGENT_PER_DAY: z.coerce.number().int().positive().default(5),
   HQ_MAX_ITERATIONS: z.coerce.number().int().nonnegative().default(2),
 
+  /** Map met de kennisbank (Markdown-notities voor Graphify en Obsidian). Standaard ~/vault. */
+  HQ_VAULT_DIR: z.string().optional(),
+  /** Het graphify-programma (pip install graphifyy). */
+  GRAPHIFY_BIN: z.string().default("graphify"),
+  /** Sleutel waarmee Graphify 's nachts de kennisgraaf opbouwt. Zonder sleutel gebruikt HQ zijn eigen graaf. */
+  GRAPHIFY_API_KEY: z.string().optional(),
+  GRAPHIFY_BACKEND: z.string().default("claude"),
+  GRAPHIFY_MODEL: z.string().default("claude-haiku-4-5"),
+  /** Pas vanaf zoveel lessen en notities bouwt Graphify een graaf met AI en krijgen agents graaf-uitvoer. */
+  HQ_GRAPHIFY_MIN_NOTES: z.coerce.number().int().min(0).default(100),
+
+  /** Werkplaats: token (fine-grained, alleen lezen) waarmee HQ je repositories volgt. */
+  HQ_GITHUB_TOKEN: z.string().optional(),
+  /** Hoe vaak HQ GitHub bekijkt (seconden) en de sites controleert. */
+  HQ_GITHUB_POLL_SECONDS: z.coerce.number().int().min(30).default(120),
+  HQ_HEALTH_CHECK_SECONDS: z.coerce.number().int().min(60).default(300),
+  /** Geheim waarmee Claude Code-hooks live meldingen sturen (alleen schrijven). Leeg = uit. */
+  HQ_HOOK_TOKEN: z.string().min(16).optional(),
+  /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
+  HQ_OWNER_NAMES: z.string().default("Kalle"),
+
+  /** Gratis AI: OmniRoute op deze server (zie `dist/main.js gratis-ai`). */
+  HQ_GRATIS_AI_URL: z.string().default("http://127.0.0.1:20128"),
+  /** De sleutel waarmee HQ en de agents OmniRoute gebruiken; `gratis-ai --schrijf` zet hem. Leeg = gratis AI staat uit. */
+  HQ_GRATIS_AI_KEY: z.string().optional(),
+  /** Welke agents op gratis AI draaien (sjabloonnamen, komma-gescheiden), bv. "verkenner". Leeg = geen. */
+  HQ_GRATIS_AI_ROLES: z.string().default(""),
+  /** Contextvenster waarop Claude Code moet rekenen bij gratis modellen (die zijn kleiner dan Claude). */
+  HQ_GRATIS_AI_CONTEXT: z.coerce.number().int().min(8000).default(64000),
+  /** Hoeveel modellen per aanbieder in de combo "gratis" (limieten gelden vaak per model). */
+  HQ_GRATIS_AI_PER_PROVIDER: z.coerce.number().int().min(1).max(10).default(3),
+  /** Waar de sleutels van de aanbieders en het OmniRoute-wachtwoord staan, en waar hq.env staat. */
+  HQ_GRATIS_AI_ENV: z.string().optional(),
+  HQ_ENV_FILE: z.string().optional(),
+
+  /**
+   * Nut-meter: agents die in 30 dagen geld kostten zonder resultaat automatisch pauzeren (wekelijks).
+   * In het kantoor blijven ze zitten, zonder naam. "uit" (of false/0/nee) = alleen melden.
+   */
+  HQ_AUTO_PAUSE: z.string().default("aan"),
+  HQ_VALUE_CRON: z.string().default("0 7 * * 1"),
+
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
   HQ_SYNC_CRON: z.string().default("*/2 * * * *"),
   HQ_COST_SYNC_CRON: z.string().default("*/15 * * * *"),
   HQ_REVENUE_IMPORT_CRON: z.string().default("0 * * * *"),
   HQ_EVALUATE_CRON: z.string().default("0 7 * * *"),
+  HQ_VAULT_SYNC_CRON: z.string().default("20 * * * *"),
+  HQ_KNOWLEDGE_CRON: z.string().default("30 3 * * *"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -98,13 +142,46 @@ export interface Config {
     maxRequestsPerAgentPerDay: number;
     maxIterations: number;
   };
+  knowledge: {
+    vaultDir: string | undefined;
+    graphifyBin: string;
+    graphifyApiKey: string | undefined;
+    graphifyBackend: string;
+    graphifyModel: string;
+    /** Onder dit aantal lessen en notities voegt een graaf weinig toe: geen AI-extractie, geen graaf-uitvoer. */
+    graphifyMinNotes: number;
+  };
+  gratisAi: {
+    url: string;
+    key: string | undefined;
+    roles: string[];
+    contextTokens: number;
+    perProvider: number;
+    envFile: string;
+    /** Het env-bestand van HQ zelf: `gratis-ai --schrijf` zet daar de sleutel in. */
+    hqEnvFile: string;
+  };
+  code: {
+    githubToken: string | undefined;
+    pollMs: number;
+    healthMs: number;
+    hookToken: string | undefined;
+    ownerNames: string[];
+  };
+  value: {
+    /** Agents zonder aantoonbaar resultaat automatisch pauzeren (de nut-meter). */
+    autoPause: boolean;
+  };
   cron: {
+    value: string;
     dailyReport: string;
     weeklyPortfolio: string;
     sync: string;
     costSync: string;
     revenueImport: string;
     evaluate: string;
+    vaultSync: string;
+    knowledge: string;
   };
 }
 
@@ -157,13 +234,43 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       maxRequestsPerAgentPerDay: e.HQ_MAX_REQUESTS_PER_AGENT_PER_DAY,
       maxIterations: e.HQ_MAX_ITERATIONS,
     },
+    knowledge: {
+      vaultDir: e.HQ_VAULT_DIR ?? (cleaned.HOME ? `${cleaned.HOME}/vault` : undefined),
+      graphifyBin: e.GRAPHIFY_BIN,
+      graphifyApiKey: e.GRAPHIFY_API_KEY,
+      graphifyBackend: e.GRAPHIFY_BACKEND,
+      graphifyModel: e.GRAPHIFY_MODEL,
+      graphifyMinNotes: e.HQ_GRAPHIFY_MIN_NOTES,
+    },
+    gratisAi: {
+      url: e.HQ_GRATIS_AI_URL.replace(/\/+$/, ""),
+      key: e.HQ_GRATIS_AI_KEY,
+      roles: e.HQ_GRATIS_AI_ROLES.split(",").map((r) => r.trim()).filter(Boolean),
+      contextTokens: e.HQ_GRATIS_AI_CONTEXT,
+      perProvider: e.HQ_GRATIS_AI_PER_PROVIDER,
+      envFile: e.HQ_GRATIS_AI_ENV ?? `${cleaned.HOME ?? "."}/.config/hq/gratis-ai.env`,
+      hqEnvFile: e.HQ_ENV_FILE ?? `${cleaned.HOME ?? "."}/.config/hq/hq.env`,
+    },
+    code: {
+      githubToken: e.HQ_GITHUB_TOKEN,
+      pollMs: e.HQ_GITHUB_POLL_SECONDS * 1000,
+      healthMs: e.HQ_HEALTH_CHECK_SECONDS * 1000,
+      hookToken: e.HQ_HOOK_TOKEN,
+      ownerNames: e.HQ_OWNER_NAMES.split(",").map((n) => n.trim()).filter(Boolean),
+    },
+    value: {
+      autoPause: !/^(uit|nee|false|0|off|no)$/i.test(e.HQ_AUTO_PAUSE.trim()),
+    },
     cron: {
+      value: e.HQ_VALUE_CRON,
       dailyReport: e.HQ_DAILY_REPORT_CRON,
       weeklyPortfolio: e.HQ_WEEKLY_PORTFOLIO_CRON,
       sync: e.HQ_SYNC_CRON,
       costSync: e.HQ_COST_SYNC_CRON,
       revenueImport: e.HQ_REVENUE_IMPORT_CRON,
       evaluate: e.HQ_EVALUATE_CRON,
+      vaultSync: e.HQ_VAULT_SYNC_CRON,
+      knowledge: e.HQ_KNOWLEDGE_CRON,
     },
   };
 }
@@ -171,5 +278,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 /** Config met veilige standaardwaarden voor tests. */
 export function testConfig(overrides: Partial<Config> = {}): Config {
   const base = loadConfig({});
-  return { ...base, ...overrides, money: { ...base.money, ...(overrides.money ?? {}) } };
+  return {
+    ...base,
+    ...overrides,
+    money: { ...base.money, ...(overrides.money ?? {}) },
+    knowledge: { ...base.knowledge, ...(overrides.knowledge ?? {}) },
+    code: { ...base.code, ...(overrides.code ?? {}) },
+    gratisAi: { ...base.gratisAi, ...(overrides.gratisAi ?? {}) },
+    value: { ...base.value, ...(overrides.value ?? {}) },
+  };
 }

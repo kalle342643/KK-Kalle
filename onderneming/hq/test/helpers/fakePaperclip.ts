@@ -17,8 +17,9 @@ import type {
   PcIssue,
   PcProject,
   PcRoutine,
+  PcActivity,
   PcRoutineTrigger,
-  PcRun,
+  PcRunDetail,
   PcSkill,
   ScheduleTriggerInput,
 } from "../../src/paperclip/types.js";
@@ -38,8 +39,10 @@ export class FakePaperclip implements PaperclipApi {
   projects = new Map<string, PcProject>();
   policies = new Map<string, PcBudgetPolicy>();
   costs: CostEvent[] = [];
-  runs = new Map<string, PcRun>();
+  runs = new Map<string, PcRunDetail>();
   issues: Array<PcIssue & CreateIssueInput & { companyId: string }> = [];
+  /** Activiteitenlogboek in volgorde van ontstaan (listActivity geeft het nieuwste eerst). */
+  activity: PcActivity[] = [];
   routines = new Map<string, PcRoutine & { companyId: string }>();
   skills = new Map<string, PcSkill & { companyId: string; files: Record<string, string> }>();
   tokens = new Map<string, string>();
@@ -85,6 +88,24 @@ export class FakePaperclip implements PaperclipApi {
       lastHeartbeatAt: null,
     };
     this.agents.set(a.id, a);
+    return a;
+  }
+
+  addActivity(partial: Partial<PcActivity> & { action: string }): PcActivity {
+    const a: PcActivity = {
+      id: randomUUID(),
+      companyId: [...this.companies.keys()][0] ?? "",
+      actorType: "system",
+      actorId: null,
+      entityType: null,
+      entityId: null,
+      agentId: null,
+      runId: null,
+      details: null,
+      createdAt: new Date().toISOString(),
+      ...partial,
+    };
+    this.activity.push(a);
     return a;
   }
 
@@ -440,21 +461,48 @@ export class FakePaperclip implements PaperclipApi {
       (r) => r.status === "running" && this.agents.get(r.agentId)?.companyId === companyId,
     );
   }
+  async getRun(runId: string) {
+    return this.need(this.runs, runId, "heartbeat-runs");
+  }
+  /** Logboeken per run, als JSONL zoals Paperclip ze opslaat. Vul met appendRunLog. */
+  runLogs = new Map<string, string>();
+  appendRunLog(runId: string, stream: "stdout" | "stderr", chunk: string) {
+    const line = JSON.stringify({ ts: new Date().toISOString(), stream, chunk });
+    this.runLogs.set(runId, (this.runLogs.get(runId) ?? "") + `${line}\n`);
+  }
+  async runLog(runId: string, offset: number, limitBytes = 256_000) {
+    const all = Buffer.from(this.runLogs.get(runId) ?? "", "utf8");
+    const end = Math.min(all.length, offset + limitBytes);
+    return { content: all.subarray(offset, end).toString("utf8"), ...(end < all.length ? { nextOffset: end } : {}) };
+  }
+  async listActivity(companyId: string, limit = 50) {
+    return this.activity
+      .filter((a) => a.companyId === companyId)
+      .slice(-limit)
+      .reverse();
+  }
   async cancelRun(runId: string) {
     const r = this.need(this.runs, runId, "heartbeat-runs");
     r.status = "cancelled";
     this.calls.push(`cancelRun:${runId}`);
   }
 
-  async createIssue(companyId: string, input: CreateIssueInput) {
+  async createIssue(companyId: string, input: CreateIssueInput & { createdByAgentId?: string | null; originKind?: string; parentId?: string }) {
     const issue = {
       id: randomUUID(),
       identifier: `HQ-${this.issues.length + 1}`,
       status: "todo",
       companyId,
+      createdByAgentId: null,
+      createdByUserId: input.createdByAgentId ? null : "local-board",
       ...input,
     };
     this.issues.push(issue);
+    return issue;
+  }
+  async getIssue(issueId: string) {
+    const issue = this.issues.find((i) => i.id === issueId);
+    if (!issue) throw new PaperclipError(404, "GET", `/issues/${issueId}`, { error: "Issue not found" });
     return issue;
   }
 

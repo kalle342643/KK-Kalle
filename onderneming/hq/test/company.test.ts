@@ -56,7 +56,7 @@ describe("bootstrap naar Paperclip", () => {
     expect(first.companyCreated).toBe(true);
     expect(first.agents.created.sort()).toEqual(["Argus", "Atlas"]);
     expect(first.skills.created.length).toBe(def.skills.length);
-    expect(first.routines.created.length).toBe(3);
+    expect(first.routines.created.length).toBe(2);
     expect(first.warnings).toEqual([]);
 
     const company = env.paperclip.companies.get(first.companyId)!;
@@ -121,7 +121,8 @@ describe("Agent Factory", () => {
     const agents = [...env.paperclip.agents.values()].filter(
       (a) => (a.metadata?.hq as Record<string, unknown> | undefined)?.branch === "complyscan",
     );
-    expect(agents.map((a) => a.name).sort()).toEqual(["Amstel", "IJssel", "Maas", "Rijn", "Schelde", "Waal"]);
+    // Geen aparte pitcher meer: de lead maakt de top 5 zelf (docs/ONDERZOEK-AGENTS.md).
+    expect(agents.map((a) => a.name).sort()).toEqual(["Amstel", "Maas", "Rijn", "Schelde", "Waal"]);
     expect(agents.every((a) => a.status === "idle")).toBe(true); // aannames gedelegeerd goedgekeurd
     const maas = agents.find((a) => a.name === "Maas")!;
     expect(branch.leadAgentId).toBe(maas.id);
@@ -130,8 +131,22 @@ describe("Agent Factory", () => {
     const routineTitles = [...env.paperclip.routines.values()].map((r) => r.title);
     expect(routineTitles).toContain("Ideeënraad ComplyScan");
     const approvals = await listApprovals(env.db, { status: ["approved"], limit: 100 });
-    expect(approvals.filter((a) => a.kind === "hire_agent").length).toBe(6);
+    expect(approvals.filter((a) => a.kind === "hire_agent").length).toBe(5);
     expect(env.notifier.last()!.text).toContain("Tak ComplyScan staat klaar");
+  });
+
+  it("pauzeert routines die niet meer nodig zijn (de dagelijkse analyse doet HQ nu zelf)", async () => {
+    const def = loadCompany();
+    expect(def.company.retiredRoutines).toContain("Dagelijkse analyse");
+    expect(def.company.routines.map((r) => r.title)).not.toContain("Dagelijkse analyse");
+    const deps = { db: env.db, config: env.ctx.config, paperclip: env.paperclip, log: env.ctx.log };
+    const first = await bootstrap(deps, def);
+    // Een oudere installatie had hem nog.
+    const old = await env.paperclip.createRoutine(first.companyId, { title: "Dagelijkse analyse", description: "oud", status: "active" });
+    const second = await bootstrap(deps, def);
+    expect(second.routines.updated).toEqual(["Dagelijkse analyse (gepauzeerd)"]);
+    expect(env.paperclip.routines.get(old.id)!.status).toBe("paused");
+    expect((await bootstrap(deps, def)).routines.updated).toEqual([]);
   });
 
   it("werkt tak-agents bij als hun sjabloon verandert", async () => {

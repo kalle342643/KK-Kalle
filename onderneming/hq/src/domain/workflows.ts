@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  announceDecision,
   getApproval,
   listApprovals,
   markApplied,
@@ -142,6 +143,7 @@ export async function syncApprovals(ctx: AppContext): Promise<{ newPending: numb
     const { record: updated } = await mirrorApproval(ctx, pc);
     if (updated.status === "approved" || updated.status === "rejected") {
       decided += 1;
+      await announceDecision(ctx, updated);
       await applyDecision(ctx, updated);
     }
   }

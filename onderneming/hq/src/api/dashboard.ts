@@ -1,3 +1,4 @@
+import { FAVICON } from "./officePage.js";
 import { listApprovals, type ApprovalRecord } from "../domain/approvals.js";
 import { recentAudit } from "../domain/audit.js";
 import { listBranches } from "../domain/branches.js";
@@ -126,6 +127,7 @@ export async function renderDashboard(ctx: AppContext): Promise<string> {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HQ</title>
+<link rel="icon" href="${FAVICON}">
 <style>
 :root { --bg:#f6f7f9; --card:#fff; --text:#1d2433; --muted:#6b7385; --line:#e3e6ec; --accent:#2f6fec; --ok:#1f9d63; --warn:#d98a06; --bad:#d64545; }
 @media (prefers-color-scheme: dark) { :root { --bg:#11141a; --card:#1a1f27; --text:#e7eaf0; --muted:#9aa3b2; --line:#2a313c; --accent:#6d9cff; } }

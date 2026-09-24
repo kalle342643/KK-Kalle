@@ -38,5 +38,8 @@ Voeg altijd een **voorspelling** toe ("ik verwacht 700 plays"). De analist verge
 - **KILL** — geen signaal. Het project stopt. Geen herkansing met hetzelfde idee in een andere jas.
 
 ## 5. Leren
-Na elke beslissing schrijft de analist 3–5 lessen. Lees vóór elk nieuw voorstel de lessen van je tak
-(`GET /lessons?branch=...`) en noem in je pitch waarom dit idee niet in een eerdere valkuil trapt.
+Na elke beslissing schrijft de analist 3–5 lessen. Vraag vóór elk nieuw voorstel de kennisbank
+(`hq kennis "<je idee in een paar woorden>"`) en noem in je pitch waarom dit idee niet in een eerdere valkuil trapt.
+HQ controleert dat ook zelf: bij elk voorstel zoekt HQ vergelijkbare experimenten en lessen op, zet ze bij het
+voorstel voor Kalle en geeft ze aan jou terug (`knowledge` in het antwoord). Staat er een eerdere KILL op
+hetzelfde idee? Leg dan uit wat er nu anders is.

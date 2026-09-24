@@ -3,7 +3,20 @@ import { requireBranch } from "../domain/branches.js";
 import type { Actor, AppContext } from "../domain/context.js";
 import { audit } from "../domain/audit.js";
 import { requireExperiment } from "../domain/experiments.js";
-import { recordLedger, REVENUE_SOURCES } from "../domain/ledger.js";
+import { recordRevenue, REVENUE_SOURCES } from "../domain/ledger.js";
+
+/** Nederlandse kolomnamen mogen ook (zo schrijf je ze uit jezelf). */
+const HEADER_ALIASES: Record<string, string> = {
+  datum: "date",
+  bedrag: "amount_eur",
+  bedrag_eur: "amount_eur",
+  amount: "amount_eur",
+  tak: "branch",
+  bron: "source",
+  experiment: "experiment_id",
+  omschrijving: "description",
+  id: "external_id",
+};
 
 /** Minimale CSV-parser (komma of puntkomma, aanhalingstekens, lege regels overslaan). */
 export function parseCsv(text: string): Array<Record<string, string>> {
@@ -31,7 +44,10 @@ export function parseCsv(text: string): Array<Record<string, string>> {
     out.push(cur);
     return out.map((s) => s.trim());
   };
-  const header = split(lines[0]!).map((h) => h.toLowerCase());
+  const header = split(lines[0]!).map((h) => {
+    const key = h.toLowerCase().replace(/\s+/g, "_");
+    return HEADER_ALIASES[key] ?? key;
+  });
   return lines.slice(1).map((line) => {
     const cells = split(line);
     const row: Record<string, string> = {};
@@ -64,7 +80,8 @@ export interface CsvImportResult {
 
 /**
  * Importeert omzet uit een CSV (bv. een export van CrazyGames of een affiliate-dashboard).
- * Kolommen: date, amount_eur, branch, source, experiment_id (optioneel), external_id (optioneel), description.
+ * Kolommen: date, amount_eur, branch, source, experiment_id (optioneel), external_id (optioneel), description,
+ * of in het Nederlands: datum, bedrag, tak, bron, experiment, id, omschrijving.
  * Zonder external_id wordt een sleutel gemaakt van datum+bron+tak+bedrag, zodat dubbel importeren niets dubbel telt.
  */
 export async function importRevenueCsv(ctx: AppContext, text: string, actor: Actor): Promise<CsvImportResult> {
@@ -87,8 +104,7 @@ export async function importRevenueCsv(ctx: AppContext, text: string, actor: Act
       const branch = await requireBranch(ctx.db, r.branch);
       const experimentId = r.experiment_id ? Number(r.experiment_id.replace(/^EXP-/i, "")) : null;
       if (experimentId) await requireExperiment(ctx.db, experimentId);
-      await recordLedger(ctx.db, {
-        kind: "revenue",
+      await recordRevenue(ctx, {
         amountEur: r.amount_eur,
         source,
         externalId: r.external_id || `${r.date.slice(0, 10)}:${branch.slug}:${experimentId ?? "-"}:${r.amount_eur}`,

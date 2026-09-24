@@ -7,6 +7,8 @@ import { DomainError, getBranch, HOLDING_SLUG, listBranches, requireBranch, type
 import type { Actor, AppContext } from "./context.js";
 import { assertNotHalted } from "./killswitch.js";
 import { totals } from "./ledger.js";
+import { safeProposalKnowledge, knowledgeSummaryLines, type ProposalKnowledge } from "../knowledge/precheck.js";
+import { experimentCode } from "./codes.js";
 import { eurToUsdCents, formatEur, round2 } from "./money.js";
 import { addDays, daysBetween } from "./time.js";
 
@@ -96,9 +98,7 @@ function toExperiment(r: ExperimentRow): Experiment {
   };
 }
 
-export function experimentCode(id: number): string {
-  return `EXP-${id}`;
-}
+export { experimentCode };
 
 export async function getExperiment(db: Db, id: number): Promise<Experiment | undefined> {
   const rows = await db.query<ExperimentRow>("select * from experiments where id = $1", [id]);
@@ -204,7 +204,7 @@ export async function proposeExperiment(
   ctx: AppContext,
   input: Proposal,
   actor: Actor,
-): Promise<{ experiment: Experiment; approval: ApprovalRecord }> {
+): Promise<{ experiment: Experiment; approval: ApprovalRecord; knowledge: ProposalKnowledge | null }> {
   await assertNotHalted(ctx);
   const cfg = ctx.config.money;
   const branch = await requireBranch(ctx.db, input.branch);
@@ -273,12 +273,14 @@ export async function proposeExperiment(
       input.evidence,
       input.plan ?? null,
       agentId,
-      // De tak-lead voert uit; de voorsteller (vaak een verkenner of pitcher) alleen als er geen lead is.
+      // De tak-lead voert uit; de voorsteller (vaak een verkenner) alleen als er geen lead is.
       input.leadAgentId ?? branch.leadAgentId ?? agentId,
     ],
   );
   const experiment = toExperiment(rows[0]!);
   await audit(ctx.db, actor, "experiment.propose", { experimentId: experiment.id, budgetEur, branch: branch.slug });
+  // Vooronderzoek: wat weet de holding hier al over? Staat bij het voorstel, zodat jij het ziet bij het beslissen.
+  const knowledge = await safeProposalKnowledge(ctx, experiment);
 
   const summary = [
     `Tak: ${branch.name}`,
@@ -287,6 +289,7 @@ export async function proposeExperiment(
     input.prediction ? `Voorspelling: ${input.prediction}` : null,
     `Bewijs: ${input.evidence.join(" , ")}`,
     iteration > 0 ? `Iteratie ${iteration} van ${experimentCode(input.parentId!)}` : null,
+    ...(knowledge ? knowledgeSummaryLines(knowledge) : []),
   ]
     .filter(Boolean)
     .join("\n");
@@ -304,7 +307,7 @@ export async function proposeExperiment(
     actor,
   );
   await ctx.db.query("update experiments set approval_id = $2 where id = $1", [experiment.id, approval.paperclipApprovalId]);
-  return { experiment: { ...experiment, approvalId: approval.paperclipApprovalId }, approval };
+  return { experiment: { ...experiment, approvalId: approval.paperclipApprovalId }, approval, knowledge };
 }
 
 /** Na jouw akkoord: project + hard budget in Paperclip, en een taak voor de verantwoordelijke agent. */
@@ -326,7 +329,9 @@ export async function startExperiment(ctx: AppContext, id: number): Promise<Expe
         name,
         status: "in_progress",
         leadAgentId: lead,
-        idempotencyKey: `hq-exp-${id}`,
+        // Met het aanmaakmoment erbij: na een lege HQ-database begint de nummering opnieuw bij 1,
+        // en dan mag EXP-1 niet op het oude project van een vorige EXP-1 botsen.
+        idempotencyKey: `hq-exp-${id}-${exp.createdAt.getTime().toString(36)}`,
       });
       projectId = project.id;
     } catch (err) {
@@ -371,6 +376,12 @@ export async function startExperiment(ctx: AppContext, id: number): Promise<Expe
   }
   exp = await setStatus(ctx.db, id, "running", { started_at: now, deadline_at: deadline });
   await audit(ctx.db, "system", "experiment.start", { experimentId: id, projectId });
+  await ctx.events.emit({
+    type: "experiment.started",
+    agentId: lead,
+    text: `${experimentCode(id)} ${exp.title}`,
+    data: { experimentId: id, branch: branch.slug, budgetEur: exp.budgetEur },
+  });
   await ctx.notifier.send({
     text: `▶️ ${experimentCode(id)} gestart: ${exp.title}\nBudget ${formatEur(exp.budgetEur)}, deadline ${deadline.toISOString().slice(0, 10)}.`,
     silent: true,
@@ -452,6 +463,12 @@ export async function recordMetric(
     [experimentId, input.name, input.value, input.source, input.trusted, input.note ?? null, input.externalId ?? null, actor],
   );
   await audit(ctx.db, actor, "metric.record", { experimentId, name: input.name, value: input.value, trusted: input.trusted });
+  await ctx.events.emit({
+    type: "metric",
+    agentId: actor.startsWith("agent:") ? actor.slice(6) : null,
+    text: `${experimentCode(experimentId)} ${input.name}: ${input.value}`,
+    data: { experimentId, name: input.name, value: input.value, trusted: input.trusted, by: actor.startsWith("agent:") ? "agent" : actor },
+  });
 }
 
 export interface ExperimentSnapshot {

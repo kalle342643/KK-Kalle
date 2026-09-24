@@ -9,6 +9,9 @@ cd onderneming/hq
 npm ci
 npm test
 npm run build
+chmod +x ../deploy/tools/*
+cp ../deploy/hq.service ../deploy/gratis-ai.service ~/.config/systemd/user/
+systemctl --user daemon-reload
 node --env-file="$env_file" dist/main.js migrate
 # Nieuwe of gewijzigde skills, agents en routines doorzetten naar Paperclip.
 node --env-file="$env_file" dist/main.js bootstrap

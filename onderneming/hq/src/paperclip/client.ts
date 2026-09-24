@@ -17,6 +17,8 @@ import type {
   PcRoutine,
   PcRoutineTrigger,
   PcRun,
+  PcRunDetail,
+  PcActivity,
   PcSkill,
   ScheduleTriggerInput,
   ApprovalStatus,
@@ -80,9 +82,15 @@ export interface PaperclipApi {
   costsByAgent(companyId: string, range?: { from?: string; to?: string }): Promise<PcAgentCost[]>;
 
   listLiveRuns(companyId: string): Promise<PcRun[]>;
+  getRun(runId: string): Promise<PcRunDetail>;
+  /** Een stuk van het logboek van een run (JSONL-regels `{ts, stream, chunk}`), vanaf `offset` bytes. */
+  runLog(runId: string, offset: number, limitBytes?: number): Promise<{ content: string; nextOffset?: number }>;
   cancelRun(runId: string): Promise<void>;
+  /** Het activiteitenlogboek, nieuwste eerst. */
+  listActivity(companyId: string, limit?: number): Promise<PcActivity[]>;
 
   createIssue(companyId: string, input: CreateIssueInput): Promise<PcIssue>;
+  getIssue(issueId: string): Promise<PcIssue>;
 
   listRoutines(companyId: string): Promise<PcRoutine[]>;
   createRoutine(companyId: string, input: CreateRoutineInput): Promise<PcRoutine>;
@@ -281,12 +289,27 @@ export class HttpPaperclipClient implements PaperclipApi {
   listLiveRuns(companyId: string) {
     return this.request<PcRun[]>("GET", `/companies/${companyId}/live-runs`);
   }
+  getRun(runId: string) {
+    return this.request<PcRunDetail>("GET", `/heartbeat-runs/${runId}`);
+  }
   async cancelRun(runId: string) {
     await this.request("POST", `/heartbeat-runs/${runId}/cancel`, {});
+  }
+  runLog(runId: string, offset: number, limitBytes = 256_000) {
+    return this.request<{ content: string; nextOffset?: number }>(
+      "GET",
+      `/heartbeat-runs/${runId}/log?offset=${Math.max(0, Math.floor(offset))}&limitBytes=${limitBytes}`,
+    );
+  }
+  listActivity(companyId: string, limit = 50) {
+    return this.request<PcActivity[]>("GET", `/companies/${companyId}/activity?limit=${limit}`);
   }
 
   createIssue(companyId: string, input: CreateIssueInput) {
     return this.request<PcIssue>("POST", `/companies/${companyId}/issues`, input);
+  }
+  getIssue(issueId: string) {
+    return this.request<PcIssue>("GET", `/issues/${issueId}`);
   }
 
   listRoutines(companyId: string) {

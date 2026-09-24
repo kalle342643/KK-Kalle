@@ -1,6 +1,7 @@
 import type { Config } from "../config.js";
 import type { Db } from "../db/index.js";
 import type { Notifier } from "../notify/notifier.js";
+import type { OfficeEvents } from "../office/events.js";
 import type { PaperclipApi } from "../paperclip/client.js";
 
 export interface Logger {
@@ -17,6 +18,8 @@ export interface AppContext {
   notifier: Notifier;
   /** Het Paperclip-bedrijf (de holding) waar alle agents onder vallen. */
   companyId: string;
+  /** Wat er in het kantoor gebeurt (voor de live weergave). */
+  events: OfficeEvents;
   now(): Date;
   log: Logger;
 }

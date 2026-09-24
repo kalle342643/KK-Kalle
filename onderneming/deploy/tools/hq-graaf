@@ -1,0 +1,53 @@
+#!/usr/bin/env bash
+# hq-graaf: vraag de kennisgraaf van de holding (Graphify) om verbanden.
+#
+#   hq-graaf vraag "waarom werken puzzelgames op mobiel slecht?"   knopen en verbanden rond een vraag
+#   hq-graaf uitleg "retentie"                                   wat is dit en waar hangt het aan vast?
+#   hq-graaf pad "Fluxgrid" "retentie"                           hoe hangen twee dingen samen?
+#   hq-graaf hubs                                                de onderwerpen waar alles om draait
+#
+# De graaf staat in de kennisbank (~/vault). HQ werkt hem elke nacht bij uit lessen, notities en
+# experimenten. Voor code in je eigen workspace: `graphify update .` en daarna `graphify query "..."`.
+set -euo pipefail
+
+usage() {
+  sed -n '2,10p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+vault="${HQ_VAULT_DIR:-$HOME/vault}"
+graph=""
+for candidate in "$vault/graphify-out/graph.json" "$vault/.hq/graph.json"; do
+  if [[ -f "$candidate" ]]; then
+    graph="$candidate"
+    break
+  fi
+done
+if [[ -z "$graph" ]]; then
+  echo "hq-graaf: nog geen kennisgraaf in $vault. Gebruik 'hq kennis \"...\"' zolang die er niet is." >&2
+  exit 3
+fi
+bin="$(command -v graphify || echo "$HOME/.local/bin/graphify")"
+[[ -x "$bin" ]] || { echo "hq-graaf: graphify is niet geïnstalleerd" >&2; exit 3; }
+
+[[ $# -ge 1 ]] || usage
+cmd="$1"
+shift
+case "$cmd" in
+  vraag)
+    [[ $# -ge 1 ]] || usage
+    exec "$bin" query "$*" --graph "$graph" --budget 1500
+    ;;
+  uitleg)
+    [[ $# -eq 1 ]] || usage
+    exec "$bin" explain "$1" --graph "$graph"
+    ;;
+  pad)
+    [[ $# -eq 2 ]] || usage
+    exec "$bin" path "$1" "$2" --graph "$graph"
+    ;;
+  hubs)
+    exec "$bin" god-nodes --graph "$graph" --top 15
+    ;;
+  *) usage ;;
+esac

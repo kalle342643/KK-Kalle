@@ -11,14 +11,16 @@
     "hq": "dist/main.js"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.build.json && node scripts/build-web.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p web/tsconfig.json --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
     "start": "node dist/main.js serve",
     "migrate": "node dist/main.js migrate",
     "bootstrap": "node dist/main.js bootstrap",
-    "hq": "node dist/main.js"
+    "hq": "node dist/main.js",
+    "build:web": "node scripts/build-web.mjs",
+    "demo": "node scripts/build-demo.mjs"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",
@@ -30,8 +32,14 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.8",
+    "@gltf-transform/core": "^4.5.0",
+    "@gltf-transform/extensions": "^4.5.0",
     "@types/node": "^24.0.0",
     "@types/pg": "^8.23.1",
+    "@types/three": "^0.186.0",
+    "esbuild": "^0.28.2",
+    "meshoptimizer": "^1.2.0",
+    "three": "^0.186.0",
     "typescript": "^5.9.3",
     "vitest": "^5.0.1"
   }

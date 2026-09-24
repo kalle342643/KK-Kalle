@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Eenmalige inrichting van een verse Ubuntu 24.04-VPS (bv. Hetzner CX33) voor de AI-onderneming.
+# Eenmalige inrichting van een verse Ubuntu 24.04-server voor de AI-onderneming: een VPS (bv. Hetzner CX33),
+# een gratis Oracle Cloud-server (ARM) of een eigen computer thuis. Werkt op x86-64 en ARM64.
 # Draai als root:   curl -fsSL <raw-url>/onderneming/deploy/setup-vps.sh | bash
 #            of:    bash setup-vps.sh
 # Het script is idempotent: opnieuw draaien kan geen kwaad.
@@ -7,8 +8,9 @@
 # Wat het doet:
 #   1. systeemupdates, firewall (alleen SSH + Tailscale), automatische beveiligingsupdates
 #   2. gebruiker 'ai' die alles draait (niet als root)
-#   3. Node.js 24, PostgreSQL (database voor HQ), Tailscale, Claude Code CLI, Paperclip
-#   4. HQ bouwen uit deze repository en als service klaarzetten
+#   3. Node.js 24, PostgreSQL (database voor HQ), Tailscale, Claude Code CLI, Paperclip, Graphify
+#   4. webgereedschap voor de agents: Crawl4AI (pagina's lezen), last30days (trends), hq-commando's
+#   5. HQ (met het 3D-kantoor) bouwen uit deze repository en als service klaarzetten
 # Wat je daarna zelf doet staat in onderneming/docs/SETUP.md (stap 4 en verder).
 set -euo pipefail
 
@@ -28,7 +30,7 @@ log "Systeem bijwerken"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
-apt-get install -y ca-certificates curl git gnupg ufw unattended-upgrades postgresql jq
+apt-get install -y ca-certificates curl git gnupg ufw unattended-upgrades postgresql jq pipx
 dpkg-reconfigure -f noninteractive unattended-upgrades
 
 log "Firewall: alleen SSH en Tailscale"
@@ -74,7 +76,33 @@ npm install -g @anthropic-ai/claude-code
 if ! command -v paperclipai >/dev/null; then
   curl -fsSL https://paperclip.ing/install.sh | bash -s -- --no-prompt --no-onboard
 fi
+# Graphify maakt van de kennisbank een graaf (de hologram-kamer in het kantoor).
+if ! command -v graphify >/dev/null; then
+  pipx install graphifyy
+fi
+mkdir -p ~/vault
+# ...en is voor elke agent beschikbaar als Claude Code-skill (/graphify), bv. om code te doorgronden.
+graphify install --platform claude >/dev/null
+# Crawl4AI: webpagina's lezen met een echte (headless) browser. Agents gebruiken het via `hq-web`.
+if ! command -v crwl >/dev/null; then
+  pipx install crawl4ai
+fi
+# last30days: wat speelt er de afgelopen 30 dagen (via `hq-trends`, alleen bronnen met een open API).
+# Vaste versie: bij een update eerst nakijken of de bronnen nog binnen de regels blijven.
+if [[ ! -d ~/tools/last30days/.git ]]; then
+  git clone --quiet --depth 1 --branch v3.25.0 https://github.com/mvanhorn/last30days-skill ~/tools/last30days
+fi
+# OmniRoute: de gratis AI-router (vaste versie; bijwerken alleen na nakijken van de release). Groot (±2 GB).
+if [[ "$(omniroute --version 2>/dev/null | tail -1)" != *3.8.50* ]]; then
+  npm install -g omniroute@3.8.50
+fi
 AS_AI
+
+log "Browser voor Crawl4AI"
+C4AI_PY="/home/$AI_USER/.local/share/pipx/venvs/crawl4ai/bin/python"
+# Systeembibliotheken moeten als root; de browser zelf komt in de map van '$AI_USER'.
+"$C4AI_PY" -m playwright install-deps chromium
+sudo -iu "$AI_USER" "$C4AI_PY" -m playwright install --only-shell chromium
 
 log "HQ ophalen en bouwen"
 sudo -iu "$AI_USER" env REPO_URL="$REPO_URL" REPO_BRANCH="$REPO_BRANCH" bash <<'AS_AI'
@@ -94,11 +122,37 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
   chmod 600 ~/.config/hq/hq.env
   # Willekeurige geheimen alvast invullen.
   sed -i "s|^HQ_ADMIN_TOKEN=.*|HQ_ADMIN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
+  sed -i "s|^HQ_HOOK_TOKEN=.*|HQ_HOOK_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
 fi
+# Gratis AI-router (OmniRoute): geheimen en het wachtwoord van het dashboard, één keer willekeurig gemaakt.
+# STORAGE_ENCRYPTION_KEY versleutelt de sleutels in de database: nooit veranderen, anders is alles weg.
+if [[ ! -f ~/.config/hq/gratis-ai.env ]]; then
+  cp ../deploy/gratis-ai.env.example ~/.config/hq/gratis-ai.env
+  chmod 600 ~/.config/hq/gratis-ai.env
+  omni_password="$(openssl rand -hex 12)"
+  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^API_KEY_SECRET=.*|API_KEY_SECRET=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^STORAGE_ENCRYPTION_KEY=.*|STORAGE_ENCRYPTION_KEY=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^INITIAL_PASSWORD=.*|INITIAL_PASSWORD=$omni_password|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^OMNIROUTE_PASSWORD=.*|OMNIROUTE_PASSWORD=$omni_password|" ~/.config/hq/gratis-ai.env
+fi
+# Een hq.env van een eerdere installatie wijst nog naar de oude router (LiteLLM, poort 4000).
+sed -i "s|^HQ_GRATIS_AI_URL=http://127.0.0.1:4000$|HQ_GRATIS_AI_URL=http://127.0.0.1:20128|" ~/.config/hq/hq.env
 cp ../deploy/hq.service ~/.config/systemd/user/hq.service
-cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ~/.config/systemd/user/
-chmod +x ../deploy/backup.sh ../deploy/update.sh
+cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ../deploy/gratis-ai.service ~/.config/systemd/user/
+chmod +x ../deploy/backup.sh ../deploy/update.sh ../deploy/tools/*
 AS_AI
+
+log "Commando's voor de agents"
+# Paperclip start agents met een kaal PATH (zonder ~/.local/bin en ~/.npm-global/bin). Daarom komen de
+# commando's die agents nodig hebben in /usr/local/bin. De hq-commando's wijzen naar de repository,
+# zodat update.sh ze vanzelf bijwerkt.
+for tool in hq hq-web hq-trends hq-graaf; do
+  ln -sfn "/home/$AI_USER/KK-Kalle/onderneming/deploy/tools/$tool" "/usr/local/bin/$tool"
+done
+for bin in "/home/$AI_USER/.npm-global/bin/claude" "/home/$AI_USER/.local/bin/graphify" "/home/$AI_USER/.local/bin/crwl"; do
+  if [[ -e "$bin" ]]; then ln -sfn "$bin" "/usr/local/bin/$(basename "$bin")"; fi
+done
 
 cat <<'NEXT'
 
@@ -114,4 +168,5 @@ cat <<'NEXT'
                                   node --env-file=$HOME/.config/hq/hq.env dist/main.js check
                                   node --env-file=$HOME/.config/hq/hq.env dist/main.js bootstrap
                                   systemctl --user enable --now hq hq-backup.timer
+  6. Het kantoor openen:          http://<servernaam>:8080/?token=<HQ_ADMIN_TOKEN>   (via Tailscale)
 NEXT

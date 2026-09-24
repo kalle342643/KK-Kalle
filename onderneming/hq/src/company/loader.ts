@@ -66,6 +66,8 @@ export const companySpec = z.object({
   timezone: z.string().default("Europe/Amsterdam"),
   requireBoardApprovalForNewAgents: z.boolean().default(true),
   routines: z.array(routineSpec).default([]),
+  /** Routines die niet meer nodig zijn: `bootstrap` pauzeert ze in Paperclip (op titel). */
+  retiredRoutines: z.array(z.string().min(1)).default([]),
 });
 
 export type CompanySpec = z.infer<typeof companySpec>;

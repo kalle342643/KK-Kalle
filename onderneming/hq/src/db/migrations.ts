@@ -154,4 +154,118 @@ insert into branches (slug, name, description, status, monthly_budget_eur)
 values ('holding', 'Holding', 'Overhead: CEO, analist en alles wat niet bij een tak hoort.', 'active', 0);
 `,
   },
+  {
+    id: "002_office",
+    sql: `
+-- Wat er in het kantoor gebeurt: agents die werken, praten, iets opzoeken of iets vragen.
+create table office_events (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  type text not null,
+  agent_id text,
+  target_agent_id text,
+  text text,
+  data jsonb not null default '{}',
+  -- Voorkomt dubbele gebeurtenissen als dezelfde Paperclip-activiteit twee keer langskomt.
+  source_key text unique
+);
+create index office_events_at_idx on office_events(at);
+
+-- Notities van agents: het gedeelde geheugen (ook als Markdown in de kennisbank-map).
+create table notes (
+  id integer generated always as identity primary key,
+  agent_id text,
+  author text not null,
+  title text not null,
+  body text not null,
+  tags text[] not null default '{}',
+  branch_id integer references branches(id),
+  experiment_id integer references experiments(id),
+  created_at timestamptz not null default now()
+);
+create index notes_fts_idx on notes using gin (to_tsvector('simple', title || ' ' || body));
+`,
+  },
+  {
+    id: "003_profiles",
+    sql: `
+-- Wat jij in het kantoor aan een agent verandert: een bijnaam en een uiterlijk.
+-- Ook voor 'owner' (jij) en 'hq-bot' (de bot die je berichten stuurt).
+create table agent_profiles (
+  agent_id text primary key,
+  nickname text,
+  avatar integer check (avatar between 0 and 11),
+  updated_at timestamptz not null default now()
+);
+`,
+  },
+  {
+    id: "004_werkplaats",
+    sql: `
+-- De werkplaats: projecten die je (met Claude Code) bouwt, gevolgd via GitHub en een gezondheidscheck.
+create table code_projects (
+  key text primary key check (key ~ '^[a-z0-9][a-z0-9-]{0,39}$'),
+  name text not null,
+  repo text,
+  url text,
+  health_url text,
+  branch_slug text,
+  backlog_path text not null default 'BACKLOG.md',
+  description text,
+  -- Wat HQ de vorige keer bij GitHub zag (branches, PR's, tests, uitrol, backlog).
+  state jsonb not null default '{}',
+  -- Uitkomst van de gezondheidscheck (bereikbaar, sinds wanneer, hoe snel).
+  health jsonb not null default '{}',
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Claude Code-sessies: gezien aan commits (Claude-Session in het bericht, of een claude/-branch) of via hooks.
+create table code_sessions (
+  id text primary key,
+  project_key text references code_projects(key) on delete set null,
+  source text not null check (source in ('cloud', 'local', 'action')),
+  url text,
+  branch text,
+  title text,
+  last_action text,
+  started_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  ended_at timestamptz,
+  commits integer not null default 0,
+  pr jsonb
+);
+create index code_sessions_activity_idx on code_sessions(last_activity_at desc);
+
+-- Elke gezondheidscheck, voor de uptime van de afgelopen dag (HQ ruimt na 14 dagen op).
+create table code_health (
+  project_key text not null references code_projects(key) on delete cascade,
+  at timestamptz not null default now(),
+  ok boolean not null,
+  status integer,
+  ms integer
+);
+create index code_health_idx on code_health(project_key, at desc);
+`,
+  },
+  {
+    id: "005_helpers",
+    sql: `
+-- Helpers (sub-agents) die een Claude Code-sessie inzet: iets uitzoeken, een plan maken, een review.
+create table code_helpers (
+  session_id text not null references code_sessions(id) on delete cascade,
+  agent_id text not null,
+  agent_type text not null,
+  task text,
+  last_action text,
+  tools integer not null default 0,
+  started_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  ended_at timestamptz,
+  primary key (session_id, agent_id)
+);
+create index code_helpers_activity_idx on code_helpers(last_activity_at desc);
+`,
+  },
 ];
