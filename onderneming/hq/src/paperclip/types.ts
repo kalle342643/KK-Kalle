@@ -155,6 +155,8 @@ export interface PcRunDetail extends PcRun {
   finishedAt?: string | null;
   error?: string | null;
   contextSnapshot?: { issueId?: string; wakeReason?: string; [key: string]: unknown } | null;
+  /** Verbruik van de run (Paperclip vult dit na afloop). */
+  usageJson?: { model?: string; inputTokens?: number; outputTokens?: number; costUsd?: number; [key: string]: unknown } | null;
 }
 
 export interface PcIssue {

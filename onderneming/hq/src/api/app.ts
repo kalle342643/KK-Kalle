@@ -41,6 +41,8 @@ import { importRevenueCsv } from "../importers/csv.js";
 import { runJob, type JobDefinition } from "../jobs/scheduler.js";
 import { noteSchema, addNote, searchNotes } from "../knowledge/notes.js";
 import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
+import { profileSchema, setProfile } from "../office/profiles.js";
+import { listProjects, officeStats, projectDetail } from "../office/projects.js";
 import { buildOfficeSnapshot } from "../office/snapshot.js";
 import type { OfficeEvent } from "../office/types.js";
 import { PaperclipError } from "../paperclip/client.js";
@@ -56,6 +58,8 @@ const STATIC_TYPES: Record<string, string> = {
   css: "text/css; charset=utf-8",
   map: "application/json",
   png: "image/png",
+  glb: "model/gltf-binary",
+  json: "application/json",
   svg: "image/svg+xml",
   woff2: "font/woff2",
 };
@@ -446,6 +450,11 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     }),
   );
   ownerApi.get("/knowledge/graph", async (c) => c.json(await knowledgeGraph(ctx, Math.min(Number(c.req.query("max") ?? 400), 2000))));
+  ownerApi.get("/projects", async (c) => c.json(await listProjects(ctx, 200)));
+  ownerApi.get("/projects/:id", async (c) => c.json(await projectDetail(ctx, idParam(c))));
+  ownerApi.get("/stats", async (c) => c.json(await officeStats(ctx, Math.min(Math.max(Number(c.req.query("days") ?? 30), 7), 120))));
+  // Een agent (of jij, of de HQ-bot) een bijnaam of ander uiterlijk geven.
+  ownerApi.put("/agents/:agentId/profile", async (c) => c.json(await setProfile(ctx, c.req.param("agentId"), await body(c, profileSchema))));
   ownerApi.post("/agents/:agentId/:action{pause|resume}", async (c) => {
     const agentId = c.req.param("agentId");
     const action = c.req.param("action") as "pause" | "resume";
@@ -508,12 +517,22 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     }
     return c.html(readFileSync(file, "utf8"));
   });
-  app.get("/static/:file{[a-z0-9._-]+}", (c) => {
-    const name = c.req.param("file");
-    const type = STATIC_TYPES[name.split(".").pop() ?? ""];
-    const path = join(PUBLIC_DIR, name);
-    if (!type || !existsSync(path)) return c.text("niet gevonden", 404);
-    return c.body(readFileSync(path), 200, { "content-type": type, "cache-control": "no-cache" });
+  app.get("/static/*", (c) => {
+    let rel: string;
+    try {
+      rel = decodeURIComponent(c.req.path.slice("/static/".length));
+    } catch {
+      return c.text("niet gevonden", 404);
+    }
+    const ext = rel.split(".").pop() ?? "";
+    const type = STATIC_TYPES[ext];
+    const path = join(PUBLIC_DIR, rel);
+    if (!type || !/^[A-Za-z0-9._/-]+$/.test(rel) || rel.includes("..") || !path.startsWith(PUBLIC_DIR) || !existsSync(path)) {
+      return c.text("niet gevonden", 404);
+    }
+    // Modellen veranderen zelden; code en opmaak altijd vers ophalen.
+    const cache = ext === "glb" || ext === "png" ? "public, max-age=604800" : "no-cache";
+    return c.body(readFileSync(path), 200, { "content-type": type, "cache-control": cache });
   });
 
   return app;

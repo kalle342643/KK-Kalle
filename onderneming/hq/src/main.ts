@@ -20,6 +20,7 @@ import { TelegramApi, TelegramNotifier } from "./notify/telegram.js";
 import { WhatsAppNotifier } from "./notify/whatsapp.js";
 import { rebuildKnowledge } from "./knowledge/service.js";
 import { OfficeEvents } from "./office/events.js";
+import { OfficeNotifier } from "./office/notifier.js";
 import { PaperclipWatcher } from "./office/watcher.js";
 import { HttpPaperclipClient } from "./paperclip/client.js";
 
@@ -70,13 +71,15 @@ async function makeContext(config: Config): Promise<{ ctx: AppContext; telegram?
   const companyId = await resolveCompanyId({ db, config });
   if (!companyId) die("Nog geen holding in Paperclip. Draai eerst: hq bootstrap");
   const { notifier, telegram } = makeNotifier(config);
+  const events = new OfficeEvents(db, consoleLogger);
   const ctx: AppContext = {
     db,
     config,
     paperclip,
-    notifier,
+    // Elk bericht aan jou is in het kantoor te zien bij de HQ-bot.
+    notifier: new OfficeNotifier(notifier, events),
     companyId,
-    events: new OfficeEvents(db, consoleLogger),
+    events,
     now: () => new Date(),
     log: consoleLogger,
   };

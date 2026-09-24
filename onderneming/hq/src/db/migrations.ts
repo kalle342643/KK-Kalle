@@ -186,4 +186,17 @@ create table notes (
 create index notes_fts_idx on notes using gin (to_tsvector('simple', title || ' ' || body));
 `,
   },
+  {
+    id: "003_profiles",
+    sql: `
+-- Wat jij in het kantoor aan een agent verandert: een bijnaam en een uiterlijk.
+-- Ook voor 'owner' (jij) en 'hq-bot' (de bot die je berichten stuurt).
+create table agent_profiles (
+  agent_id text primary key,
+  nickname text,
+  avatar integer check (avatar between 0 and 11),
+  updated_at timestamptz not null default now()
+);
+`,
+  },
 ];

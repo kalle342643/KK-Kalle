@@ -329,7 +329,9 @@ export async function formatApproval(ctx: AppContext, record: ApprovalRecord): P
   if (record.requestedByAgentId) {
     try {
       const agent = await ctx.paperclip.getAgent(record.requestedByAgentId);
-      who = `${agent.name}${agent.title ? ` (${agent.title})` : ""} vraagt: `;
+      const nick = (await ctx.db.query<{ nickname: string | null }>("select nickname from agent_profiles where agent_id = $1", [agent.id]))[0]?.nickname;
+      const name = nick && nick !== agent.name ? `${nick} (${agent.name})` : agent.name;
+      who = `${name}${agent.title ? `, ${agent.title},` : ""} vraagt: `;
     } catch {
       who = "Een agent vraagt: ";
     }

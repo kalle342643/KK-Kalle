@@ -9,6 +9,8 @@ import { computePortfolio } from "../domain/portfolio.js";
 import { addLocalDays, startOfLocalDay, startOfLocalMonth } from "../domain/time.js";
 import { knowledgeGraph } from "../knowledge/service.js";
 import type { PcAgent } from "../paperclip/types.js";
+import { listProfiles, people } from "./profiles.js";
+import { listProjects, officeStats } from "./projects.js";
 import type { OfficeAgent, OfficeBranch, OfficeSnapshot } from "./types.js";
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v : null);
@@ -54,6 +56,7 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     for (const r of rows) if (r.text) tasks.set(r.agent_id, r.text);
   }
 
+  const profiles = await listProfiles(ctx.db);
   const agents: OfficeAgent[] = pcAgents.map((a) => {
     const hq = (a.metadata?.hq ?? {}) as Record<string, unknown>;
     const model = str((a.adapterConfig as Record<string, unknown> | undefined)?.model);
@@ -75,6 +78,8 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
       lastActiveAt: a.lastHeartbeatAt,
       pauseReason: a.pauseReason,
       currentTask: tasks.get(a.id) ?? null,
+      nickname: profiles.get(a.id)?.nickname ?? null,
+      avatar: profiles.get(a.id)?.avatar ?? null,
     };
   });
 
@@ -133,6 +138,9 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     },
     branches: officeBranches,
     agents,
+    people: await people(ctx.db),
+    projects: await listProjects(ctx),
+    stats: await officeStats(ctx),
     approvals: pending.map((a) => ({
       id: a.id,
       title: a.title,

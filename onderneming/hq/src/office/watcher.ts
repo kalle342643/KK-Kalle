@@ -127,8 +127,19 @@ export class PaperclipWatcher {
       if (current.has(runId)) continue;
       this.liveRuns.delete(runId);
       let status = "finished";
+      let usage: Record<string, unknown> = {};
       try {
-        status = (await this.ctx.paperclip.getRun(runId)).status;
+        const detail = await this.ctx.paperclip.getRun(runId);
+        status = detail.status;
+        const u = detail.usageJson ?? null;
+        if (u) {
+          usage = {
+            tokensIn: typeof u.inputTokens === "number" ? u.inputTokens : null,
+            tokensOut: typeof u.outputTokens === "number" ? u.outputTokens : null,
+            costUsd: typeof u.costUsd === "number" ? Math.round(u.costUsd * 10000) / 10000 : null,
+            model: typeof u.model === "string" ? u.model : null,
+          };
+        }
       } catch {
         // Onbekend: gewoon klaar.
       }
@@ -136,7 +147,7 @@ export class PaperclipWatcher {
         type: "run.finished",
         agentId: info.agentId,
         text: info.issueTitle,
-        data: { runId, status },
+        data: { runId, status, ...usage },
         sourceKey: `run:${runId}:end`,
       });
     }

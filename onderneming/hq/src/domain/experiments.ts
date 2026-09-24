@@ -326,7 +326,9 @@ export async function startExperiment(ctx: AppContext, id: number): Promise<Expe
         name,
         status: "in_progress",
         leadAgentId: lead,
-        idempotencyKey: `hq-exp-${id}`,
+        // Met het aanmaakmoment erbij: na een lege HQ-database begint de nummering opnieuw bij 1,
+        // en dan mag EXP-1 niet op het oude project van een vorige EXP-1 botsen.
+        idempotencyKey: `hq-exp-${id}-${exp.createdAt.getTime().toString(36)}`,
       });
       projectId = project.id;
     } catch (err) {

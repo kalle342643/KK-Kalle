@@ -30,6 +30,10 @@ export type OfficeEventType =
   | "experiment.verdict"
   /** Een agent stuurt jou een bericht. */
   | "notify"
+  /** HQ stuurde jou een bericht (Telegram/WhatsApp); de HQ-bot in de controlekamer. */
+  | "message.sent"
+  /** Je gaf een agent een bijnaam of ander uiterlijk. */
+  | "agent.profile"
   | "halt"
   | "resume";
 
@@ -73,6 +77,60 @@ export interface OfficeAgent {
   pauseReason: string | null;
   /** Waar hij nu aan werkt (als er een run loopt). */
   currentTask: string | null;
+  /** Door jou gekozen bijnaam en uiterlijk (poppetje 0-11). */
+  nickname: string | null;
+  avatar: number | null;
+}
+
+/** Jij en de HQ-bot lopen ook rond in het kantoor, maar zijn geen Paperclip-agents. */
+export interface OfficePerson {
+  id: "owner" | "hq-bot";
+  name: string;
+  nickname: string | null;
+  avatar: number | null;
+}
+
+export type ProjectStatus = "proposed" | "approved" | "running" | "keep" | "iterate" | "killed" | "rejected";
+
+/** Een project = een experiment, met alles wat je nodig hebt om te zien hoe het ervoor staat. */
+export interface OfficeProject {
+  id: number;
+  code: string;
+  title: string;
+  branch: string;
+  branchName: string;
+  status: ProjectStatus;
+  leadAgentId: string | null;
+  metric: string;
+  target: number;
+  value: number | null;
+  trusted: boolean;
+  spentEur: number;
+  budgetEur: number;
+  revenueEur: number;
+  daysLeft: number | null;
+  startedAt: string | null;
+  endedAt: string | null;
+  createdAt: string;
+  reason: string | null;
+  iteration: number;
+  hypothesis: string;
+  prediction: string | null;
+}
+
+export interface OfficeStats {
+  /** Omzet en kosten per dag (oudste eerst), in de tijdzone van HQ. */
+  days: Array<{ date: string; revenueEur: number; costEur: number }>;
+  branches: Array<{ slug: string; name: string; revenue30Eur: number; cost30Eur: number; budgetEur: number }>;
+  totals: { revenue30Eur: number; cost30Eur: number; tokensToday: number; runsToday: number };
+}
+
+export interface ProjectDetail {
+  project: OfficeProject;
+  metrics: Array<{ name: string; value: number; source: string; trusted: boolean; at: string }>;
+  ledger: Array<{ kind: string; amountEur: number; source: string; description: string | null; at: string }>;
+  lessons: Array<{ id: number; lesson: string; tags: string[]; at: string }>;
+  events: OfficeEvent[];
 }
 
 export interface OfficeExperiment {
@@ -154,6 +212,9 @@ export interface OfficeSnapshot {
   };
   branches: OfficeBranch[];
   agents: OfficeAgent[];
+  people: OfficePerson[];
+  projects: OfficeProject[];
+  stats: OfficeStats;
   approvals: OfficeApproval[];
   knowledge: { source: "graphify" | "hq"; nodes: number; edges: number; builtAt: string | null };
   events: OfficeEvent[];
