@@ -35,9 +35,10 @@ flowchart TD
 | **Jij** | ✅/❌ op geld, publicaties, aannames en nieuwe takken; omzet invoeren als die niet automatisch binnenkomt | het dagelijkse werk |
 
 ## Het kantoor
-Het kantoor (`/`) is de plek waar je alles bedient. Elk poppetje is een echte agent uit Paperclip; wat je ziet
-gebeurt echt. Er wordt niets gesimuleerd behalve wat sfeer als er niets gebeurt (koffie halen, een praatje; met
-🐢 zet je dat uit).
+Het kantoor (`/`) is de plek waar je alles bedient. Elk poppetje met een naam is een echte agent uit Paperclip; wat
+je ziet gebeurt echt. Er wordt niets gesimuleerd behalve wat sfeer als er niets gebeurt (koffie halen, een praatje,
+figuranten zonder naam; met 🐢 zet je dat uit). Niemand zegt iets wat niet gezegd is: krijgt een agent een taak of
+een reactie, dan toont hij alleen 📥 (ontvangen) of 👀 (gelezen), geen verzonnen antwoord.
 
 | Wat je ziet | Wat er echt gebeurde | Bron |
 |---|---|---|
@@ -47,7 +48,8 @@ gebeurt echt. Er wordt niets gesimuleerd behalve wat sfeer als er niets gebeurt 
 | Iemand brengt een papiertje naar jouw bureau | een verzoek wacht op jouw ✅/❌ | HQ-goedkeuringen |
 | Iemand zit op de bank bij de receptie | een sollicitant (nieuwe agent) wacht op jou | Paperclip `agent.hire_created` |
 | Muntjes in een afdeling | omzet geboekt | HQ-grootboek |
-| Drie of meer van één afdeling in de vergaderzaal | ze werken tegelijk aan iets | afgeleid uit de runs |
+| Twee of meer samen aan de vergadertafel ("🤝 Samen aan: …") | ze werken op hetzelfde moment aan dezelfde klus: dezelfde taak, of subtaken van één taak (zoals de ideeënraad) | Paperclip-runs + de bovenliggende taak (`parentId`) |
+| ☑️ boven een agent | hij rondde een opdracht af die iemand anders hem gaf | Paperclip-activiteit (`issue.updated` naar klaar) |
 | De HQ-bot in de controlekamer stuurt iets | een Telegram-bericht aan jou | HQ-meldingen |
 | Rood licht, iedereen terug naar de eigen plek | noodstop | HQ kill switch |
 | Ballon "🔎 zoekt: …" of "🌐 leest: …" boven een agent | de agent gebruikt het web of de kennisgraaf tijdens zijn run | het run-logboek in Paperclip (`heartbeat-runs/:id/log`) |
@@ -55,9 +57,15 @@ gebeurt echt. Er wordt niets gesimuleerd behalve wat sfeer als er niets gebeurt 
 | Het bord van een project wordt rood, de HQ-bot rent erheen | de site ligt eruit (twee gezondheidschecks op rij mis) | HQ-gezondheidscheck |
 | Confetti bij een projectbord | een pull request is samengevoegd of een nieuwe versie staat live | GitHub (pull requests, deployments) |
 
-Klikbaar: elk poppetje (naam geven, uiterlijk kiezen, waar het aan werkt, kosten, pauzeren), het projectenbord
-(vergaderzaal), de cijfermuur (controlekamer), de kluis (grootboek), het hologram (kennisgraaf), jouw bureau
-(verzoeken) en de rode knop (noodstop). `/overzicht` is de oude pagina met alles in lijsten; `/demo` is een
+Klikbaar, en overal kun je ook iets dóén:
+- **een poppetje:** waar het aan werkt, kosten, nut, een taak geven, pauzeren of hervatten, naam en uiterlijk;
+- **een project** (projectenbord in de vergaderzaal): 📏 een meting invoeren, 💶 omzet boeken, ⚖️ zelf beslissen
+  (KEEP, ITERATE of KILL, via hetzelfde pad als de automatische beoordeling);
+- **de kluis:** 💶 omzet boeken, 📄 een CSV importeren, de laatste boekingen;
+- **het hologram (kennisbank):** zoeken in lessen en notities, met de graaf eronder;
+- **de cijfermuur:** cijfers, en de nut-meter (💤 nu al pauzeren wie niets oplevert);
+- **jouw bureau:** verzoeken goedkeuren of afwijzen; **de rode knop:** noodstop;
+- **de werkplaats:** projecten volgen, Claude Code een opdracht geven. `/overzicht` is de oude pagina met alles in lijsten; `/demo` is een
 verzonnen bedrijf om het kantoor te laten zien zonder echte gegevens.
 
 **Hoe het werkt.**

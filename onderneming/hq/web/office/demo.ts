@@ -6,10 +6,13 @@
  */
 import type {
   AgentValue,
+  AutoPauseResult,
   BacklogItem,
   CodeProject,
   CodeSession,
   KnowledgeGraph,
+  KnowledgeHits,
+  LedgerLine,
   OfficeAgent,
   OfficeApproval,
   OfficeBranch,
@@ -19,7 +22,7 @@ import type {
   OfficeSnapshot,
   ProjectDetail,
 } from "../../src/office/types.js";
-import type { CodeProjectInput, DataSource, RepoChoice } from "./data.js";
+import type { CodeProjectInput, DataSource, RepoChoice, RevenueInput } from "./data.js";
 import { BOT_ID, OWNER_ID } from "./layout.js";
 
 const DAY = 86_400_000;
@@ -313,6 +316,21 @@ const LESSONS = [
   "Een build onder 5 MB laadt snel genoeg op mobiel",
 ];
 
+/** Notities van verkenners (verzonnen), om in de kennisbank op te zoeken. */
+const DEMO_NOTES: KnowledgeHits["notes"] = [
+  { id: 1, title: "Poki: puzzelgames in de top 20", excerpt: "7 van de top 20 zijn puzzelgames met levels onder een minuut. Kleur als mechaniek zie je bijna niet.", author: "Rigel", tags: ["games", "puzzel"] },
+  { id: 2, title: "Klachten over moeilijke levels", excerpt: "In reacties onder puzzelgames klagen spelers vooral over een te steile moeilijkheid rond level 10.", author: "Deneb", tags: ["games", "levels"] },
+  { id: 3, title: "Affiliate-programma's voor microfoons", excerpt: "Bol.com betaalt 3-5%, Amazon.nl 3%; Coolblue heeft geen open programma.", author: "Beuk", tags: ["content", "affiliate"] },
+  { id: 4, title: "Zzp'ers en facturen", excerpt: "Veel irritatie over het handmatig overtypen van bonnetjes; bestaande tools kosten € 10-25 per maand.", author: "Waal", tags: ["saas", "zzp"] },
+];
+
+/** De ideeënraad per tak, zoals de lead hem met subtaken regelt (skill ideeenraad). */
+const COUNCIL_TASKS: Record<string, string> = {
+  "tak-lead": "Top 5 maken uit de waarnemingen van de verkenners",
+  verkenner: "Waarnemingen verzamelen uit mijn eigen bron",
+  criticus: "Pitches afschieten met live data van concurrenten",
+};
+
 const TALK: Record<string, string[]> = {
   lead: ["Kun je dit vandaag afronden?", "Goed werk, zet het in HQ als meting", "Eerst in de kennisbank kijken of we dit al eens probeerden", "Hou het budget in de gaten: nog € 8 over"],
   member: ["Klaar met de eerste versie, wil je kijken?", "Ik zie 3 klachten over te moeilijke levels", "Dit idee is te duur om te bouwen, voorstel: kleiner beginnen", "Meting staat in HQ", "Ik loop vast op de laadtijd, tips?"],
@@ -354,6 +372,9 @@ export class DemoSource implements DataSource {
   private readonly events: OfficeEvent[] = [];
   private readonly metrics = new Map<number, Array<{ value: number; at: string; source: string; trusted: boolean }>>();
   private readonly lessons: Array<{ id: number; lesson: string; tags: string[]; at: string; projectId: number | null }> = [];
+  /** Wat jij zelf boekte (omzet, CSV). */
+  private readonly booked: LedgerLine[] = [];
+  private councils = 0;
   private days: Array<{ date: string; revenueEur: number; costEur: number }> = [];
   private readonly runs = new Map<string, { until: number; task: string }>();
   private halted = false;
@@ -697,6 +718,118 @@ export class DemoSource implements DataSource {
     return { repos: REPOS, error: null };
   }
 
+  // ---------------------------------------------------------------- wat jij invoert en beslist
+
+  async addMetric(experimentId: number, metric: { name: string; value: number; note?: string }): Promise<void> {
+    const p = this.projects.find((x) => x.id === experimentId);
+    if (!p) throw new Error(`Project EXP-${experimentId} bestaat niet.`);
+    if (!["running", "keep", "iterate"].includes(p.status)) throw new Error(`${p.code} loopt niet.`);
+    if (!/^[a-z0-9_]{2,40}$/.test(metric.name)) throw new Error("Naam van de meting: kleine letters, cijfers of _.");
+    if (metric.name === p.metric) {
+      p.value = metric.value;
+      p.trusted = true;
+      const list = this.metrics.get(p.id) ?? [];
+      list.push({ value: metric.value, at: new Date().toISOString(), source: "owner", trusted: true });
+      this.metrics.set(p.id, list.slice(-30));
+    }
+    this.emit({ type: "metric", agentId: null, text: `${p.code} ${metric.name}: ${metric.value}`, data: { experimentId: p.id, name: metric.name, value: metric.value, trusted: true, by: "owner" } });
+  }
+
+  async addRevenue(input: RevenueInput): Promise<void> {
+    if (!(input.amountEur > 0)) throw new Error("Bedrag moet groter dan 0 zijn.");
+    if (!this.branches.some((b) => b.slug === input.branch)) throw new Error(`Onbekende tak '${input.branch}'.`);
+    const p = input.experimentId ? this.projects.find((x) => x.id === input.experimentId) : undefined;
+    if (p) p.revenueEur = round2(p.revenueEur + input.amountEur);
+    const today = this.days[this.days.length - 1]!;
+    today.revenueEur = round2(today.revenueEur + input.amountEur);
+    this.booked.push({
+      id: this.booked.length + 1,
+      kind: "revenue",
+      amountEur: round2(input.amountEur),
+      source: input.source,
+      description: input.description ?? null,
+      branch: input.branch,
+      experiment: p?.code ?? null,
+      at: new Date().toISOString(),
+    });
+    this.emit({ type: "revenue", agentId: null, text: input.description ?? null, data: { amountEur: round2(input.amountEur), branch: input.branch, experimentId: p?.id ?? null, source: input.source } });
+  }
+
+  async importCsv(text: string): Promise<{ imported: number; errors: string[] }> {
+    const errors: string[] = [];
+    let imported = 0;
+    const lines = text.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    for (const [k, line] of lines.entries()) {
+      const [date, amountRaw, branch, source, description] = line.split(/[;,\t]/).map((x) => x.trim());
+      if (k === 0 && /datum|date/i.test(date ?? "")) continue;
+      const amount = Number((amountRaw ?? "").replace(",", "."));
+      if (!["crazygames", "affiliate", "owner", "csv"].includes(source ?? "")) {
+        errors.push(`regel ${k + 1}: bron '${source ?? ""}' mag niet`);
+        continue;
+      }
+      if (!date || !Number.isFinite(amount) || amount <= 0 || !branch) {
+        errors.push(`regel ${k + 1}: onleesbaar`);
+        continue;
+      }
+      try {
+        await this.addRevenue({ amountEur: amount, branch, source: source === "csv" ? "owner" : (source as RevenueInput["source"]), description: description || "CSV-import" });
+        imported += 1;
+      } catch (err) {
+        errors.push(`regel ${k + 1}: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+    return { imported, errors };
+  }
+
+  async endProject(id: number, verdict: "keep" | "iterate" | "kill", reason: string): Promise<void> {
+    const p = this.projects.find((x) => x.id === id);
+    if (!p) throw new Error(`Project EXP-${id} bestaat niet.`);
+    if (p.status !== "running") throw new Error(`${p.code} loopt niet.`);
+    if (reason.trim().length < 3) throw new Error("Schrijf kort waarom (minstens 3 tekens).");
+    p.status = verdict === "kill" ? "killed" : verdict;
+    p.endedAt = new Date().toISOString();
+    p.daysLeft = null;
+    p.reason = `Besloten door jou: ${reason.trim()}`;
+    const label = verdict === "keep" ? "✅ KEEP" : verdict === "iterate" ? "🔁 ITERATE" : "🪦 KILL";
+    this.emit({ type: "experiment.verdict", agentId: p.leadAgentId, text: `${label} ${p.code} ${p.title}`, data: { experimentId: p.id, verdict, branch: p.branch, reason: p.reason } });
+    this.emit({ type: "message.sent", agentId: BOT_ID, text: `${label} ${p.code} ${p.title}\n${p.reason}`, data: {} });
+  }
+
+  async ledger(limit = 25): Promise<LedgerLine[]> {
+    // Per dag de omzet en de AI-kosten (zoals de importers en de kostensync ze boeken), plus wat jij zelf boekte.
+    const daily: LedgerLine[] = this.days.slice(-10).flatMap((d, k) => [
+      { id: 1000 + k * 2, kind: "revenue" as const, amountEur: d.revenueEur, source: "csv", description: "CrazyGames en affiliate (dagtotaal)", branch: "games", experiment: null, at: `${d.date}T20:00:00.000Z` },
+      { id: 1001 + k * 2, kind: "token_cost" as const, amountEur: d.costEur, source: "paperclip", description: "AI-kosten van de agents", branch: null, experiment: null, at: `${d.date}T23:00:00.000Z` },
+    ]);
+    return clone([...daily, ...this.booked].sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit));
+  }
+
+  async searchKnowledge(q: string): Promise<KnowledgeHits> {
+    const terms = q.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter((w) => w.length >= 3);
+    if (!terms.length) throw new Error("Zoek op minstens 3 tekens.");
+    const hit = (text: string) => terms.some((t) => text.toLowerCase().includes(t));
+    const known = this.lessons.map((l) => ({ id: l.id, lesson: l.lesson, tags: l.tags, experiment: l.projectId ? `EXP-${l.projectId}` : null as string | null }));
+    const lessons = [...known, ...LESSONS.filter((text) => !known.some((l) => l.lesson === text)).map((lesson, k) => ({ id: 100 + k, lesson, tags: ["demo"], experiment: null as string | null }))];
+    return {
+      lessons: lessons.filter((l) => hit(l.lesson)).slice(0, 6),
+      notes: DEMO_NOTES.filter((n) => hit(`${n.title} ${n.excerpt}`)).slice(0, 6),
+    };
+  }
+
+  async pauseIdle(): Promise<AutoPauseResult> {
+    const paused: AutoPauseResult["paused"] = [];
+    for (const v of this.agentValues()) {
+      const a = this.agent(v.agentId);
+      if (v.verdict !== "niets" || !a || a.status === "paused" || a.status === "pending_approval") continue;
+      if (this.runs.has(a.id)) this.finishRun(a, "cancelled");
+      a.status = "paused";
+      a.pauseReason = "nut-meter";
+      paused.push({ agentId: a.id, name: a.name, costEur: v.costEur });
+      this.emit({ type: "agent.status", agentId: a.id, text: `${a.name} is gepauzeerd door de nut-meter: kostte ${eur(v.costEur)} zonder resultaat`, data: { from: "idle", to: "paused", by: "nut-meter" } });
+    }
+    return { paused, skipped: null };
+  }
+
   /** Een sessie zet een helper in, of een helper levert op. Geeft true als er iets gebeurde. */
   private helperStep(): boolean {
     const moment = this.clock % 180;
@@ -998,14 +1131,30 @@ export class DemoSource implements DataSource {
     return pick(list);
   }
 
-  private startRun(a: OfficeAgent, announce = true): void {
-    const task = this.taskFor(a);
-    this.runs.set(a.id, { until: this.clock + 14 + Math.random() * 30, task });
+  private startRun(a: OfficeAgent, announce = true, work?: { task: string; job: { groupId: string; title: string } }): void {
+    const task = work?.task ?? this.taskFor(a);
+    this.runs.set(a.id, { until: this.clock + (work ? 40 + Math.random() * 25 : 14 + Math.random() * 30), task });
     a.status = "running";
     a.currentTask = task;
+    a.job = work?.job ?? null;
     a.lastActiveAt = new Date().toISOString();
-    if (announce) this.emit({ type: "run.started", agentId: a.id, text: task, data: {} });
-    else this.events.push({ id: this.nextId++, at: new Date().toISOString(), type: "run.started", agentId: a.id, targetAgentId: null, text: task, data: {} });
+    const data = work ? { groupId: work.job.groupId, groupTitle: work.job.title } : {};
+    if (announce) this.emit({ type: "run.started", agentId: a.id, text: task, data });
+    else this.events.push({ id: this.nextId++, at: new Date().toISOString(), type: "run.started", agentId: a.id, targetAgentId: null, text: task, data });
+  }
+
+  /**
+   * De ideeënraad van een tak: de lead zet subtaken uit voor de verkenners en de criticus, die er tegelijk aan
+   * werken. Eén klus, dus in het kantoor zitten ze samen aan tafel (net als live, via de bovenliggende taak).
+   */
+  private council(): void {
+    const branches = this.branches.filter((b) => b.slug !== "holding");
+    const branch = branches[this.councils++ % branches.length];
+    if (!branch) return;
+    const members = this.active().filter((a) => a.branch === branch.slug && !this.runs.has(a.id) && a.template && COUNCIL_TASKS[a.template]);
+    if (members.length < 2) return;
+    const job = { groupId: `council-${branch.slug}-${this.clock}`, title: `Ideeënraad ${branch.name}` };
+    for (const a of members) this.startRun(a, true, { task: COUNCIL_TASKS[a.template!]!, job });
   }
 
   private finishRun(a: OfficeAgent, status: "succeeded" | "failed" | "cancelled"): void {
@@ -1013,6 +1162,7 @@ export class DemoSource implements DataSource {
     this.runs.delete(a.id);
     a.status = "idle";
     a.currentTask = null;
+    a.job = null;
     const tokensIn = 8000 + Math.round(Math.random() * 40_000);
     const tokensOut = 600 + Math.round(Math.random() * 4000);
     const costEur = round2((a.model?.includes("haiku") ? 0.004 : a.model?.includes("opus") ? 0.05 : 0.02) * (tokensIn / 10_000));
@@ -1043,6 +1193,8 @@ export class DemoSource implements DataSource {
       if (this.clock >= run.until) this.finishRun(a, Math.random() < 0.06 ? "failed" : "succeeded");
     }
     if (this.halted) return;
+    // Om de paar minuten de ideeënraad van een tak (de eerste al vlak na binnenkomst).
+    if (this.clock % 200 === 25) this.council();
     // Wie aan het werk is, gaat soms het web op.
     if (this.runs.size && Math.random() < 0.22) this.webStep();
     // De werkplaats: Claude Code aan het werk, en af en toe iets met een project.

@@ -65,6 +65,8 @@ export class Actor {
   /** Tijd tot hij weer iets 'uit zichzelf' mag doen (koffie, praatje). */
   restless = 20 + Math.random() * 40;
   meeting: string | null = null;
+  /** De klus waar zijn huidige taak bij hoort (Paperclip-taak of de bovenliggende taak); samen = aan tafel. */
+  job: { groupId: string; title: string | null } | null = null;
   visible = true;
 
   constructor(

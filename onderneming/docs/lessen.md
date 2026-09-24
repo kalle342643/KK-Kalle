@@ -183,6 +183,22 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
   op dat moment liep, stond daarna naast het gebouw (en kwam er niet meer in: geen route vanaf daar). Nu gaat wie na
   een verbouwing niet op de vloer staat meteen naar zijn eigen plek.
 
+## Functie boven hoe cool het is (24 september, avond)
+- **Een kantoor mag niets laten zien wat er niet is.** Het "overleg" gebeurde zodra drie agents van één afdeling
+  tegelijk werkten, ook als ze niets met elkaar te maken hadden, en collega's antwoordden met verzonnen zinnen ("Top,
+  dank je!"). Nu: samen aan tafel alleen bij dezelfde klus (Paperclip-taak of subtaken via `parentId`), en de ontvanger
+  toont alleen 📥 of 👀. Daarom zet de lead de ideeënraad op als één taak met subtaken; dat is ook terug te lezen.
+- **Een paneel waar je alleen kunt kijken, laat je terug naar Telegram grijpen.** Meting invoeren, omzet boeken, een
+  CSV importeren, zelf beslissen en zoeken in de kennisbank kan nu in het kantoor, met dezelfde routes als de rest.
+  Zelf beslissen loopt via hetzelfde pad als de automatische beoordeling (vervolgtaak, lessen, bericht).
+- **Een hint in de UI moet kloppen met de code.** Het kantoor noemde Nederlandse CSV-kolommen, de importer kende alleen
+  Engelse. Nu kent de importer beide. Les: test een hint door hem letterlijk te volgen.
+- **Klik-test in live-modus zonder Paperclip:** een echte HQ-server (routes, kantoor-bundel, SSE) met de nep-Paperclip
+  uit de tests, gebundeld met esbuild (`--packages=external`, uitvoer in `dist/api/` zodat `../public/` klopt), en
+  Playwright die elke knop indrukt en daarna de API controleert: 17 van 17. Een lege `favicon.ico` gaf de enige fout.
+- **Paperclip draait alleen op Node ≥ 24.11** (de doctor blokkeert daaronder), OmniRoute op 22.22.2+ of 24. Op de
+  server staat Node 24 (past bij allebei); in deze sandbox is de standaard 22.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.

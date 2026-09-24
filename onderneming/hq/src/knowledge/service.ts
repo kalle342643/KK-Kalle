@@ -46,7 +46,7 @@ export async function knowledgeSize(db: Db): Promise<number> {
 }
 
 /** Beantwoordt een vraag van een agent uit de kennisbank en laat hem in het kantoor naar de Graphify-kamer lopen. */
-export async function askKnowledge(ctx: AppContext, question: string, agentId: string | null): Promise<KnowledgeAnswer> {
+export async function askKnowledge(ctx: AppContext, question: string, agentId: string | null, opts: { emit?: boolean } = {}): Promise<KnowledgeAnswer> {
   const terms = searchTerms(question);
   const lessons = await rankedSearch<{ id: number; lesson: string; tags: string[] | null; experiment_id: number | null }>(
     ctx.db,
@@ -76,12 +76,15 @@ export async function askKnowledge(ctx: AppContext, question: string, agentId: s
   }
   const graphSource = graph ? (graphPath(ctx.config.knowledge.vaultDir)?.source ?? null) : null;
 
-  await ctx.events.emit({
-    type: "knowledge.query",
-    agentId,
-    text: question,
-    data: { lessons: lessons.length, notes: notes.length, graph: Boolean(graph), terms },
-  });
+  // Een agent die iets opzoekt, loopt in het kantoor naar de kennisbank; als jij zoekt, blijft het stil.
+  if (opts.emit !== false) {
+    await ctx.events.emit({
+      type: "knowledge.query",
+      agentId,
+      text: question,
+      data: { lessons: lessons.length, notes: notes.length, graph: Boolean(graph), terms },
+    });
+  }
 
   const found = lessons.length + notes.length + (graph ? 1 : 0);
   return {

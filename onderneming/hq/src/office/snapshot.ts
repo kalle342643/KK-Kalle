@@ -45,16 +45,20 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     paperclipError = errorMessage(err);
   }
 
-  // Waar werken ze nu aan? De watcher legde bij elke gestarte run de taak vast.
+  // Waar werken ze nu aan, en bij welke klus hoort dat? De watcher legde bij elke gestarte run de taak vast.
   const tasks = new Map<string, string>();
+  const jobs = new Map<string, { groupId: string; title: string | null }>();
   const liveAgents = pcAgents.filter((a) => a.status === "running").map((a) => a.id);
   if (liveAgents.length) {
-    const rows = await ctx.db.query<{ agent_id: string; text: string | null }>(
-      `select distinct on (agent_id) agent_id, text from office_events
-       where type = 'run.started' and agent_id = any($1::text[]) order by agent_id, id desc`,
+    const rows = await ctx.db.query<{ agent_id: string; text: string | null; group_id: string | null; group_title: string | null }>(
+      `select distinct on (agent_id) agent_id, text, data->>'groupId' as group_id, data->>'groupTitle' as group_title
+       from office_events where type = 'run.started' and agent_id = any($1::text[]) order by agent_id, id desc`,
       [liveAgents],
     );
-    for (const r of rows) if (r.text) tasks.set(r.agent_id, r.text);
+    for (const r of rows) {
+      if (r.text) tasks.set(r.agent_id, r.text);
+      if (r.group_id) jobs.set(r.agent_id, { groupId: r.group_id, title: r.group_title });
+    }
   }
 
   const profiles = await listProfiles(ctx.db);
@@ -79,6 +83,7 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
       lastActiveAt: a.lastHeartbeatAt,
       pauseReason: a.pauseReason,
       currentTask: tasks.get(a.id) ?? null,
+      job: jobs.get(a.id) ?? null,
       nickname: profiles.get(a.id)?.nickname ?? null,
       avatar: profiles.get(a.id)?.avatar ?? null,
     };

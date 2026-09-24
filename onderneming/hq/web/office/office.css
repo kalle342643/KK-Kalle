@@ -957,6 +957,8 @@ button.chip:hover {
 input[type="text"],
 input[type="search"],
 input[type="url"],
+input[type="number"],
+.panel-body input[type="file"],
 .panel-body select,
 .panel-body textarea {
   font: inherit;
@@ -1080,6 +1082,63 @@ input[type="url"],
   margin: 6px 0 14px;
   padding-left: 18px;
   font-size: 13px;
+}
+/* Zoekresultaten in de kennisbank. */
+.knowledge-results {
+  margin: 8px 0 12px;
+}
+.knowledge-results .notes {
+  list-style: none;
+  margin: 6px 0 14px;
+  padding: 0;
+  font-size: 13px;
+}
+.knowledge-results .notes li {
+  padding: 6px 0;
+  border-bottom: 1px solid var(--border);
+}
+.knowledge-results .notes p {
+  margin: 2px 0 0;
+}
+/* De kluis: laatste boekingen. */
+.ledger-lines {
+  list-style: none;
+  margin: 6px 0 14px;
+  padding: 0;
+}
+.ledger-lines li {
+  display: grid;
+  grid-template-columns: 52px minmax(96px, auto) 1fr;
+  gap: 8px;
+  align-items: baseline;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--border);
+}
+.ledger-lines .amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ledger-lines .amount.plus {
+  color: var(--good-ink);
+}
+.ledger-lines .amount.minus {
+  color: var(--muted);
+}
+.task-form .row input,
+.task-form .row select,
+.task-form .grow {
+  flex: 1;
+  min-width: 0;
+}
+.task-form .grow select {
+  width: 100%;
+}
+.task-form .buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
 }
 
 /* Verzoeken. */

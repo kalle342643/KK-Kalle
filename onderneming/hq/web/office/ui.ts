@@ -6,7 +6,7 @@
 import type { AgentValue, CodeProject, CodeSession, OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
 import { codeStatus, COLUMNS, progressOf } from "./boards.js";
 import { hideTip, lineChart, pairedBars } from "./charts.js";
-import type { DataSource } from "./data.js";
+import type { DataSource, RevenueInput } from "./data.js";
 import { isExtraId, type Director, type Liveliness } from "./director.js";
 import { layoutGraph } from "./hologram.js";
 import { BOT_ID, OWNER_ID, type Layout } from "./layout.js";
@@ -366,7 +366,7 @@ export class Ui {
       case "revenue":
         return `💶 +${eur(Number(e.data.amountEur ?? 0))}${e.data.branch ? ` voor ${this.branchName(String(e.data.branch))}` : ""}${t ? ` · ${t}` : ""}`;
       case "metric":
-        return `📈 ${who}: ${t}`;
+        return e.agentId ? `📈 ${who}: ${t}` : e.data.by === "owner" ? `📏 ${this.label(OWNER_ID)}: ${t} (betrouwbaar)` : `📈 ${t}`;
       case "experiment.started":
         return `🚀 Gestart: ${t}`;
       case "experiment.verdict":
@@ -903,6 +903,7 @@ export class Ui {
         stat("Omzet", eur(p.revenueEur)),
         stat(p.status === "running" ? "Nog" : "Gestart", p.status === "running" ? `${p.daysLeft ?? "?"} dagen` : p.startedAt ? new Date(p.startedAt).toLocaleDateString("nl-NL") : "–"),
       ),
+      ...this.projectActions(p),
       h("h3", {}, `${p.metric} door de tijd`),
       chartHost,
       p.reason ? h("section", { class: "card" }, h("h3", {}, "Uitkomst"), h("p", {}, p.reason)) : null,
@@ -925,6 +926,88 @@ export class Ui {
       );
     });
     return el;
+  }
+
+  /**
+   * Wat jij bij een project doet: een meting invoeren (bv. plays uit het CrazyGames-portaal; alleen metingen van
+   * jou of een import tellen als bewijs), omzet boeken, of zelf beslissen voordat de deadline komt.
+   */
+  private projectActions(p: OfficeProject): HTMLElement[] {
+    const out: HTMLElement[] = [];
+    const reopen = () => this.open("project", String(p.id));
+    if (["running", "keep", "iterate"].includes(p.status)) {
+      const name = h("input", { type: "text", value: p.metric, "aria-label": "Naam van de meting", pattern: "[a-z0-9_]{2,40}" }) as HTMLInputElement;
+      const value = h("input", { type: "number", step: "any", min: "0", placeholder: `Aantal (doel ${p.target})`, "aria-label": "Waarde" }) as HTMLInputElement;
+      const save = async () => {
+        const n = Number(value.value.replace(",", "."));
+        if (!value.value.trim() || !Number.isFinite(n)) return this.toast("Vul een getal in.", "warn");
+        await this.act(() => this.deps.source.addMetric(p.id, { name: name.value.trim(), value: n, note: "via het kantoor" }), `📏 ${p.code} ${name.value.trim()}: ${n.toLocaleString("nl-NL")}`);
+        reopen();
+      };
+      out.push(
+        h(
+          "details",
+          { class: "card task-form" },
+          h("summary", {}, "📏 Meting invoeren"),
+          h("p", { class: "small muted" }, "Een meting van jou (bv. plays of kliks uit het portaal van het platform) telt als betrouwbaar. Alleen zo'n meting kan een experiment laten slagen; een meting van een agent is alleen een signaal."),
+          h("div", { class: "row" }, name, value, h("button", { class: "good", onclick: () => void save() }, "Opslaan")),
+        ),
+      );
+      const amount = h("input", { type: "number", step: "0.01", min: "0.01", placeholder: "Bedrag in €", "aria-label": "Bedrag" }) as HTMLInputElement;
+      const source = sourceSelect(p.branch);
+      const note = h("input", { type: "text", maxlength: "300", placeholder: "Omschrijving (bv. uitbetaling september)", "aria-label": "Omschrijving" }) as HTMLInputElement;
+      const book = async () => {
+        const n = Number(amount.value.replace(",", "."));
+        if (!(n > 0)) return this.toast("Vul een bedrag in.", "warn");
+        await this.act(
+          () => this.deps.source.addRevenue({ amountEur: n, branch: p.branch, experimentId: p.id, source: source.value as RevenueInput["source"], description: note.value.trim() || undefined }),
+          `💶 ${eur(n)} geboekt op ${p.code}`,
+        );
+        reopen();
+      };
+      out.push(
+        h(
+          "details",
+          { class: "card task-form" },
+          h("summary", {}, "💶 Omzet boeken"),
+          h("p", { class: "small muted" }, "Geld dat binnenkwam voor dit project. Agents kunnen nooit omzet boeken; alleen jij, Stripe en CSV-exports."),
+          h("div", { class: "row" }, amount, source),
+          note,
+          h("div", { class: "row" }, h("button", { class: "good", onclick: () => void book() }, "Boeken")),
+        ),
+      );
+    }
+    if (p.status === "running") {
+      const reason = h("textarea", { rows: "2", maxlength: "500", placeholder: "Waarom? (bv. de cijfers uit het portaal zijn duidelijk)", "aria-label": "Waarom" }) as HTMLTextAreaElement;
+      const decide = async (verdict: "keep" | "iterate" | "kill") => {
+        const why = reason.value.trim();
+        if (why.length < 3) return this.toast("Schrijf kort waarom; dat leest de analist later terug.", "warn");
+        if (verdict === "kill" && !window.confirm(`${p.code} stoppen? Het budget wordt niet verder gebruikt.`)) return;
+        const label = verdict === "keep" ? "✅ KEEP" : verdict === "iterate" ? "🔁 ITERATE" : "🪦 KILL";
+        await this.act(() => this.deps.source.endProject(p.id, verdict, why), `${label} ${p.code}`);
+        reopen();
+      };
+      out.push(
+        h(
+          "details",
+          { class: "card task-form" },
+          h("summary", {}, "⚖️ Nu beslissen"),
+          h("p", { class: "small muted" }, "Normaal beslist HQ zelf, op de deadline of als het budget op is. Weet je het nu al? Beslis dan hier: de lead krijgt de vervolgstap en de analist schrijft de lessen, net als bij een automatische beslissing."),
+          reason,
+          h(
+            "div",
+            { class: "buttons" },
+            h("button", { class: "good", onclick: () => void decide("keep") }, "✅ KEEP: opschalen"),
+            h("button", { onclick: () => void decide("iterate") }, "🔁 ITERATE: nog een ronde"),
+            h("button", { class: "bad", onclick: () => void decide("kill") }, "🪦 KILL: stoppen"),
+          ),
+        ),
+      );
+    }
+    if (p.status === "proposed") {
+      out.push(h("p", { class: "small" }, h("button", { class: "linkish", onclick: () => this.open("approvals") }, "📥 Dit voorstel wacht op jou: naar je bureau →")));
+    }
+    return out;
   }
 
   // ---- cijfers
@@ -954,6 +1037,14 @@ export class Ui {
       h("h3", {}, "Per tak (30 dagen)"),
       h("div", { class: "chart-host", "data-chart": "branches" }),
       s.agents?.length ? h("h3", {}, "Nut per agent (30 dagen)") : null,
+      s.agents?.some((v) => v.verdict === "niets" && !v.autoPausedAt)
+        ? h(
+            "p",
+            { class: "small" },
+            "Wie geld kost zonder resultaat, gaat maandag op pauze. ",
+            h("button", { class: "linkish", onclick: () => void this.pauseIdleNow() }, "💤 Nu al pauzeren"),
+          )
+        : null,
       s.agents?.length
         ? h(
             "ul",
@@ -975,6 +1066,19 @@ export class Ui {
       top.length ? h("ol", { class: "rank" }, ...top.map((a) => h("li", {}, h("button", { class: "linkish", onclick: () => this.open("agent", a.id) }, a.nickname || a.name), h("span", {}, eur(a.costTodayEur))))) : null,
       this.deps.source.mode === "live" ? h("p", { class: "small" }, h("a", { href: "/overzicht" }, "Alles in één lijst (oud overzicht) →")) : null,
     );
+  }
+
+  /** De nut-meter nu draaien in plaats van maandag. */
+  private async pauseIdleNow(): Promise<void> {
+    try {
+      const res = await this.deps.source.pauseIdle();
+      if (res.paused.length) this.toast(`💤 Op pauze: ${res.paused.map((p) => `${p.name} (${eur(p.costEur)})`).join(", ")}. Hervatten kan bij het poppetje.`, "good");
+      else this.toast(res.skipped ? `Niemand gepauzeerd: ${res.skipped}.` : "Niemand gepauzeerd: nieuw, net hervat, of het levert toch iets op.", "info");
+      await this.deps.refresh();
+      if (this.panel?.kind === "stats") this.open("stats");
+    } catch (err) {
+      this.toast(`⚠️ ${err instanceof Error ? err.message : String(err)}`, "bad");
+    }
   }
 
   /** Wat een agent de afgelopen 30 dagen opleverde, naast wat hij kostte. */
@@ -1036,13 +1140,109 @@ export class Ui {
   }
 
   private ledgerPanel(): HTMLElement {
-    const s = this.snap!.stats;
+    const snap = this.snap!;
+    const s = snap.stats;
+    const reopen = () => this.open("ledger");
+
+    // Omzet boeken: tak, eventueel het project, bedrag en bron.
+    const branches = snap.branches.filter((b) => b.slug !== "holding");
+    const branch = h("select", { "aria-label": "Tak" }, ...branches.map((b) => h("option", { value: b.slug }, b.name))) as HTMLSelectElement;
+    const project = h("select", { "aria-label": "Project" }) as HTMLSelectElement;
+    const amount = h("input", { type: "number", step: "0.01", min: "0.01", placeholder: "Bedrag in €", "aria-label": "Bedrag" }) as HTMLInputElement;
+    const note = h("input", { type: "text", maxlength: "300", placeholder: "Omschrijving (bv. uitbetaling september)", "aria-label": "Omschrijving" }) as HTMLInputElement;
+    let source = sourceSelect(branch.value || null);
+    const sourceHost = h("span", { class: "grow" }, source);
+    const fillProjects = () => {
+      const list = snap.projects.filter((p) => p.branch === branch.value && ["running", "keep", "iterate"].includes(p.status));
+      project.replaceChildren(h("option", { value: "" }, "Hele tak (geen project)"), ...list.map((p) => h("option", { value: String(p.id) }, `${p.code} ${p.title}`)));
+      source = sourceSelect(branch.value || null);
+      sourceHost.replaceChildren(source);
+    };
+    branch.addEventListener("change", fillProjects);
+    fillProjects();
+    const book = async () => {
+      const n = Number(amount.value.replace(",", "."));
+      if (!(n > 0)) return this.toast("Vul een bedrag in.", "warn");
+      if (!branch.value) return this.toast("Er is nog geen tak om op te boeken.", "warn");
+      await this.act(
+        () =>
+          this.deps.source.addRevenue({
+            amountEur: n,
+            branch: branch.value,
+            experimentId: project.value ? Number(project.value) : undefined,
+            source: source.value as RevenueInput["source"],
+            description: note.value.trim() || undefined,
+          }),
+        `💶 ${eur(n)} geboekt`,
+      );
+      reopen();
+    };
+
+    // CSV-export van een platform of affiliate-netwerk: dubbele regels tellen niet twee keer.
+    const file = h("input", { type: "file", accept: ".csv,text/csv,text/plain", "aria-label": "CSV-bestand" }) as HTMLInputElement;
+    const importCsv = async () => {
+      const f = file.files?.[0];
+      if (!f) return this.toast("Kies eerst een CSV-bestand.", "warn");
+      try {
+        const res = await this.deps.source.importCsv(await f.text());
+        this.toast(`📄 ${res.imported} ${res.imported === 1 ? "regel" : "regels"} geïmporteerd${res.errors.length ? `; ${res.errors.length} overgeslagen: ${res.errors.slice(0, 2).join("; ")}` : ""}`, res.errors.length ? "warn" : "good");
+        await this.deps.refresh();
+        reopen();
+      } catch (err) {
+        this.toast(`⚠️ ${err instanceof Error ? err.message : String(err)}`, "bad");
+      }
+    };
+
+    const lines = h("ul", { class: "ledger-lines" }, h("li", { class: "muted small" }, "Laden…"));
+    void this.deps.source
+      .ledger(15)
+      .then((rows) => {
+        const kind = { revenue: "💶", token_cost: "🤖", spend: "🧾" } as const;
+        lines.replaceChildren(
+          ...(rows.length
+            ? rows.map((r) =>
+                h(
+                  "li",
+                  {},
+                  h("span", { class: "when small muted" }, new Date(r.at).toLocaleDateString("nl-NL", { day: "numeric", month: "short" })),
+                  h("span", { class: `amount ${r.kind === "revenue" ? "plus" : "minus"}` }, `${kind[r.kind]} ${r.kind === "revenue" ? "+" : "−"}${eur(Math.abs(r.amountEur))}`),
+                  h("span", { class: "small" }, [r.description ?? r.source, r.experiment, r.branch ? this.branchName(r.branch) : null].filter(Boolean).join(" · ")),
+                ),
+              )
+            : [h("li", { class: "muted small" }, "Nog geen boekingen.")]),
+        );
+      })
+      .catch((err) => lines.replaceChildren(h("li", { class: "muted small" }, `Kon de boekingen niet laden: ${err instanceof Error ? err.message : String(err)}`)));
+
     return h(
       "div",
       {},
       h("h2", {}, "🔒 Kluis"),
       h("p", { class: "muted" }, "Omzet komt alleen uit Stripe, CSV-exports of van jou. Agents kunnen hier nooit iets boeken."),
       h("section", { class: "tiles" }, tile("Omzet 30 dagen", eur(s.totals.revenue30Eur)), tile("Kosten 30 dagen", eur(s.totals.cost30Eur)), tile("Resultaat", eur(s.totals.revenue30Eur - s.totals.cost30Eur))),
+      h(
+        "details",
+        { class: "card task-form" },
+        h("summary", {}, "💶 Omzet boeken"),
+        h("p", { class: "small muted" }, "Bijvoorbeeld een uitbetaling van CrazyGames of een affiliate-commissie. Kies het project als je weet waar het vandaan kwam: dan telt het mee bij dat experiment."),
+        h("div", { class: "row" }, branch, project),
+        h("div", { class: "row" }, amount, sourceHost),
+        note,
+        h("div", { class: "row" }, h("button", { class: "good", onclick: () => void book() }, "Boeken")),
+      ),
+      h(
+        "details",
+        { class: "card task-form" },
+        h("summary", {}, "📄 CSV importeren"),
+        h(
+          "p",
+          { class: "small muted" },
+          "Eerste regel: datum;bedrag;tak;bron;omschrijving (Engels mag ook). Bron: crazygames, affiliate of owner. Een kolom experiment (bv. EXP-3) koppelt de omzet aan een project. Twee keer hetzelfde bestand importeren telt niet dubbel.",
+        ),
+        h("div", { class: "row" }, file, h("button", { class: "good", onclick: () => void importCsv() }, "Importeren")),
+      ),
+      h("h3", {}, "Laatste boekingen"),
+      lines,
       h("h3", {}, "Omzet en kosten per dag (30 dagen)"),
       h("div", { class: "chart-host", "data-chart": "days" }),
       h("h3", {}, "Per tak"),
@@ -1114,8 +1314,42 @@ export class Ui {
   private knowledgePanel(): HTMLElement {
     const snap = this.snap!;
     const canvas = h("canvas", { class: "graph-canvas", width: "640", height: "420", "aria-label": "Kennisgraaf" }) as HTMLCanvasElement;
-    const search = h("input", { type: "search", placeholder: "Zoek in de graaf…", "aria-label": "Zoek in de kennisgraaf" }) as HTMLInputElement;
+    const search = h("input", { type: "search", placeholder: "Zoek in lessen en notities (bv. levels, affiliate)…", "aria-label": "Zoek in de kennisbank" }) as HTMLInputElement;
     const info = h("p", { class: "muted small" }, "Laden…");
+    // Echte antwoorden: wat agents leerden en opschreven, met het experiment erbij. De graaf eronder licht mee op.
+    const results = h("div", { class: "knowledge-results" });
+    let timer: number | undefined;
+    let asked = "";
+    const lookUp = () => {
+      const q = search.value.trim();
+      if (q.length < 3) {
+        results.replaceChildren();
+        return;
+      }
+      asked = q;
+      void this.deps.source
+        .searchKnowledge(q)
+        .then((hits) => {
+          if (asked !== q) return;
+          results.replaceChildren(
+            ...(hits.lessons.length || hits.notes.length
+              ? [
+                  hits.lessons.length ? h("h3", {}, `Lessen (${hits.lessons.length})`) : null,
+                  hits.lessons.length ? h("ul", { class: "lessons" }, ...hits.lessons.map((l) => h("li", {}, l.lesson, l.experiment ? h("span", { class: "muted small" }, ` · ${l.experiment}`) : null))) : null,
+                  hits.notes.length ? h("h3", {}, `Notities (${hits.notes.length})`) : null,
+                  hits.notes.length
+                    ? h("ul", { class: "notes" }, ...hits.notes.map((n) => h("li", {}, h("b", {}, n.title), h("span", { class: "muted small" }, ` · ${n.author}`), h("p", { class: "small" }, n.excerpt))))
+                    : null,
+                ].filter((x): x is HTMLHeadingElement | HTMLUListElement => x !== null)
+              : [h("p", { class: "muted small" }, `Niets gevonden voor "${q}". Agents schrijven hier alles op wat ze leren; probeer een ander woord.`)]),
+          );
+        })
+        .catch((err) => results.replaceChildren(h("p", { class: "muted small" }, `Zoeken mislukt: ${err instanceof Error ? err.message : String(err)}`)));
+    };
+    search.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = window.setTimeout(lookUp, 350);
+    });
     void this.deps.source.graph().then((graph) => {
       const laid = layoutGraph(graph, 80);
       const W = canvas.width;
@@ -1185,6 +1419,7 @@ export class Ui {
       h("p", { class: "muted" }, "Alles wat agents leren en opschrijven (lessen, notities, experimenten) als één graaf. Wil een agent iets weten, dan loopt die hierheen en vraagt het eerst aan de graaf."),
       h("section", { class: "tiles" }, tile("Knopen", String(snap.knowledge.nodes)), tile("Verbanden", String(snap.knowledge.edges)), tile("Bron", snap.knowledge.source === "graphify" ? "Graphify" : "HQ")),
       search,
+      results,
       canvas,
       info,
       this.deps.source.mode === "live" && snap.knowledge.source === "graphify" ? h("p", { class: "small" }, h("a", { href: "/kennis", target: "_blank", rel: "noopener" }, "Open de volledige Graphify-weergave →")) : null,
@@ -1249,6 +1484,16 @@ export class Ui {
         ),
         h("li", {}, "Klik op een poppetje om te zien waar het mee bezig is, of om het een naam en een ander uiterlijk te geven."),
         h("li", {}, "Klik op het projectenbord (vergaderzaal), de schermen (controlekamer), de kluis, het hologram (kennisbank) of je bureau."),
+        h(
+          "li",
+          {},
+          "Overal kun je ook iets dóén: bij een project een meting invoeren, omzet boeken of zelf beslissen (KEEP, ITERATE, KILL); in de kluis omzet boeken of een CSV importeren; in de kennisbank zoeken in lessen en notities.",
+        ),
+        h(
+          "li",
+          {},
+          "🤝 Samen aan tafel = ze werken op hetzelfde moment aan dezelfde klus (bv. de ideeënraad). 📥 = taak ontvangen, 👀 = gelezen, ☑️ = opdracht af. Niemand zegt iets wat niet echt gezegd is.",
+        ),
         h("li", {}, "Slepen = bewegen, scrollen of knijpen = zoomen, Q/E of ⟲ ⟳ = draaien."),
         h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel figuranten er zijn en hoeveel iedereen 'uit zichzelf' rondloopt (koffie, praatje). Dat is alleen sfeer en kost niets."),
         h("li", {}, "📝 Klik op een agent om hem een taak te geven. 🛠️ In de werkplaats zie je je projecten (live, tests, uitrol, wat op jou wacht) en je Claude Code-sessies; daar geef je Claude Code ook een opdracht."),
@@ -1640,6 +1885,19 @@ function chip(label: string, value: string, sub: string, onClick?: () => void, a
     h("b", {}, value),
     h("span", { class: "chip-sub" }, sub),
   ) as HTMLElement;
+}
+
+/** Waar kwam het geld vandaan? Met een logische keuze vooraf per soort tak. */
+function sourceSelect(branch: string | null): HTMLSelectElement {
+  const s = h(
+    "select",
+    { "aria-label": "Bron" },
+    h("option", { value: "crazygames" }, "Uitbetaling platform (CrazyGames, Poki)"),
+    h("option", { value: "affiliate" }, "Affiliate-commissie"),
+    h("option", { value: "owner" }, "Iets anders (bv. zelf verkocht)"),
+  ) as HTMLSelectElement;
+  s.value = branch === "games" ? "crazygames" : branch === "content" ? "affiliate" : "owner";
+  return s;
 }
 
 function tile(label: string, value: string): HTMLElement {

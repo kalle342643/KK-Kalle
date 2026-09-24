@@ -97,6 +97,11 @@ export interface OfficeAgent {
   pauseReason: string | null;
   /** Waar hij nu aan werkt (als er een run loopt). */
   currentTask: string | null;
+  /**
+   * De klus waar die taak bij hoort: de taak zelf, of de bovenliggende taak bij een subtaak (bv. de ideeënraad).
+   * Werken twee agents tegelijk aan dezelfde klus, dan zitten ze in het kantoor samen aan tafel.
+   */
+  job?: { groupId: string; title: string | null } | null;
   /** Door jou gekozen bijnaam en uiterlijk (poppetje 0-11). */
   nickname: string | null;
   avatar: number | null;
@@ -164,6 +169,31 @@ export interface AgentValue {
   costPerOutputEur: number | null;
   /** Wanneer de nut-meter hem op pauze zette (en jij hem sindsdien niet weer aanzette). */
   autoPausedAt: string | null;
+}
+
+/** Eén boeking in de kluis (omzet, AI-kosten of een uitgave). */
+export interface LedgerLine {
+  id: number;
+  kind: "token_cost" | "spend" | "revenue";
+  amountEur: number;
+  source: string;
+  description: string | null;
+  branch: string | null;
+  experiment: string | null;
+  at: string;
+}
+
+/** Wat je terugvindt als je zelf zoekt in de kennisbank. */
+export interface KnowledgeHits {
+  lessons: Array<{ id: number; lesson: string; tags: string[]; experiment: string | null }>;
+  notes: Array<{ id: number; title: string; excerpt: string; author: string; tags: string[] }>;
+}
+
+/** Uitkomst van een ronde van de nut-meter. */
+export interface AutoPauseResult {
+  paused: Array<{ agentId: string; name: string; costEur: number }>;
+  /** Waarom er (deels) niets gebeurde: uitgezet, noodstop, of te veel tegelijk (dan klopt de meting vast niet). */
+  skipped: string | null;
 }
 
 export interface ProjectDetail {

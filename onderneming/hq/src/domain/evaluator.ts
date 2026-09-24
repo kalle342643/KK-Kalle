@@ -1,10 +1,12 @@
 import type { Config } from "../config.js";
 import { audit } from "./audit.js";
-import { errorMessage, type AppContext } from "./context.js";
+import { DomainError } from "./branches.js";
+import { errorMessage, type Actor, type AppContext } from "./context.js";
 import {
   endExperiment,
   experimentCode,
   listExperiments,
+  requireExperiment,
   snapshot,
   type ExperimentSnapshot,
 } from "./experiments.js";
@@ -85,17 +87,35 @@ export async function evaluateRunning(ctx: AppContext): Promise<EvaluationResult
   return results;
 }
 
+/**
+ * Jij beslist eerder dan de automatische beoordeling (bv. de cijfers uit het CrazyGames-portaal zijn duidelijk).
+ * Precies hetzelfde pad: vervolgtaak voor de lead, lessen door de analist, een bericht.
+ */
+export async function concludeExperiment(
+  ctx: AppContext,
+  id: number,
+  verdict: Exclude<Verdict, "continue">,
+  reason: string,
+  actor: Actor,
+): Promise<void> {
+  const exp = await requireExperiment(ctx.db, id);
+  if (exp.status !== "running") throw new DomainError(`${experimentCode(id)} loopt niet (status: ${exp.status}).`, 409);
+  const roles = (await getSetting<Record<string, string>>(ctx.db, "agent_roles")) ?? {};
+  await applyVerdict(ctx, await snapshot(ctx, exp), { verdict, reason }, roles, actor);
+}
+
 async function applyVerdict(
   ctx: AppContext,
   s: ExperimentSnapshot,
   d: Decision,
   roles: Record<string, string>,
+  actor: Actor = "job:evaluate",
 ): Promise<void> {
   const e = s.experiment;
   const code = experimentCode(e.id);
   const verdict = d.verdict as Exclude<Verdict, "continue">;
   await endExperiment(ctx, e.id, verdict === "kill" ? "killed" : verdict, d.reason);
-  await audit(ctx.db, "job:evaluate", `experiment.${verdict}`, { experimentId: e.id, reason: d.reason });
+  await audit(ctx.db, actor, `experiment.${verdict}`, { experimentId: e.id, reason: d.reason });
   await ctx.events.emit({
     type: "experiment.verdict",
     agentId: e.leadAgentId ?? s.branch.leadAgentId,

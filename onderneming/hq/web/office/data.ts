@@ -1,7 +1,16 @@
 /**
  * Waar het kantoor zijn gegevens vandaan haalt: HQ (live) of een verzonnen demobedrijf.
  */
-import type { CodeProject, KnowledgeGraph, OfficeEvent, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+import type { AutoPauseResult, CodeProject, KnowledgeGraph, KnowledgeHits, LedgerLine, OfficeEvent, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+
+/** Omzet die jij boekt (uitbetaling van CrazyGames, affiliate, iets wat je zelf verkocht). */
+export interface RevenueInput {
+  amountEur: number;
+  branch: string;
+  source: "owner" | "crazygames" | "affiliate";
+  experimentId?: number;
+  description?: string;
+}
 
 /** Wat je invult bij "project volgen" in de werkplaats. */
 export interface CodeProjectInput {
@@ -42,6 +51,17 @@ export interface DataSource {
   removeCodeProject(key: string): Promise<void>;
   refreshCodeProject(key: string): Promise<CodeProject | null>;
   codeRepos(): Promise<{ repos: RepoChoice[]; error: string | null }>;
+  /** Een meting die jij doet (bv. plays uit het CrazyGames-portaal): telt als betrouwbaar. */
+  addMetric(experimentId: number, metric: { name: string; value: number; note?: string }): Promise<void>;
+  addRevenue(input: RevenueInput): Promise<void>;
+  /** CSV-export (datum;bedrag;tak;bron;omschrijving); dubbele regels tellen niet twee keer. */
+  importCsv(text: string): Promise<{ imported: number; errors: string[] }>;
+  /** Zelf beslissen over een lopend experiment, eerder dan de automatische beoordeling. */
+  endProject(id: number, verdict: "keep" | "iterate" | "kill", reason: string): Promise<void>;
+  ledger(limit?: number): Promise<LedgerLine[]>;
+  searchKnowledge(q: string): Promise<KnowledgeHits>;
+  /** De nut-meter nu draaien: wie 30 dagen geld kostte zonder resultaat, gaat op pauze. */
+  pauseIdle(): Promise<AutoPauseResult>;
 }
 
 export class HttpError extends Error {
@@ -53,11 +73,11 @@ export class HttpError extends Error {
   }
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown, contentType = "application/json"): Promise<T> {
   const res = await fetch(path, {
     method,
-    headers: body === undefined ? {} : { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
+    headers: body === undefined ? {} : { "content-type": contentType },
+    body: body === undefined ? undefined : typeof body === "string" && contentType !== "application/json" ? body : JSON.stringify(body),
     credentials: "same-origin",
   });
   const text = await res.text();
@@ -146,5 +166,26 @@ export class LiveSource implements DataSource {
   }
   codeRepos(): Promise<{ repos: RepoChoice[]; error: string | null }> {
     return request("GET", "/api/owner/code/repos");
+  }
+  async addMetric(experimentId: number, metric: { name: string; value: number; note?: string }): Promise<void> {
+    await request("POST", "/api/owner/metrics", { experimentId, source: "owner", ...metric });
+  }
+  async addRevenue(input: RevenueInput): Promise<void> {
+    await request("POST", "/api/owner/revenue", input);
+  }
+  importCsv(text: string): Promise<{ imported: number; errors: string[] }> {
+    return request("POST", "/api/owner/revenue/csv", text, "text/csv");
+  }
+  async endProject(id: number, verdict: "keep" | "iterate" | "kill", reason: string): Promise<void> {
+    await request("POST", `/api/owner/experiments/${id}/end`, { verdict, reason });
+  }
+  ledger(limit = 25): Promise<LedgerLine[]> {
+    return request("GET", `/api/owner/ledger?limit=${limit}`);
+  }
+  searchKnowledge(q: string): Promise<KnowledgeHits> {
+    return request("GET", `/api/owner/knowledge?q=${encodeURIComponent(q)}`);
+  }
+  pauseIdle(): Promise<AutoPauseResult> {
+    return request("POST", "/api/owner/value/pause", {});
   }
 }

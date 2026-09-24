@@ -3,6 +3,7 @@ import { audit } from "../src/domain/audit.js";
 import { proposeExperiment } from "../src/domain/experiments.js";
 import { halt } from "../src/domain/killswitch.js";
 import { addLesson } from "../src/domain/lessons.js";
+import { formatEur } from "../src/domain/money.js";
 import { buildDailyReport } from "../src/domain/report.js";
 import { buildOfficeSnapshot } from "../src/office/snapshot.js";
 import { computeAgentValues, pauseIdleAgents, valueReportLines } from "../src/office/value.js";
@@ -41,7 +42,7 @@ describe("de nut-meter", () => {
     expect(by.get(env.analyst.id)).toMatchObject({ verdict: "rustig" });
 
     const lines = valueReportLines(values, new Map([[env.scout.id, "Rigel"]])).join("\n");
-    expect(lines).toContain("💤 Kost geld zonder aantoonbaar resultaat (30 dagen): Rigel €2,");
+    expect(lines).toContain(`💤 Kost geld zonder aantoonbaar resultaat (30 dagen): Rigel ${formatEur(2.25)}`);
     expect(valueReportLines(values.filter((v) => v.verdict !== "niets"), new Map())).toEqual([]);
   });
 
@@ -96,7 +97,7 @@ describe("automatisch pauzeren", () => {
     expect(result).toEqual({ paused: [{ agentId: env.scout.id, name: "Rigel", costEur: 2.25 }], skipped: null });
     expect(env.paperclip.agents.get(env.scout.id)!.status).toBe("paused");
     const message = env.notifier.sent.at(-1)!.text;
-    expect(message).toContain("💤 Nut-meter: Rigel (€2,25) staat op pauze.");
+    expect(message).toContain(`💤 Nut-meter: Rigel (${formatEur(2.25)}) staat op pauze.`);
     expect(message).toContain("▶️ Hervatten");
     const events = await env.ctx.events.recent();
     expect(events.find((e) => e.type === "agent.status")).toMatchObject({ agentId: env.scout.id, data: { to: "paused", by: "nut-meter" } });

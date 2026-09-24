@@ -1,8 +1,8 @@
 import { audit } from "../domain/audit.js";
 import { errorMessage, type AppContext } from "../domain/context.js";
 import { isHalted } from "../domain/killswitch.js";
-import { usdCentsToEur } from "../domain/money.js";
-import type { AgentValue } from "./types.js";
+import { formatEur, usdCentsToEur } from "../domain/money.js";
+import type { AgentValue, AutoPauseResult } from "./types.js";
 
 /**
  * De nut-meter: wat kost een agent, en wat levert hij aantoonbaar op? Een agent die geld kost maar in 30 dagen
@@ -114,12 +114,6 @@ export async function agentValues(ctx: AppContext): Promise<AgentValue[]> {
   }
 }
 
-export interface AutoPauseResult {
-  paused: Array<{ agentId: string; name: string; costEur: number }>;
-  /** Waarom er (deels) niets gebeurde: uitgezet, noodstop, of te veel tegelijk (dan klopt de meting vast niet). */
-  skipped: string | null;
-}
-
 /**
  * Wat niets oplevert, kost ook niets meer: agents die in 30 dagen geld kostten zonder resultaat, gaan op pauze.
  * In het kantoor houden ze hun plek, zonder naam. Jij zet ze met één klik weer aan (en dan hebben ze weer
@@ -162,7 +156,7 @@ export async function pauseIdleAgents(ctx: AppContext): Promise<AutoPauseResult>
       await ctx.events.emit({
         type: "agent.status",
         agentId: agent.id,
-        text: `${agent.name} is gepauzeerd door de nut-meter: kostte €${v.costEur.toFixed(2).replace(".", ",")} zonder resultaat`,
+        text: `${agent.name} is gepauzeerd door de nut-meter: kostte ${formatEur(v.costEur)} zonder resultaat`,
         data: { from: agent.status, to: updated.status, by: "nut-meter" },
       });
       result.paused.push({ agentId: agent.id, name: agent.name, costEur: v.costEur });
@@ -172,7 +166,7 @@ export async function pauseIdleAgents(ctx: AppContext): Promise<AutoPauseResult>
   }
   cache.delete(ctx);
   if (result.paused.length) {
-    const eur = (n: number) => `€${n.toFixed(2).replace(".", ",")}`;
+    const eur = formatEur;
     await ctx.notifier.send({
       text: [
         `💤 Nut-meter: ${result.paused.map((p) => `${p.name} (${eur(p.costEur)})`).join(", ")} ${result.paused.length === 1 ? "staat" : "staan"} op pauze.`,
@@ -188,7 +182,7 @@ export async function pauseIdleAgents(ctx: AppContext): Promise<AutoPauseResult>
 export function valueReportLines(values: AgentValue[], names: Map<string, string>, paused: Set<string> = new Set()): string[] {
   const idle = values.filter((v) => v.verdict === "niets" && !paused.has(v.agentId));
   if (!idle.length) return [];
-  const eur = (n: number) => `€${n.toFixed(2).replace(".", ",")}`;
+  const eur = formatEur;
   return [
     "",
     `💤 Kost geld zonder aantoonbaar resultaat (${VALUE_DAYS} dagen): ${idle

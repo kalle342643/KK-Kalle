@@ -24,7 +24,8 @@ import {
   type ExperimentStatus,
 } from "../domain/experiments.js";
 import { halt, haltState, resume } from "../domain/killswitch.js";
-import { recordRevenue, REVENUE_SOURCES } from "../domain/ledger.js";
+import { concludeExperiment } from "../domain/evaluator.js";
+import { recentLedger, recordRevenue, REVENUE_SOURCES } from "../domain/ledger.js";
 import { addLesson, lessonSchema, searchLessons } from "../domain/lessons.js";
 import { computePortfolio } from "../domain/portfolio.js";
 import { buildDailyReport, buildStatus } from "../domain/report.js";
@@ -52,6 +53,7 @@ import { profileSchema, setProfile } from "../office/profiles.js";
 import { listProjects, officeStats, projectDetail } from "../office/projects.js";
 import { buildOfficeSnapshot } from "../office/snapshot.js";
 import type { OfficeEvent } from "../office/types.js";
+import { pauseIdleAgents } from "../office/value.js";
 import { PaperclipError } from "../paperclip/client.js";
 import type { PcAgent } from "../paperclip/types.js";
 import { AgentAuthenticator } from "./agentAuth.js";
@@ -553,6 +555,38 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     );
     return c.json({ ok: true }, 201);
   });
+  // Jij beslist eerder dan de automatische beoordeling: zelfde pad (vervolgtaak, lessen, bericht).
+  ownerApi.post("/experiments/:id/end", async (c) => {
+    const input = await body(c, z.object({ verdict: z.enum(["keep", "iterate", "kill"]), reason: z.string().trim().min(3).max(500) }));
+    await concludeExperiment(ctx, idParam(c), input.verdict, `Besloten door jou: ${input.reason}`, "owner");
+    return c.json({ ok: true });
+  });
+  // De laatste boekingen (omzet, AI-kosten, uitgaven) voor de kluis.
+  ownerApi.get("/ledger", async (c) => {
+    const limit = Math.min(Math.max(Number(c.req.query("limit") ?? 25) || 25, 1), 100);
+    const [entries, branches] = await Promise.all([recentLedger(ctx.db, limit), listBranches(ctx.db)]);
+    const slugOf = new Map(branches.map((b) => [b.id, b.slug]));
+    return c.json(
+      entries.map((e) => ({
+        id: e.id,
+        kind: e.kind,
+        amountEur: e.amountEur,
+        source: e.source,
+        description: e.description,
+        branch: e.branchId ? (slugOf.get(e.branchId) ?? null) : null,
+        experiment: e.experimentId ? experimentCode(e.experimentId) : null,
+        at: e.occurredAt.toISOString(),
+      })),
+    );
+  });
+  // Zelf zoeken in de kennisbank (lessen en notities). In het kantoor loopt daarvoor niemand naar de kennisbank.
+  ownerApi.get("/knowledge", async (c) => {
+    const q = (c.req.query("q") ?? "").trim();
+    if (q.length < 3) throw new DomainError("Zoek op minstens 3 tekens.");
+    return c.json(await askKnowledge(ctx, q.slice(0, 300), null, { emit: false }));
+  });
+  // De nut-meter nu draaien (anders op maandag): wie geld kost zonder resultaat, gaat op pauze.
+  ownerApi.post("/value/pause", async (c) => c.json(await pauseIdleAgents(ctx)));
   app.route("/api/owner", ownerApi);
 
   // ---------------------------------------------------------------- pagina's

@@ -96,6 +96,28 @@ describe("Paperclip meekijken", () => {
     expect((await types()).filter((t) => t === "run.started").length).toBe(1);
   });
 
+  it("subtaken van één taak zijn samen één klus (zoals de ideeënraad)", async () => {
+    const council = await env.paperclip.createIssue(env.ctx.companyId, { title: "Ideeënraad Games-studio", assigneeAgentId: env.lead.id });
+    const sub = await env.paperclip.createIssue(env.ctx.companyId, { title: "Waarnemingen: trending games", assigneeAgentId: env.scout.id, parentId: council.id });
+    const solo = await env.paperclip.createIssue(env.ctx.companyId, { title: "Lessen EXP-2", assigneeAgentId: env.analyst.id });
+    for (const [runId, agentId, issueId] of [
+      ["run-a", env.lead.id, council.id],
+      ["run-b", env.scout.id, sub.id],
+      ["run-c", env.analyst.id, solo.id],
+    ] as const) {
+      env.paperclip.runs.set(runId, { id: runId, status: "running", agentId, startedAt: null, contextSnapshot: { issueId } });
+      env.paperclip.agents.get(agentId)!.status = "running";
+    }
+    await new PaperclipWatcher(env.ctx).tick();
+    const started = new Map((await env.ctx.events.recent()).filter((e) => e.type === "run.started").map((e) => [e.agentId, e.data]));
+    expect(started.get(env.lead.id)).toMatchObject({ groupId: council.id, groupTitle: "Ideeënraad Games-studio" });
+    expect(started.get(env.scout.id)).toMatchObject({ groupId: council.id, groupTitle: "Ideeënraad Games-studio" });
+    expect(started.get(env.analyst.id)).toMatchObject({ groupId: solo.id, groupTitle: "Lessen EXP-2" });
+    // Het kantoor krijgt het mee in de momentopname (ook na het herladen van de pagina).
+    const snap = await buildOfficeSnapshot(env.ctx);
+    expect(snap.agents.find((a) => a.id === env.scout.id)!.job).toEqual({ groupId: council.id, title: "Ideeënraad Games-studio" });
+  });
+
   it("wie tegen wie praat: reacties en nieuwe taken tussen agents", async () => {
     const issue = await env.paperclip.createIssue(env.ctx.companyId, {
       title: "Top 5 pitches",

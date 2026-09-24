@@ -24,13 +24,17 @@ Agents kunnen omzet niet zelf boeken, dus die moet uit een betrouwbare bron kome
 | Bron | Hoe |
 |---|---|
 | Stripe | automatisch elk uur (als `STRIPE_API_KEY` is ingesteld) |
-| CrazyGames, affiliate-dashboards | exporteer een CSV en upload die in het dashboard (*Grootboek → Omzet importeren*) of `hq import-csv` |
-| Losse bedragen | `/omzet 12,50 games CrazyGames september` |
-| Meetpunten (plays, aanmeldingen) | `/meting EXP-3 plays 740`, bv. afgelezen uit het CrazyGames-dashboard |
+| CrazyGames, affiliate-dashboards | exporteer een CSV en importeer die in het kantoor (🔒 kluis → *CSV importeren*), of `hq import-csv` |
+| Losse bedragen | in het kantoor: 🔒 kluis of een project → *💶 Omzet boeken*; of in Telegram `/omzet 12,50 games CrazyGames september` |
+| Meetpunten (plays, aanmeldingen) | in het kantoor: project → *📏 Meting invoeren*; of `/meting EXP-3 plays 740`, bv. afgelezen uit het CrazyGames-dashboard |
 
-CSV-kolommen: `date, amount_eur, branch, source` en optioneel `experiment_id, external_id, description`.
-Komma of puntkomma als scheidingsteken; `12,50` en `12.50` mogen allebei. Twee keer hetzelfde bestand
-importeren telt niets dubbel.
+Een meting of bedrag van jou telt als betrouwbaar; alleen daarmee kan een experiment slagen (een meting van een agent is
+een signaal). Weet je het eerder dan de deadline? Project → *⚖️ Nu beslissen* (KEEP, ITERATE of KILL): de lead krijgt
+de vervolgstap en de analist schrijft de lessen, net als bij een automatische beslissing.
+
+CSV-kolommen: `date, amount_eur, branch, source` en optioneel `experiment_id, external_id, description`, of in het
+Nederlands `datum, bedrag, tak, bron, experiment, id, omschrijving`. Komma of puntkomma als scheidingsteken; `12,50` en
+`12.50` mogen allebei. Twee keer hetzelfde bestand importeren telt niets dubbel.
 
 ## Noodstop
 **`/stop [reden]`** in Telegram (of de rode knop in je kantoor, of 🛑 Noodstop bovenin, of `hq halt`):

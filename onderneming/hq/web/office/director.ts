@@ -37,7 +37,8 @@ export class Director {
   liveliness: Liveliness = "normal";
   private selected: string | null = null;
   private halted = false;
-  private meeting: { branch: string; members: Set<string>; chatter: number } | null = null;
+  /** Twee of meer agents die tegelijk aan dezelfde klus werken, zitten samen aan de vergadertafel. */
+  private meeting: { groupId: string; title: string | null; members: Set<string> } | null = null;
   private readonly reserved = new Map<string, string>();
   private readonly monitorState = new Map<string, string>();
   /** Werkplaats: welke Claude Code-sessie aan welk bureau zit (en andersom). */
@@ -308,7 +309,10 @@ export class Director {
       // Bij binnenkomst niet iedereen tegelijk laten roepen hoe het met ze gaat.
       if (actor.status !== status && !isNew && !first && !session && !helping) this.statusChanged(actor, actor.status, status);
       actor.setStatus(status);
-      if (agent) actor.setWorking(agent.status === "running", agent.currentTask);
+      if (agent) {
+        actor.setWorking(agent.status === "running", agent.currentTask);
+        actor.job = agent.status === "running" ? (agent.job ?? null) : null;
+      }
       if (session) actor.setWorking(session.state === "working", session.lastAction ?? session.title);
       if (helping) actor.setWorking(true, helping.helper.lastAction ?? helping.helper.task);
     }
@@ -422,6 +426,7 @@ export class Director {
         if (!a) return;
         a.setWorking(true, text || a.taskText);
         a.setStatus("running");
+        a.job = typeof e.data.groupId === "string" ? { groupId: e.data.groupId, title: typeof e.data.groupTitle === "string" ? e.data.groupTitle : null } : null;
         if (!this.meeting?.members.has(a.id) && a.home && (!a.seated || dist(a.pos, a.home) > 0.2) && a.queueLength < 2) {
           a.queue(...this.goHome(a));
         }
@@ -431,6 +436,7 @@ export class Director {
       case "run.finished": {
         if (!a) return;
         a.setWorking(false, null);
+        a.job = null;
         if (a.status === "running") a.setStatus("idle");
         const failed = e.data.status === "failed" || e.data.status === "timed_out";
         const tools = typeof e.data.tools === "string" ? ` · ${e.data.tools}` : "";
@@ -482,7 +488,7 @@ export class Director {
       case "approval.decided": {
         const approved = e.data.status === "approved";
         if (a) {
-          a.say(approved ? "✅ Goedgekeurd, dank je!" : "❌ Afgewezen… oké.", 4, approved ? "happy" : "alert");
+          a.say(approved ? "✅ Goedgekeurd" : "❌ Afgewezen", 4, approved ? "happy" : "alert");
           if (a.idle && !a.seated) a.queue(act(approved ? "jump" : "emote-no"));
         }
         this.actor(OWNER_ID)?.say(approved ? "👍" : "👎", 2, "info");
@@ -513,7 +519,7 @@ export class Director {
           this.burst(room.rect.x + room.rect.w / 2, room.rect.z + room.rect.d / 2, "#f5c542", 14);
           for (const x of this.actors.values()) {
             const home = x.home;
-            if (home && roomAt(this.layout, home.x, home.z)?.id === roomId && Math.random() < 0.7) x.say(pick(["🎉", "💶", "🙌", "Yes!"]), 3, "happy");
+            if (home && roomAt(this.layout, home.x, home.z)?.id === roomId && Math.random() < 0.7) x.say(pick(["🎉", "💶", "🙌"]), 3, "happy");
           }
         }
         this.actor(BOT_ID)?.say(`💶 +${euro(amount)}`, 5, "happy");
@@ -628,7 +634,7 @@ export class Director {
       }
       case "code.ci": {
         const red = e.data.state === "failed";
-        if (a) a.say(red ? "😬 Tests rood, ik kijk ernaar" : "✅ Tests weer groen", 4, red ? "alert" : "happy");
+        if (a) a.say(red ? "😬 Tests rood" : "✅ Tests weer groen", 4, red ? "alert" : "happy");
         break;
       }
       case "code.deploy":
@@ -671,9 +677,11 @@ export class Director {
   private talk(a: Actor, target: Actor | null, text: string, kind: string): void {
     const line = kind === "delegate" ? `📝 ${short(text, 90)}` : `💬 ${short(text, 110)}`;
     // Druk bezig of samen in overleg: gewoon zeggen, niet heen en weer lopen.
+    // De ontvanger zegt niets terug (dat zou verzonnen zijn): hij laat alleen zien dat het binnenkwam.
+    const received = kind === "delegate" ? "📥" : "👀";
     if (!target || a.queueLength >= 3 || (this.meeting?.members.has(a.id) && target && this.meeting.members.has(target.id))) {
       a.say(line, 6, "talk");
-      if (target) setTimeout(() => target.say(reply(kind), 3, "happy"), 1800);
+      if (target && target.id !== OWNER_ID) setTimeout(() => target.say(received, 2.5, "info"), 1800);
       return;
     }
     const spot = this.approach(target);
@@ -685,12 +693,8 @@ export class Director {
       say(line, duration, "talk"),
       act(kind === "delegate" ? "interact-right" : "emote-yes", Math.min(duration, 2.2)),
       run(() => {
-        if (target.id !== OWNER_ID) {
-          target.say(reply(kind), 3, "happy");
-          if (!target.seated && target.idle) target.queue(face(() => a.pos), act("emote-yes"));
-        } else {
-          target.say("👀", 2, "info");
-        }
+        target.say(received, 2.5, "info");
+        if (target.id !== OWNER_ID && !target.seated && target.idle) target.queue(face(() => a.pos));
       }),
       wait(Math.max(0.8, duration - 2.2)),
       ...this.goHome(a),
@@ -740,7 +744,8 @@ export class Director {
       run((x) => {
         x.holdPaper(false);
         if (paper) this.world.setInbox((this.snap?.approvals.length ?? 0) + 1);
-        this.actor(OWNER_ID)?.say(paper ? "📥 Ik kijk ernaar" : "📊 Dank je!", 3, "info");
+        // Jij zegt niets (dat zou verzonnen zijn); het verzoek ligt nu op je bureau.
+        this.actor(OWNER_ID)?.say(paper ? "📥" : "📊", 2.5, "info");
       }),
       wait(0.8),
       ...this.goHome(a),
@@ -861,8 +866,9 @@ export class Director {
         }
         case "meeting": {
           busy = Boolean(this.meeting);
-          const name = this.meeting ? (snap.branches.find((b) => b.slug === this.meeting!.branch)?.name ?? this.meeting.branch) : "";
-          status = this.meeting ? `💬 Overleg ${name} (${this.meeting.members.size})` : `📋 ${snap.projects.filter((p) => p.status === "running").length} lopende projecten`;
+          status = this.meeting
+            ? `🤝 Samen aan: ${short(this.meeting.title ?? "één klus", 40)} (${this.meeting.members.size})`
+            : `📋 ${snap.projects.filter((p) => p.status === "running").length} lopende projecten`;
           break;
         }
         case "owner":
@@ -907,47 +913,59 @@ export class Director {
     }
   }
 
-  /** Drie of meer van één afdeling tegelijk aan het werk: dan overleggen ze in de vergaderzaal. */
+  /**
+   * Werken twee of meer agents tegelijk aan dezelfde klus (dezelfde Paperclip-taak, of subtaken van één taak zoals
+   * de ideeënraad), dan zitten ze samen aan de vergadertafel. Wie klaar is, gaat terug naar zijn bureau. Verder
+   * werkt iedereen aan zijn eigen bureau: het kantoor laat geen overleg zien dat er niet is.
+   */
   private updateMeeting(): void {
     if (this.halted || !this.snap) return;
-    const byBranch = new Map<string, Actor[]>();
-    for (const agent of this.snap.agents) {
-      const a = this.actors.get(agent.id);
-      if (!a || !a.working || agent.hqRole === "ceo") continue;
-      byBranch.set(agent.branch, [...(byBranch.get(agent.branch) ?? []), a]);
+    const byJob = new Map<string, Actor[]>();
+    for (const a of this.actors.values()) {
+      if (a.info.kind !== "agent" || !a.working || !a.job) continue;
+      byJob.set(a.job.groupId, [...(byJob.get(a.job.groupId) ?? []), a]);
     }
+    const seats = this.layout.pois.filter((p) => p.kind === "meeting-seat");
+    const leave = (a: Actor) => {
+      a.meeting = null;
+      a.clear();
+      a.queue(...this.goHome(a));
+    };
+    const join = (a: Actor, groupId: string) => {
+      const seat = seats.find((s) => !this.reserved.has(s.id) || this.reserved.get(s.id) === a.id);
+      if (!seat) return false;
+      a.meeting = groupId;
+      a.clear();
+      this.reserved.set(seat.id, a.id);
+      a.queue(standUp(), walkTo(() => this.grid, seat.spot, { sit: true }));
+      return true;
+    };
     if (this.meeting) {
-      const still = (byBranch.get(this.meeting.branch) ?? []).filter((a) => this.meeting!.members.has(a.id));
-      if (still.length < 2) {
-        for (const id of this.meeting.members) {
+      const m = this.meeting;
+      const working = byJob.get(m.groupId) ?? [];
+      // Wie klaar is met zijn deel, gaat terug; wie er later bij komt, schuift aan.
+      for (const id of [...m.members]) {
+        const a = this.actors.get(id);
+        if (a && working.includes(a)) continue;
+        m.members.delete(id);
+        if (a) leave(a);
+      }
+      if (m.members.size + working.filter((a) => !m.members.has(a.id)).length < 2) {
+        for (const id of m.members) {
           const a = this.actors.get(id);
-          if (!a) continue;
-          a.meeting = null;
-          a.queue(say(pick(["👍 Goed overleg", "Aan de slag!", "✅"]), 2.5, "happy"), ...this.goHome(a));
+          if (a) leave(a);
         }
         this.meeting = null;
         return;
       }
-      this.meeting.chatter -= 2;
-      if (this.meeting.chatter <= 0) {
-        this.meeting.chatter = 4 + Math.random() * 5;
-        const m = pick([...this.meeting.members]);
-        this.actors.get(m)?.say(pick(["💬", "🤔", "💡", "📊", "👍"]), 2.5, "info");
-      }
+      for (const a of working) if (!m.members.has(a.id) && join(a, m.groupId)) m.members.add(a.id);
       return;
     }
-    for (const [branch, list] of byBranch) {
-      if (list.length < 3) continue;
-      const seats = this.layout.pois.filter((p) => p.kind === "meeting-seat");
-      const members = list.slice(0, seats.length);
-      this.meeting = { branch, members: new Set(members.map((a) => a.id)), chatter: 3 };
-      members.forEach((a, k) => {
-        a.meeting = branch;
-        a.clear();
-        const seat = seats[k]!;
-        this.reserved.set(seat.id, a.id);
-        a.queue(standUp(), say("💬 Overleg!", 2.5, "info"), walkTo(() => this.grid, seat.spot, { sit: true }));
-      });
+    for (const [groupId, list] of byJob) {
+      if (list.length < 2 || seats.length < 2) continue;
+      const m = { groupId, title: list[0]!.job?.title ?? null, members: new Set<string>() };
+      this.meeting = m;
+      for (const a of list) if (join(a, groupId)) m.members.add(a.id);
       return;
     }
   }
@@ -1039,11 +1057,6 @@ export class Director {
 
 function dist(a: { x: number; z: number }, b: { x: number; z: number }): number {
   return Math.hypot(a.x - b.x, a.z - b.z);
-}
-
-function reply(kind: string): string {
-  if (kind === "delegate") return pick(["👍 Komt goed!", "Ik pak het op", "✅ Doe ik"]);
-  return pick(["Top, dank je!", "Helder 👌", "Ik kijk ernaar", "👍"]);
 }
 
 /** Helpers hebben het id van hun sessie + "~" + hun eigen id. */

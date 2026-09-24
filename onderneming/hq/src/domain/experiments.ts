@@ -467,7 +467,7 @@ export async function recordMetric(
     type: "metric",
     agentId: actor.startsWith("agent:") ? actor.slice(6) : null,
     text: `${experimentCode(experimentId)} ${input.name}: ${input.value}`,
-    data: { experimentId, name: input.name, value: input.value, trusted: input.trusted },
+    data: { experimentId, name: input.name, value: input.value, trusted: input.trusted, by: actor.startsWith("agent:") ? "agent" : actor },
   });
 }
 

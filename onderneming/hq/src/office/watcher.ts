@@ -112,6 +112,9 @@ export class PaperclipWatcher {
       let identifier: string | null = null;
       let issueId: string | null = null;
       let wakeReason: string | null = null;
+      // Aan welke klus werkt hij? Subtaken van één taak (bv. de ideeënraad) zijn samen één klus.
+      let groupId: string | null = null;
+      let groupTitle: string | null = null;
       try {
         const detail = await this.ctx.paperclip.getRun(run.id);
         wakeReason = typeof detail.contextSnapshot?.wakeReason === "string" ? detail.contextSnapshot.wakeReason : null;
@@ -119,6 +122,9 @@ export class PaperclipWatcher {
         const issue = issueId ? await this.issue(issueId) : null;
         issueTitle = issue?.title ?? null;
         identifier = issue?.identifier ?? null;
+        const parent = issue?.parentId ? await this.issue(issue.parentId) : null;
+        groupId = parent?.id ?? issue?.id ?? null;
+        groupTitle = parent?.title ?? issueTitle;
       } catch {
         // Zonder details tonen we alleen dat hij werkt.
       }
@@ -127,7 +133,7 @@ export class PaperclipWatcher {
         type: "run.started",
         agentId: run.agentId,
         text: issueTitle ?? (wakeReason ? (WAKE_REASON[wakeReason] ?? null) : null),
-        data: { runId: run.id, issueId, identifier, wakeReason },
+        data: { runId: run.id, issueId, identifier, wakeReason, groupId, groupTitle },
         sourceKey: `run:${run.id}:start`,
         at: run.startedAt ? new Date(run.startedAt) : undefined,
       });

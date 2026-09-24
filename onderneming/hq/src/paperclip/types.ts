@@ -170,6 +170,8 @@ export interface PcIssue {
   createdByAgentId?: string | null;
   createdByUserId?: string | null;
   projectId?: string | null;
+  /** Bovenliggende taak (bv. de ideeënraad met subtaken voor verkenners en criticus). */
+  parentId?: string | null;
   /** Waar de taak vandaan komt: `manual` of `routine_execution` (een vaste routine). */
   originKind?: string | null;
 }

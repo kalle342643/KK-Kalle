@@ -15,6 +15,10 @@ Lopen er in de tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Dan 
 over. Meer voorstellen dan Kalle kan kiezen is weggegooid geld, en minder aandacht per idee.
 
 ## Volgorde (de tak-lead regelt dit met Paperclip-taken)
+De raad is **één taak met subtaken**. Jouw raad-taak is de bovenliggende taak; maak voor elke verkenner en voor
+de criticus een subtaak eronder (`parentId` = de id van de raad-taak). Zo staat de hele raad bij elkaar: de analist
+leest later terug wat de raad dacht, en in het kantoor zie je wie er samen aan werkt.
+
 1. **Kennisbank eerst.** Iedereen begint met `hq kennis "<onderwerp van deze week>"` en
    `hq GET "/lessons?branch=<tak>"`: wat is al getest, afgeschoten of door een collega uitgezocht?
 2. **Verkenners (2–3)**, elk met een eigen bron, volgens de skill `onderzoek` (WebSearch, `hq-web`,
