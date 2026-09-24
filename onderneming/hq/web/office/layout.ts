@@ -59,6 +59,8 @@ export interface Desk {
   visitor: Spot;
   agentId: string | null;
   lead: boolean;
+  /** Bureau voor een figurant: een poppetje zonder naam dat niets doet en niets kost (alleen voor de sfeer). */
+  extra?: boolean;
 }
 
 export type PoiKind =
@@ -215,7 +217,18 @@ const GLASS_H = 1.25;
 
 const isLead = (a: LayoutAgent) => a.hqRole === "lead" || a.template === "tak-lead";
 
-export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAgent[]; ownerName?: string; workshop?: LayoutWorkshop }): Layout {
+/** Figuranten per afdeling bij elke stand van de levendigheid (rustig = alleen wie echt werkt). */
+export const EXTRA_SEATS = { calm: 0, normal: 2, lively: 4 } as const;
+
+export function buildLayout(input: {
+  branches: LayoutBranch[];
+  agents: LayoutAgent[];
+  ownerName?: string;
+  workshop?: LayoutWorkshop;
+  /** Bureaus voor figuranten per afdeling (bovenop de echte agents en één vrij bureau). */
+  extraSeats?: number;
+}): Layout {
+  const extra = Math.max(0, Math.min(8, Math.floor(input.extraSeats ?? 0)));
   const agents = input.agents.filter((a) => a.status !== "terminated");
   const pending = agents.filter((a) => a.status === "pending_approval");
   const staff = agents.filter((a) => a.status !== "pending_approval");
@@ -244,7 +257,7 @@ export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAge
       const rows = Math.ceil(seats / cols);
       // Breed genoeg voor een bord per project aan de noordmuur.
       const w = Math.max(11, 3 * cols + 2, Math.ceil(6.4 + workshop!.projects.length * 3.2));
-      return { branch: b, list: [] as LayoutAgent[], cols, rows, w, d: 3 * rows + 4 };
+      return { branch: b, list: [] as LayoutAgent[], extra: 0, cols, rows, w, d: 3 * rows + 4 };
     }
     const list = [...(members.get(b.slug) ?? [])].sort(
       (x, y) =>
@@ -254,10 +267,10 @@ export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAge
     );
     // In de controlekamer zit ook de HQ-bot (die jou de berichten stuurt).
     if (b.slug === "holding") list.unshift({ id: BOT_ID, name: "HQ-bot", branch: "holding", hqRole: "bot", template: null, role: "bot", status: "idle" });
-    const seats = Math.max(2, list.length + 1); // altijd een vrij bureau voor een nieuwe collega
+    const seats = Math.max(2, list.length + 1 + extra); // altijd een vrij bureau voor een nieuwe collega
     const cols = Math.min(8, Math.max(2, Math.ceil(Math.sqrt(seats * 1.4))));
     const rows = Math.ceil(seats / cols);
-    return { branch: b, list, cols, rows, w: Math.max(10, 3 * cols + 2), d: 3 * rows + 3 };
+    return { branch: b, list, extra, cols, rows, w: Math.max(10, 3 * cols + 2), d: 3 * rows + 3 };
   });
 
   const special: Array<{ kind: RoomKind; name: string; w: number }> = [
@@ -610,7 +623,7 @@ function furnishSpecial(room: Room, c: Ctx & { ceo: LayoutAgent | null }): void 
 
 function furnishDept(
   room: Room,
-  spec: { branch: LayoutBranch & { index: number }; list: LayoutAgent[]; cols: number; rows: number },
+  spec: { branch: LayoutBranch & { index: number }; list: LayoutAgent[]; extra: number; cols: number; rows: number },
   c: Ctx,
 ): void {
   const { x, z, w, d } = room.rect;
@@ -633,6 +646,7 @@ function furnishDept(
       visitor: { x: dx + 0.95, z: dz + 1.05, facing: -Math.PI / 2 },
       agentId: agent?.id ?? null,
       lead: Boolean(agent && isLead(agent)),
+      ...(!agent && k < spec.list.length + spec.extra ? { extra: true } : {}),
     };
     c.desks.push(desk);
     if (agent) c.deskOf.set(agent.id, desk.id);

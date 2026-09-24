@@ -45,6 +45,22 @@ describe("plattegrond", () => {
     expect(roomAt(layout, lead.seat.x, lead.seat.z)?.id).toBe("dept-games");
   });
 
+  it("zet bureaus klaar voor figuranten, en houdt toch een bureau vrij voor een nieuwe collega", () => {
+    const branches = [{ slug: "games", name: "Games", template: "games" }];
+    const agents = [agent("atlas", "holding", { hqRole: "ceo", role: "ceo" }), agent("g-0", "games", { hqRole: "lead", template: "tak-lead" }), agent("g-1", "games")];
+    expect(buildLayout({ branches, agents }).desks.some((d) => d.extra)).toBe(false);
+    const lively = buildLayout({ branches, agents, extraSeats: 4, workshop: { projects: [{ key: "p", name: "P" }], seats: 3 } });
+    for (const room of ["dept-games", "dept-holding"]) {
+      const desks = lively.desks.filter((d) => d.roomId === room);
+      expect(desks.filter((d) => d.extra), room).toHaveLength(4);
+      expect(desks.some((d) => !d.extra && d.agentId === null), room).toBe(true);
+      expect(desks.some((d) => d.extra && d.agentId !== null), room).toBe(false);
+    }
+    // Niet in de werkplaats: daar zitten alleen echte Claude Code-sessies.
+    expect(lively.desks.some((d) => d.extra && d.roomId === "dept-werkplaats")).toBe(false);
+    for (const d of lively.desks.filter((x) => x.extra)) expect(findPath(lively.grid, lively.entrance, d.seat), d.id).not.toBeNull();
+  });
+
   it("kamers overlappen niet en liggen binnen het gebouw", () => {
     const layout = company({ games: 7, content: 5, saas: 6, extra: 3 });
     const walled = layout.rooms.filter((r) => r.kind !== "hall" && r.kind !== "corridor");

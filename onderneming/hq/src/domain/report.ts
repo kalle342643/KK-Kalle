@@ -100,12 +100,13 @@ export async function buildDailyReport(ctx: AppContext): Promise<string> {
   } catch (err) {
     lines.push("", `🛠️ Werkplaats: stand onbekend (${errorMessage(err)})`);
   }
-  // Eén keer per week (maandag) de nut-meter: wie kost geld zonder aantoonbaar resultaat?
+  // Eén keer per week (maandag) de nut-meter: wie kost geld zonder aantoonbaar resultaat en draait nog?
   if (new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(ctx.now()) === "Mon") {
     try {
       const values = await computeAgentValues(ctx);
-      const names = new Map((await ctx.paperclip.listAgents(ctx.companyId)).map((a) => [a.id, a.name]));
-      lines.push(...valueReportLines(values, names));
+      const agents = await ctx.paperclip.listAgents(ctx.companyId);
+      const names = new Map(agents.map((a) => [a.id, a.name]));
+      lines.push(...valueReportLines(values, names, new Set(agents.filter((a) => a.status === "paused").map((a) => a.id))));
     } catch (err) {
       ctx.log.warn("nut-meter voor het rapport mislukt", { error: errorMessage(err) });
     }

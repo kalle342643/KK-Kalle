@@ -139,13 +139,19 @@ Uit de handleiding van Claude Code (Anthropic) en ervaringen op Hacker News:
 
 ## De nut-meter: de controle blijft
 Per agent zet HQ de kosten van de laatste 30 dagen naast wat hij aantoonbaar opleverde: lessen, notities,
-voorstellen, metingen, verzoeken aan jou en taken voor collega's. Het oordeel:
+voorstellen, metingen, verzoeken aan jou, taken voor collega's en afgeronde opdrachten van een ander (een bouwer of
+schrijver levert in de taak zelf). Het oordeel:
 - **levert**: er is iets terug te vinden, met de kosten per resultaat erbij;
-- **voor de sier?**: meer dan €1 uitgegeven en niets terug te vinden. Pauzeer hem, of geef hem een duidelijke taak;
+- **voor de sier?**: meer dan €1 uitgegeven en niets terug te vinden. Op maandag gaat hij automatisch op pauze;
 - **nog weinig gebruikt**: te weinig uitgegeven om iets te zeggen.
 
-Je ziet het in het kantoor, in de controlekamer (📊, "Nut per agent") en bij elk poppetje. Elke maandag staat in
-het dagrapport wie geld kost zonder resultaat. Het tellen gebeurt in de database en kost zelf geen AI.
+Je ziet het in het kantoor, in de controlekamer (📊, "Nut per agent") en bij elk poppetje. Het tellen gebeurt in de
+database en kost zelf geen AI.
+
+**De regel in het kantoor: wie een naam heeft, doet echt iets.** Een agent die niets oplevert, gaat op pauze en
+verliest zijn naamkaartje (alleen 💤); hij kost dan niets meer. Figuranten zonder naam maken het kantoor levendig,
+maar bestaan alleen in de browser: ze doen niets en kosten niets. Nieuwe agents en agents die jij weer aanzette,
+krijgen eerst twee weken.
 
 ## Wat dit betekent voor je eigen Claude Code-projecten
 1. **Houd CLAUDE.md kort (±150 regels).** Een CLAUDE.md van 1.000 regels kost zo'n 15.000 tokens in élke sessie

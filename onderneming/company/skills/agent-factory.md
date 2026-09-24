@@ -11,7 +11,7 @@ meerdere kopieën van hetzelfde model bevestigen elkaar vooral. Voeg alleen iema
 een eigen rol of een tegengesteld perspectief.
 
 ## Een agent aannemen
-1. Bekijk de sjablonen: `GET /templates` (bv. `verkenner`, `pitcher`, `criticus`, `bouwer`, `publicist`).
+1. Bekijk de sjablonen: `GET /templates` (bv. `verkenner`, `criticus`, `bouwer`, `publicist`, `schrijver`).
 2. Neem aan via `POST /hire` met `template`, `branch` en een concrete `reason` (welk knelpunt, welk bewijs).
 3. Kalle keurt elke aanname goed of af. Tot die tijd bestaat de agent niet.
 

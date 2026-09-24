@@ -20,6 +20,7 @@ describe("planner", () => {
       "evaluate",
       "daily-report",
       "weekly-portfolio",
+      "nut-meter",
       "vault-sync",
       "knowledge-graph",
     ]);

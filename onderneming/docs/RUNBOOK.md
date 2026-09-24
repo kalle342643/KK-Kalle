@@ -14,7 +14,9 @@
 - **Taak geven:** klik op een agent → *Taak geven*; of in de werkplaats een opdracht voor Claude Code.
 - **Maandag:** het portfolio-voorstel (budget per tak) en het weekplan van CEO Atlas.
 - **Woensdag:** de ideeënraad per tak; daar komen 1 à 2 experimentvoorstellen uit (niet als er al 2 lopen of wachten).
-- **Maandag in het dagrapport:** de nut-meter, als er agents zijn die geld kosten zonder aantoonbaar resultaat.
+- **Maandag 7:00, de nut-meter:** agents die 30 dagen geld kostten zonder resultaat gaan op pauze; je krijgt een
+  bericht. In het kantoor zitten ze er nog, zonder naam (alleen 💤). Toch nodig? Klik erop → ▶️ Hervatten, het
+  liefst met een taak erbij; dan heeft hij weer twee weken. Liever zelf beslissen: `HQ_AUTO_PAUSE=uit` in hq.env.
 
 ## Cijfers invoeren
 Agents kunnen omzet niet zelf boeken, dus die moet uit een betrouwbare bron komen:
@@ -80,7 +82,7 @@ paperclipai update                        # Paperclip
 ## Prompts en regels aanpassen
 Alles wat agents "weten" staat in `onderneming/company/`:
 - `agents/*.md`: CEO en analist
-- `templates/agents/*.md`: rollen in een tak (verkenner, criticus, bouwer, ...; `pitcher` staat standaard niet meer in een tak)
+- `templates/agents/*.md`: rollen in een tak (verkenner, criticus, bouwer, publicist, schrijver, tak-lead; de pitcher is weg: de lead maakt de top 5)
 - `skills/*.md`: spelregels die agents delen (HQ-API, onderzoek op het web, kennisgraaf, experiment-protocol,
   geld en regels, ...)
 - `templates/branches/*.yaml`: welke agents en routines een nieuwe tak krijgt

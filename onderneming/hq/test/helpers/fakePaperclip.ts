@@ -487,7 +487,7 @@ export class FakePaperclip implements PaperclipApi {
     this.calls.push(`cancelRun:${runId}`);
   }
 
-  async createIssue(companyId: string, input: CreateIssueInput & { createdByAgentId?: string | null }) {
+  async createIssue(companyId: string, input: CreateIssueInput & { createdByAgentId?: string | null; originKind?: string }) {
     const issue = {
       id: randomUUID(),
       identifier: `HQ-${this.issues.length + 1}`,

@@ -7,7 +7,7 @@ import type { AgentValue, CodeProject, CodeSession, OfficeAgent, OfficeEvent, Of
 import { codeStatus, COLUMNS, progressOf } from "./boards.js";
 import { hideTip, lineChart, pairedBars } from "./charts.js";
 import type { DataSource } from "./data.js";
-import type { Director, Liveliness } from "./director.js";
+import { isExtraId, type Director, type Liveliness } from "./director.js";
 import { layoutGraph } from "./hologram.js";
 import { BOT_ID, OWNER_ID, type Layout } from "./layout.js";
 import type { Pick, World } from "./world.js";
@@ -95,6 +95,26 @@ export interface UiDeps {
   thumbs: () => string[];
   refresh: () => Promise<void>;
   layout: () => Layout;
+  /** Plattegrond opnieuw bepalen (bv. na een andere levendigheid: meer of minder figuranten). */
+  relayout?: () => void;
+}
+
+const LIVELINESS: Array<[Liveliness, string, string]> = [
+  ["calm", "🐢", "Rustig: alleen wie echt werkt, geen figuranten"],
+  ["normal", "🙂", "Normaal: af en toe koffie, en een paar figuranten (zonder naam, kosten niets)"],
+  ["lively", "🎉", "Levendig: veel beweging en meer figuranten (zonder naam, kosten niets)"],
+];
+
+/** De levendigheid die je de vorige keer koos (standaard normaal). */
+export function savedLiveliness(): Liveliness {
+  try {
+    const saved = localStorage.getItem("hq-liveliness");
+    const found = LIVELINESS.find((o) => o[0] === saved);
+    if (found) return found[0];
+  } catch {
+    // geen opslag beschikbaar
+  }
+  return "normal";
 }
 
 export class Ui {
@@ -204,22 +224,11 @@ export class Ui {
   }
 
   private livelinessToggle(): HTMLElement {
-    const options: Array<[Liveliness, string, string]> = [
-      ["calm", "🐢", "Rustig: alleen echt werk"],
-      ["normal", "🙂", "Normaal: af en toe koffie of een praatje"],
-      ["lively", "🎉", "Levendig: veel beweging"],
-    ];
-    const btn = h("button", { title: options[1]![2], "aria-label": "Levendigheid" }, options[1]![1]);
-    let k = 1;
-    try {
-      const saved = localStorage.getItem("hq-liveliness");
-      const idx = options.findIndex((o) => o[0] === saved);
-      if (idx >= 0) k = idx;
-    } catch {
-      // geen opslag beschikbaar
-    }
-    const apply = () => {
-      const [value, icon, title] = options[k]!;
+    let k = Math.max(0, LIVELINESS.findIndex((o) => o[0] === this.deps.director.liveliness));
+    const btn = h("button", { title: LIVELINESS[k]![2], "aria-label": "Levendigheid" }, LIVELINESS[k]![1]);
+    btn.addEventListener("click", () => {
+      k = (k + 1) % LIVELINESS.length;
+      const [value, icon, title] = LIVELINESS[k]!;
       this.deps.director.liveliness = value;
       btn.textContent = icon;
       btn.title = title;
@@ -228,13 +237,10 @@ export class Ui {
       } catch {
         // geen opslag beschikbaar
       }
-    };
-    btn.addEventListener("click", () => {
-      k = (k + 1) % options.length;
-      apply();
-      this.toast(options[k]![2], "info");
+      // Meer of minder figuranten: dan komen er bureaus bij of gaan er weg.
+      this.deps.relayout?.();
+      this.toast(title, "info");
     });
-    queueMicrotask(apply);
     return btn;
   }
 
@@ -337,6 +343,8 @@ export class Ui {
         return `${who} ${t}`;
       case "talk":
         return e.data.kind === "delegate" ? `📝 ${who} → ${to}: ${t.replace(/^Nieuwe taak voor jou: /, "nieuwe taak: ")}` : `💬 ${who} → ${to}: ${t}`;
+      case "task.done":
+        return `☑️ ${who} rondde een opdracht af${e.targetAgentId || e.data.byOwner ? ` van ${to}` : ""}: ${t}`;
       case "notify":
         return `💬 ${who} → jou: ${t}`;
       case "knowledge.query":
@@ -452,7 +460,14 @@ export class Ui {
       "code-project": "🛠️ Projectbord: live, tests, uitrol en wat op jou wacht",
       desk: "Bureau",
     };
-    const text = pick ? (pick.kind === "agent" ? `${this.label(pick.id)} · klik voor details` : labels[pick.kind]) : null;
+    const paused = pick?.kind === "agent" && this.snap?.agents.find((a) => a.id === pick.id)?.status === "paused";
+    const text = pick
+      ? pick.kind === "agent"
+        ? isExtraId(pick.id)
+          ? "Figurant: geen naam, doet niets, kost niets"
+          : `${paused ? "💤 " : ""}${this.label(pick.id)}${paused ? " · gepauzeerd, kost niets" : ""} · klik voor details`
+        : labels[pick.kind]
+      : null;
     this.el.hint.hidden = !text;
     if (text) this.el.hint.textContent = text;
   }
@@ -463,6 +478,10 @@ export class Ui {
     if (!pick) return;
     switch (pick.kind) {
       case "agent":
+        if (isExtraId(pick.id)) {
+          this.toast("🙂 Een figurant: geen naam, doet niets en kost geen tokens. Alleen voor de sfeer (met 🐢 zijn ze weg).", "info");
+          break;
+        }
         // Een helper hoort bij zijn sessie: dan zie je daar wat hij doet.
         this.open(pick.id.startsWith("cc:") ? "session" : "agent", pick.id.startsWith("cc:") && pick.id.includes("~") ? pick.id.slice(0, pick.id.lastIndexOf("~")) : pick.id);
         break;
@@ -968,13 +987,21 @@ export class Ui {
       "section",
       { class: "card value" },
       h("div", { class: "row" }, h("h3", {}, "Nut (30 dagen)"), h("span", { class: `pill ${verdict.tone}` }, verdict.label)),
-      h("p", { class: done.length ? "" : "muted" }, done.length ? done.join(" · ") : "Nog niets terug te vinden in HQ: geen les, notitie, voorstel, meting of taak."),
+      h("p", { class: done.length ? "" : "muted" }, done.length ? done.join(" · ") : "Nog niets terug te vinden: geen les, notitie, voorstel, meting of afgeronde opdracht."),
       h(
         "p",
         { class: "small muted" },
         `${eur(v.costEur)} aan AI · ${v.runs} ${v.runs === 1 ? "run" : "runs"}${v.failedRuns ? ` (${v.failedRuns} mislukt)` : ""}${v.costPerOutputEur !== null ? ` · ${eur(v.costPerOutputEur)} per resultaat` : ""}`,
       ),
-      v.verdict === "niets" ? h("p", { class: "small" }, "💤 Kost geld zonder aantoonbaar resultaat. Pauzeer hem, of geef hem een duidelijke taak.") : null,
+      v.autoPausedAt
+        ? h(
+            "p",
+            { class: "small" },
+            `💤 De nut-meter zette hem op ${new Date(v.autoPausedAt).toLocaleDateString("nl-NL", { day: "numeric", month: "long" })} op pauze: hij kostte geld zonder resultaat. Daarom heeft hij in het kantoor geen naam. Toch nodig? ▶️ Hervatten, het liefst met een duidelijke taak erbij.`,
+          )
+        : v.verdict === "niets"
+          ? h("p", { class: "small" }, "💤 Kost geld zonder aantoonbaar resultaat. Blijft dat zo, dan zet de nut-meter hem maandag op pauze. Geef hem een duidelijke taak, of pauzeer hem zelf.")
+          : null,
     );
   }
 
@@ -1214,11 +1241,16 @@ export class Ui {
       h(
         "ul",
         {},
-        h("li", {}, "Elk poppetje is een echte agent. Wat je ziet gebeurt echt: werken, praten, iets opzoeken, iets vragen."),
+        h("li", {}, "Elk poppetje mét naam doet echt iets. Wat je ziet gebeurt echt: werken, praten, iets opzoeken, iets vragen."),
+        h(
+          "li",
+          {},
+          "Zonder naam = doet niets en kost niets. Dat zijn figuranten (alleen voor de sfeer) en agents op pauze (💤). De nut-meter pauzeert elke maandag agents die 30 dagen geld kostten zonder resultaat; jij zet ze met ▶️ Hervatten weer aan.",
+        ),
         h("li", {}, "Klik op een poppetje om te zien waar het mee bezig is, of om het een naam en een ander uiterlijk te geven."),
         h("li", {}, "Klik op het projectenbord (vergaderzaal), de schermen (controlekamer), de kluis, het hologram (kennisbank) of je bureau."),
         h("li", {}, "Slepen = bewegen, scrollen of knijpen = zoomen, Q/E of ⟲ ⟳ = draaien."),
-        h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel de poppetjes 'uit zichzelf' rondlopen (koffie, praatje). Dat is alleen sfeer en kost niets."),
+        h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel figuranten er zijn en hoeveel iedereen 'uit zichzelf' rondloopt (koffie, praatje). Dat is alleen sfeer en kost niets."),
         h("li", {}, "📝 Klik op een agent om hem een taak te geven. 🛠️ In de werkplaats zie je je projecten (live, tests, uitrol, wat op jou wacht) en je Claude Code-sessies; daar geef je Claude Code ook een opdracht."),
         h("li", {}, "🌐 Agents op het web: in het logboek zie je wie wat zoekt en leest. 🆓 Bij een agent met 'Gratis AI' draait die op de gratis router."),
       ),
@@ -1625,6 +1657,7 @@ function valueParts(v: AgentValue): string[] {
     n(o.measurements, "meting", "metingen"),
     n(o.requests, "verzoek aan jou", "verzoeken aan jou"),
     n(o.delegations, "taak voor een collega", "taken voor collega's"),
+    n(o.tasks, "afgeronde opdracht", "afgeronde opdrachten"),
   ].filter((x): x is string => x !== null);
 }
 

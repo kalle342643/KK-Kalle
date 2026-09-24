@@ -114,6 +114,13 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     });
   }
 
+  // Paperclip noemt elke pauze via de API "manual"; zeg erbij als de nut-meter het was.
+  const stats = await officeStats(ctx);
+  for (const v of stats.agents) {
+    const agent = v.autoPausedAt ? agents.find((a) => a.id === v.agentId) : undefined;
+    if (agent) agent.pauseReason = "nut-meter";
+  }
+
   let knowledge: OfficeSnapshot["knowledge"] = { source: "hq", nodes: 0, edges: 0, builtAt: null };
   try {
     const g = await knowledgeGraph(ctx, 1);
@@ -141,7 +148,7 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     agents,
     people: await people(ctx.db),
     projects: await listProjects(ctx),
-    stats: await officeStats(ctx),
+    stats,
     approvals: pending.map((a) => ({
       id: a.id,
       title: a.title,

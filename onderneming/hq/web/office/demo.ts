@@ -410,6 +410,11 @@ export class DemoSource implements DataSource {
     for (const a of this.agents) {
       if (a.hqRole !== "ceo") a.reportsTo = a.hqRole === "lead" || a.hqRole === "analyst" ? ceo.id : (this.branches.find((b) => b.slug === a.branch)?.lead ?? ceo.id);
     }
+    // De nut-meter zette Wilg op pauze: kostte geld zonder resultaat. Hij zit er nog, zonder naam.
+    const wilg = this.agent("demo-wilg")!;
+    wilg.status = "paused";
+    wilg.pauseReason = "nut-meter";
+    wilg.costTodayEur = 0;
     // Een sollicitant op de bank bij de receptie.
     const altair = add({ name: "Altair", template: "verkenner", branch: "games", status: "pending_approval" });
     altair.reportsTo = "demo-vega";
@@ -486,7 +491,10 @@ export class DemoSource implements DataSource {
 
     // Wat er vandaag al gebeurde (voor het logboek).
     const history: Array<Omit<OfficeEvent, "id" | "at"> & { ago: number }> = [
+      { ago: 200, type: "agent.status", agentId: "demo-wilg", targetAgentId: null, text: "Wilg is gepauzeerd door de nut-meter: kostte € 1,35 zonder resultaat", data: { from: "idle", to: "paused", by: "nut-meter" } },
+      { ago: 199, type: "message.sent", agentId: BOT_ID, targetAgentId: null, text: "💤 Nut-meter: Wilg (€ 1,35) staat op pauze. Toch nodig? Klik op het poppetje en kies ▶️ Hervatten.", data: {} },
       { ago: 180, type: "message.sent", agentId: BOT_ID, targetAgentId: null, text: "📊 Dagrapport: gisteren € 14,20 omzet, € 5,10 AI-kosten. 2 verzoeken wachten op jou.", data: {} },
+      { ago: 165, type: "task.done", agentId: "demo-castor", targetAgentId: "demo-vega", text: "Top 5 pitches doorlichten", data: { byOwner: false } },
       { ago: 150, type: "run.started", agentId: "demo-atlas", targetAgentId: null, text: "Weekplan voor de holding schrijven", data: {} },
       { ago: 140, type: "talk", agentId: "demo-atlas", targetAgentId: "demo-vega", text: "Nieuwe taak voor jou: Fluxgrid deze week naar 4000 plays", data: { kind: "delegate" } },
       { ago: 120, type: "knowledge.query", agentId: "demo-rigel", targetAgentId: null, text: "Wat weten we over puzzelgames op CrazyGames?", data: {} },
@@ -508,19 +516,23 @@ export class DemoSource implements DataSource {
     }
   }
 
-  /** De nut-meter in de demo: vaste cijfers per rol, en één agent die alleen geld kost (om te laten zien hoe dat eruitziet). */
+  /**
+   * De nut-meter in de demo: vaste cijfers per rol, en één agent die alleen geld kostte (Wilg). Die heeft de
+   * nut-meter gepauzeerd, tot jij hem weer aanzet.
+   */
   private agentValues(): AgentValue[] {
-    const zero = { lessons: 0, notes: 0, proposals: 0, measurements: 0, requests: 0, delegations: 0 };
+    const zero = { lessons: 0, notes: 0, proposals: 0, measurements: 0, requests: 0, delegations: 0, tasks: 0 };
     const byRole: Record<string, [number, Partial<AgentValue["outputs"]>]> = {
       ceo: [8.4, { requests: 4, delegations: 9 }],
       analyst: [2.1, { lessons: 14 }],
       "tak-lead": [5.2, { proposals: 3, delegations: 12, measurements: 2 }],
-      verkenner: [1.6, { notes: 6 }],
-      criticus: [1.9, { notes: 5 }],
-      bouwer: [7.8, { measurements: 4, notes: 2 }],
-      publicist: [2.3, { requests: 3 }],
-      schrijver: [3.1, { notes: 4, requests: 2 }],
+      verkenner: [1.6, { notes: 6, tasks: 2 }],
+      criticus: [1.9, { tasks: 4 }],
+      bouwer: [7.8, { tasks: 5, measurements: 4 }],
+      publicist: [2.3, { requests: 3, tasks: 2 }],
+      schrijver: [3.1, { tasks: 4, requests: 2 }],
     };
+    const pausedAt = new Date(Date.now() - 200 * 60_000).toISOString();
     const values = this.agents
       .filter((a) => a.status !== "terminated" && a.status !== "pending_approval")
       .map((a): AgentValue => {
@@ -536,6 +548,7 @@ export class DemoSource implements DataSource {
           outputTotal,
           verdict: outputTotal ? "levert" : cost >= 1 ? "niets" : "rustig",
           costPerOutputEur: outputTotal ? round2(cost / outputTotal) : null,
+          autoPausedAt: a.status === "paused" && a.pauseReason === "nut-meter" ? pausedAt : null,
         };
       });
     return values.sort((x, y) => Number(y.verdict === "niets") - Number(x.verdict === "niets") || y.costEur - x.costEur);
@@ -894,7 +907,8 @@ export class DemoSource implements DataSource {
     this.halted = true;
     this.haltReason = reason;
     for (const a of this.agents) {
-      if (a.status === "terminated" || a.status === "pending_approval") continue;
+      // Wie al gepauzeerd was (door jou of de nut-meter), blijft dat ook na het hervatten.
+      if (a.status === "terminated" || a.status === "pending_approval" || a.status === "paused") continue;
       if (this.runs.has(a.id)) this.finishRun(a, "cancelled");
       a.status = "paused";
       a.pauseReason = "noodstop";

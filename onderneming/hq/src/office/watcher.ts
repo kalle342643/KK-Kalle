@@ -258,6 +258,25 @@ export class PaperclipWatcher {
         });
         return;
       }
+      case "issue.updated": {
+        // Een taak op "klaar": telt voor de nut-meter als iemand anders hem gaf. Een routine of een taak die je
+        // jezelf gaf, bewijst niets (anders scoort "geen nieuws deze week" als resultaat).
+        const previous = (d._previous ?? {}) as Record<string, unknown>;
+        if (!byAgent || !a.entityId || d.status !== "done" || previous.status === "done") return;
+        const issue = await this.issue(a.entityId);
+        if (!issue || issue.originKind === "routine_execution") return;
+        if (!issue.createdByUserId && (!issue.createdByAgentId || issue.createdByAgentId === byAgent)) return;
+        await this.ctx.events.emit({
+          type: "task.done",
+          agentId: byAgent,
+          targetAgentId: issue.createdByAgentId ?? null,
+          text: issue.title,
+          data: { issueId: a.entityId, identifier: str(d.identifier) ?? issue.identifier, byOwner: Boolean(issue.createdByUserId) },
+          sourceKey,
+          at,
+        });
+        return;
+      }
       case "agent.hire_created": {
         if (!a.entityId) return;
         await this.ctx.events.emit({

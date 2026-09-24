@@ -8,6 +8,7 @@ import { markNotified } from "../domain/settings.js";
 import { syncApprovals } from "../domain/workflows.js";
 import { importStripe } from "../importers/stripe.js";
 import { rebuildKnowledge, runVaultSync } from "../knowledge/service.js";
+import { pauseIdleAgents } from "../office/value.js";
 
 export interface JobDefinition {
   name: string;
@@ -27,6 +28,8 @@ export function defaultJobs(ctx: AppContext): JobDefinition[] {
       run: async (x) => x.notifier.send({ text: await buildDailyReport(x) }),
     },
     { name: "weekly-portfolio", cron: c.weeklyPortfolio, run: (x) => proposePortfolio(x, "job:weekly-portfolio") },
+    // Wat niets oplevert, kost ook niets meer: de nut-meter pauzeert agents zonder resultaat.
+    { name: "nut-meter", cron: c.value, run: pauseIdleAgents },
     { name: "vault-sync", cron: c.vaultSync, run: runVaultSync },
     {
       name: "knowledge-graph",

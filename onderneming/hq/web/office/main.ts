@@ -9,10 +9,10 @@ import { Assets, CHARACTERS } from "./assets.js";
 import { drawCodeBoard, drawKanban, drawKpiScreen, drawVideoWall, drawWhiteboard } from "./boards.js";
 import { HttpError, LiveSource, type DataSource } from "./data.js";
 import { DemoSource } from "./demo.js";
-import { Director } from "./director.js";
+import { Director, type Liveliness } from "./director.js";
 import { Hologram } from "./hologram.js";
-import { buildLayout, OWNER_ID, workshopSeats, type Layout, type LayoutWorkshop } from "./layout.js";
-import { Ui } from "./ui.js";
+import { buildLayout, EXTRA_SEATS, OWNER_ID, workshopSeats, type Layout, type LayoutWorkshop } from "./layout.js";
+import { savedLiveliness, Ui } from "./ui.js";
 import { World } from "./world.js";
 
 const app = document.getElementById("app")!;
@@ -50,7 +50,7 @@ function workshopOf(snap: OfficeSnapshot): LayoutWorkshop | undefined {
 }
 
 /** Welke dingen bepalen de plattegrond? Verandert dit, dan bouwen we het kantoor opnieuw op. */
-function layoutKey(snap: OfficeSnapshot): string {
+function layoutKey(snap: OfficeSnapshot, liveliness: Liveliness): string {
   return JSON.stringify([
     snap.branches.map((b) => [b.slug, b.name, b.template]),
     snap.agents
@@ -59,17 +59,20 @@ function layoutKey(snap: OfficeSnapshot): string {
       .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
     ownerName(snap),
     workshopOf(snap) ?? null,
+    EXTRA_SEATS[liveliness],
   ]);
 }
 
 const ownerName = (snap: OfficeSnapshot) => snap.people.find((p) => p.id === OWNER_ID)?.nickname ?? undefined;
 
-function layoutFor(snap: OfficeSnapshot): Layout {
+function layoutFor(snap: OfficeSnapshot, liveliness: Liveliness): Layout {
   return buildLayout({
     branches: snap.branches.map((b) => ({ slug: b.slug, name: b.name, template: b.template })),
     agents: snap.agents.map((a) => ({ id: a.id, name: a.name, branch: a.branch, hqRole: a.hqRole, template: a.template, role: a.role, status: a.status })),
     ownerName: ownerName(snap),
     workshop: workshopOf(snap),
+    // Figuranten: poppetjes zonder naam die niets doen en niets kosten, alleen voor de sfeer.
+    extraSeats: EXTRA_SEATS[liveliness],
   });
 }
 
@@ -137,8 +140,9 @@ async function boot(): Promise<void> {
   app.replaceChildren(stage, overlay);
 
   const world = new World(stage, assets);
-  let layout = layoutFor(snap);
-  let key = layoutKey(snap);
+  const liveliness = savedLiveliness();
+  let layout = layoutFor(snap, liveliness);
+  let key = layoutKey(snap, liveliness);
   world.build(layout);
   world.setNight(isNight());
 
@@ -157,6 +161,7 @@ async function boot(): Promise<void> {
     label: (id) => ui?.label(id) ?? "Iemand",
     toast: (text, kind, actorId) => ui?.toast(text, kind, actorId),
   });
+  director.liveliness = liveliness;
   director.setLayout(layout);
 
   const accentOf = (branch: string) => layout.rooms.find((r) => r.id === layout.roomOfBranch.get(branch))?.accent ?? "#5b6b86";
@@ -172,10 +177,10 @@ async function boot(): Promise<void> {
 
   const apply = (s: OfficeSnapshot, first = false) => {
     snap = s;
-    const nextKey = layoutKey(s);
+    const nextKey = layoutKey(s, director.liveliness);
     if (nextKey !== key) {
       key = nextKey;
-      layout = layoutFor(s);
+      layout = layoutFor(s, director.liveliness);
       world.build(layout);
       world.setNight(isNight());
       hologram.group.position.copy(world.hologramAnchor);
@@ -215,7 +220,7 @@ async function boot(): Promise<void> {
     soonTimer = window.setTimeout(() => void refresh(), mode === "demo" ? 300 : 1200);
   };
 
-  ui = new Ui(overlay, { source, director, world, thumbs: () => thumbs, refresh, layout: () => layout });
+  ui = new Ui(overlay, { source, director, world, thumbs: () => thumbs, refresh, layout: () => layout, relayout: () => apply(snap) });
   // Pas nu in beeld brengen: de bovenbalk en knoppen staan er, dus de camera weet welk stuk vrij is.
   world.fit();
   apply(snap, true);

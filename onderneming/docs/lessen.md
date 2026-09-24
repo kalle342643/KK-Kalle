@@ -168,6 +168,21 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
 - Getest met de echte OmniRoute 3.8.50: doorschakelen van A (429) naar B in OpenAI- en Anthropic-formaat, ook
   streaming, en `gratis-ai --schrijf`: 20 modellen in de combo, en bij een tweede run blijft de sleutel dezelfde.
 
+## Naam = doet echt iets (24 september, avond)
+- **De nut-meter telde niet wat een bouwer maakt.** Een bouwer of schrijver levert in de Paperclip-taak en de
+  workspace, niet in HQ-lessen of -notities. Hij zou dus "voor de sier" scoren en automatisch op pauze gaan. Nu telt
+  een afgeronde opdracht mee (`issue.updated` naar `done` in het activiteitenlogboek), maar alleen als iemand
+  anders hem gaf: een routine (`originKind: routine_execution`) of een taak die je jezelf gaf bewijst niets.
+  Les: controleer bij een automatische maatregel eerst per rol of de meting zijn werk wel ziet.
+- **Een automatische pauze heeft remmen nodig:** nieuwe agents en agents die jij net weer aanzette krijgen twee
+  weken, en als meer dan de helft van het team op pauze zou gaan, pauzeert HQ niemand en meldt het. Dan is eerder
+  de meting kapot (bv. het kantoor liep niet mee met Paperclip) dan het hele team nutteloos.
+- **Paperclip noemt elke pauze via de API "manual".** Wie de pauze deed, houdt HQ zelf bij in het auditlog
+  (`agent.autopause`); het kantoor zegt het erbij.
+- **Een gebouw dat krimpt, laat poppetjes buiten staan.** Met minder figuranten worden de afdelingen kleiner. Wie
+  op dat moment liep, stond daarna naast het gebouw (en kwam er niet meer in: geen route vanaf daar). Nu gaat wie na
+  een verbouwing niet op de vloer staat meteen naar zijn eigen plek.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.
@@ -199,6 +214,7 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
   niets naar stdout, altijd exit 0), ook met de echte Claude Code CLI en een helper. De route via Tailscale Funnel
   en de netwerkinstellingen van een cloud-omgeving zijn niet getest.
 - **De nut-meter met echte cijfers:** getest met nep-kosten; of €1 in 30 dagen de goede drempel is, blijkt pas als
-  de agents echt werken.
+  de agents echt werken. Het automatisch pauzeren en het tellen van afgeronde opdrachten zijn getest tegen een
+  nep-Paperclip met de velden zoals de echte ze logt (`details.status`, `_previous`, `originKind`), niet met echte runs.
 - **De helpers `onderzoeker` en `reviewer` in echt werk:** Claude Code laadt ze (getest), maar hoe vaak hij ze uit
   zichzelf inzet en of dat tokens bespaart, moet in de praktijk blijken. Vraag er eventueel zelf om.

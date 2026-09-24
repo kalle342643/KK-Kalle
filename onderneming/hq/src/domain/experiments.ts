@@ -273,7 +273,7 @@ export async function proposeExperiment(
       input.evidence,
       input.plan ?? null,
       agentId,
-      // De tak-lead voert uit; de voorsteller (vaak een verkenner of pitcher) alleen als er geen lead is.
+      // De tak-lead voert uit; de voorsteller (vaak een verkenner) alleen als er geen lead is.
       input.leadAgentId ?? branch.leadAgentId ?? agentId,
     ],
   );

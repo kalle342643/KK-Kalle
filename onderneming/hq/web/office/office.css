@@ -250,6 +250,18 @@ a:focus-visible {
   box-shadow: 0 0 0 3px var(--accent, #5b6b86), 0 2px 8px rgba(20, 24, 36, 0.35);
   z-index: 6;
 }
+/* Alleen wie echt iets doet heeft een naam. Figuranten hebben geen kaartje... */
+.agent-tag.extra {
+  display: none;
+}
+/* ...en een gepauzeerde agent alleen 💤 (tot je hem aanklikt). */
+.agent-tag.nameless:not(.selected) .nm,
+.agent-tag.nameless:not(.selected) .dot {
+  display: none;
+}
+.agent-tag.nameless:not(.selected) {
+  padding: 1px 5px;
+}
 #app[data-tags="compact"] .agent-tag {
   font-size: 9.5px;
   padding: 1px 6px 1px 4px;

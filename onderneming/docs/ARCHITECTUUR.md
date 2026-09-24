@@ -141,11 +141,24 @@ Agents maken dezelfde fout niet twee keer als ze eerst kijken wat al bekend is. 
    de interactieve weergave van Graphify zelf.
 
 ## De nut-meter
-Per agent zet HQ de AI-kosten van de laatste 30 dagen (Paperclip) naast wat hij aantoonbaar opleverde in HQ: lessen,
-notities, voorstellen, metingen, verzoeken aan jou en taken voor collega's (`src/office/value.ts`, alleen tellen in
-de database). Meer dan €1 uitgegeven zonder iets terug te vinden = "voor de sier?". Je ziet het in de controlekamer
-(📊), bij elk poppetje, en elke maandag in het dagrapport. De controle waar het uit voortkwam, met het onderzoek en
-de keuzes per rol, staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md).
+Per agent zet HQ de AI-kosten van de laatste 30 dagen (Paperclip) naast wat hij aantoonbaar opleverde: lessen,
+notities, voorstellen, metingen, verzoeken aan jou, taken voor collega's en afgeronde opdrachten
+(`src/office/value.ts`, alleen tellen in de database). Een afgeronde opdracht telt alleen als iemand anders hem gaf
+(jij, een lead of de CEO): een routine of een taak die een agent zichzelf gaf, bewijst niets. Meer dan €1 uitgegeven
+zonder iets terug te vinden = "voor de sier?". Je ziet het in de controlekamer (📊), bij elk poppetje, en elke
+maandag in het dagrapport. De controle waar het uit voortkwam, met het onderzoek en de keuzes per rol, staat in
+[ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md).
+
+**Wat niets oplevert, kost ook niets meer.** Elke maandag om 7:00 (job `nut-meter`, `HQ_VALUE_CRON`) pauzeert HQ
+de agents die "voor de sier?" staan. Uitzonderingen: agents jonger dan 14 dagen, agents die jij in de laatste 14
+dagen weer aanzette, en een noodstop. En nooit meer dan de helft van het team tegelijk: dan klopt eerder de meting
+niet (HQ meldt dat en pauzeert niemand). Je krijgt een bericht; met ▶️ Hervatten bij het poppetje zet je hem terug.
+Uitzetten: `HQ_AUTO_PAUSE=uit`, dan meldt het dagrapport alleen wie geld kost zonder resultaat.
+
+**Naam = doet echt iets.** In het kantoor heeft alleen wie echt werkt een naamkaartje. Een gepauzeerde agent
+toont alleen 💤 (klik erop voor zijn naam en ▶️ Hervatten). Daarnaast zitten er figuranten: poppetjes zonder naam
+die in de browser koffie halen en uit het raam kijken, maar niets doen en niets kosten. De knop 🐢 🙂 🎉 bepaalt
+hoeveel (0, 2 of 4 per afdeling).
 
 ## Waarom een eigen kantoor (en niet Claw3D of AI Town)
 We keken eerst wat er al bestaat. De keuze: **een eigen, lichte three.js-weergave binnen HQ**, met ideeën van

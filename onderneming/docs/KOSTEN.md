@@ -64,10 +64,14 @@ is in Paperclip een configuratiekwestie; economisch gebeurt het pas als de takke
 Zie [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Geen aparte pitcher meer (de lead maakt de top 5), geen
 dagelijkse analyse-run (HQ controleert de cijfers zelf), geen weekplan van de CEO zonder nieuws, geen ideeënraad als
 er al 2 experimenten lopen of wachten, en geen Graphify-extractie onder 100 lessen en notities. De **nut-meter**
-(📊 in het kantoor, en elke maandag in het dagrapport) laat per agent zien wat hij kostte en aantoonbaar opleverde.
+(📊 in het kantoor, en elke maandag in het dagrapport) laat per agent zien wat hij kostte en aantoonbaar opleverde,
+en pauzeert elke maandag wie in 30 dagen meer dan €1 kostte zonder resultaat (zie
+[ARCHITECTUUR.md](ARCHITECTUUR.md#de-nut-meter)). In het kantoor zit zo'n agent er nog, zonder naam. De figuranten
+in het kantoor kosten niets: ze bestaan alleen in je browser.
 
 ## Goedkoper maken
-- Pauzeer wie op de nut-meter "voor de sier?" staat.
+- De nut-meter pauzeert al wie niets oplevert. Wil je strenger zijn: pauzeer zelf wie "voor de sier?" staat,
+  zonder op maandag te wachten.
 - Minder agents per tak (één verkenner in plaats van twee).
 - Ideeënraad om de twee weken in plaats van wekelijks (cron in `company/templates/branches/*.yaml`).
 - Een lager model voor een rol (`model:` in het sjabloon); `update.sh` zet het door.

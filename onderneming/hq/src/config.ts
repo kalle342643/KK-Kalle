@@ -85,6 +85,13 @@ const envSchema = z.object({
   HQ_GRATIS_AI_ENV: z.string().optional(),
   HQ_ENV_FILE: z.string().optional(),
 
+  /**
+   * Nut-meter: agents die in 30 dagen geld kostten zonder resultaat automatisch pauzeren (wekelijks).
+   * In het kantoor blijven ze zitten, zonder naam. "uit" (of false/0/nee) = alleen melden.
+   */
+  HQ_AUTO_PAUSE: z.string().default("aan"),
+  HQ_VALUE_CRON: z.string().default("0 7 * * 1"),
+
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
   HQ_SYNC_CRON: z.string().default("*/2 * * * *"),
@@ -161,7 +168,12 @@ export interface Config {
     hookToken: string | undefined;
     ownerNames: string[];
   };
+  value: {
+    /** Agents zonder aantoonbaar resultaat automatisch pauzeren (de nut-meter). */
+    autoPause: boolean;
+  };
   cron: {
+    value: string;
     dailyReport: string;
     weeklyPortfolio: string;
     sync: string;
@@ -246,7 +258,11 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       hookToken: e.HQ_HOOK_TOKEN,
       ownerNames: e.HQ_OWNER_NAMES.split(",").map((n) => n.trim()).filter(Boolean),
     },
+    value: {
+      autoPause: !/^(uit|nee|false|0|off|no)$/i.test(e.HQ_AUTO_PAUSE.trim()),
+    },
     cron: {
+      value: e.HQ_VALUE_CRON,
       dailyReport: e.HQ_DAILY_REPORT_CRON,
       weeklyPortfolio: e.HQ_WEEKLY_PORTFOLIO_CRON,
       sync: e.HQ_SYNC_CRON,
@@ -269,5 +285,6 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     knowledge: { ...base.knowledge, ...(overrides.knowledge ?? {}) },
     code: { ...base.code, ...(overrides.code ?? {}) },
     gratisAi: { ...base.gratisAi, ...(overrides.gratisAi ?? {}) },
+    value: { ...base.value, ...(overrides.value ?? {}) },
   };
 }

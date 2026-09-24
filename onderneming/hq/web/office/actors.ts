@@ -14,7 +14,8 @@ export type BubbleKind = "talk" | "think" | "alert" | "happy" | "info";
 
 export interface ActorInfo {
   id: string;
-  kind: "agent" | "owner" | "bot" | "guest" | "claude";
+  /** extra = figurant: geen naam, doet niets, kost niets (alleen voor de sfeer). */
+  kind: "agent" | "owner" | "bot" | "guest" | "claude" | "extra";
   name: string;
   label: string;
   role: string;
@@ -158,6 +159,8 @@ export class Actor {
     (this.ring.material as THREE.MeshBasicMaterial).color.set(info.accent);
     this.tagEl.querySelector(".nm")!.textContent = info.label;
     this.tagEl.classList.toggle("special", info.kind !== "agent");
+    // Alleen wie echt iets doet heeft een naam: een figurant heeft geen naamkaartje.
+    this.tagEl.classList.toggle("extra", info.kind === "extra");
     if (lookChanged) this.setLook(info.look);
   }
 
@@ -166,6 +169,8 @@ export class Actor {
     this.tagEl.dataset.status = status;
     const icon = this.tagEl.querySelector(".ic")!;
     icon.textContent = status === "paused" ? "💤" : status === "error" ? "⚠️" : status === "pending_approval" ? "🙋" : "";
+    // Gepauzeerd = doet niets en kost niets: dan ook geen naam, alleen 💤.
+    this.tagEl.classList.toggle("nameless", status === "paused");
     this.applyStatusLook();
   }
 

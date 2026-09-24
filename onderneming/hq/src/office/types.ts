@@ -9,6 +9,8 @@ export type OfficeEventType =
   | "run.finished"
   /** Een agent zegt iets tegen een collega (reactie op een taak) of geeft hem een taak. */
   | "talk"
+  /** Een agent rondde een taak af die iemand anders hem gaf (geen routine- of eigen taak). */
+  | "task.done"
   /** Een agent gebruikt een tool tijdens een run: zoekt op het web, leest een pagina, vraagt de kennisgraaf. */
   | "agent.tool"
   /** Een agent zoekt iets op in de kennisbank (loopt naar de Graphify-kamer). */
@@ -151,12 +153,17 @@ export interface AgentValue {
   costEur: number;
   runs: number;
   failedRuns: number;
-  /** Wat terug te vinden is in HQ: lessen, notities, voorstellen, metingen, verzoeken aan jou, taken voor collega's. */
-  outputs: { lessons: number; notes: number; proposals: number; measurements: number; requests: number; delegations: number };
+  /**
+   * Wat terug te vinden is: lessen, notities, voorstellen, metingen, verzoeken aan jou, taken voor collega's en
+   * afgeronde taken die iemand anders hem gaf.
+   */
+  outputs: { lessons: number; notes: number; proposals: number; measurements: number; requests: number; delegations: number; tasks: number };
   outputTotal: number;
   /** levert = aantoonbaar werk; niets = kost geld zonder resultaat; rustig = te weinig uitgegeven om iets te zeggen. */
   verdict: "levert" | "niets" | "rustig";
   costPerOutputEur: number | null;
+  /** Wanneer de nut-meter hem op pauze zette (en jij hem sindsdien niet weer aanzette). */
+  autoPausedAt: string | null;
 }
 
 export interface ProjectDetail {

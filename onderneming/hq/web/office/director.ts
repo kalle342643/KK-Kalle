@@ -11,6 +11,7 @@ import { act, Actor, face, run, say, sitHere, standUp, wait, walkTo, type ActorI
 import { defaultLook, type Assets } from "./assets.js";
 import type { Hologram } from "./hologram.js";
 import { BOT_ID, OWNER_ID, roomAt, WORKSHOP_SLUG, type Desk, type Layout, type Poi, type PoiKind, type Spot } from "./layout.js";
+import { isBlocked } from "./path.js";
 import { drawMonitor } from "./screens.js";
 import type { World } from "./world.js";
 
@@ -75,6 +76,7 @@ export class Director {
     this.meeting = null;
     this.monitorState.clear();
     this.assignSessionDesks(this.workshopActors());
+    this.syncExtras();
     for (const a of this.actors.values()) {
       a.meeting = null;
       a.home = this.homeOf(a.id);
@@ -83,7 +85,7 @@ export class Director {
       a.clear();
       if (hired) {
         a.queue(standUp(), say("🎉 Aangenomen! Op naar mijn bureau.", 4, "happy"), act("jump"), walkTo(() => this.grid, a.home, { sit: true }));
-      } else if (a.seated || !previous) {
+      } else if (a.seated || !previous || this.offFloor(a)) {
         a.place(a.home, true);
       } else {
         a.queue(walkTo(() => this.grid, a.home, { sit: true }));
@@ -91,9 +93,48 @@ export class Director {
     }
   }
 
+  /** Staat hij na een verbouwing niet meer op de vloer? (Zonder figuranten wordt het gebouw kleiner.) */
+  private offFloor(a: Actor): boolean {
+    const { x, z } = a.pos;
+    return !roomAt(this.layout, x, z) || isBlocked(this.grid, Math.floor(x), Math.floor(z));
+  }
+
   private deskOf(id: string): Desk | undefined {
-    const deskId = this.layout.deskOf.get(id);
+    const deskId = isExtraId(id) ? id.slice(4) : this.layout.deskOf.get(id);
     return deskId ? this.layout.desks.find((d) => d.id === deskId) : undefined;
+  }
+
+  /**
+   * Figuranten: aan elk bureau dat de plattegrond daarvoor vrijhoudt, zit een poppetje zonder naam. Ze halen
+   * koffie en kijken uit het raam, maar werken niet, praten niet mee en kosten niets. Alleen voor de sfeer:
+   * wie een naam heeft, doet echt iets.
+   */
+  private syncExtras(): void {
+    const desks = this.layout.desks.filter((d) => d.extra);
+    const wanted = new Set(desks.map((d) => `fig:${d.id}`));
+    for (const [id, actor] of [...this.actors]) {
+      if (!isExtraId(id) || wanted.has(id)) continue;
+      actor.dispose();
+      this.actors.delete(id);
+    }
+    for (const desk of desks) {
+      const id = `fig:${desk.id}`;
+      if (this.actors.has(id)) continue;
+      const room = this.layout.rooms.find((r) => r.id === desk.roomId);
+      const actor = new Actor(this.world, this.assets, {
+        id,
+        kind: "extra",
+        name: "Figurant",
+        label: "",
+        role: "Doet niets en kost niets: alleen voor de sfeer",
+        accent: room?.accent ?? "#5b6b86",
+        look: defaultLook(id, null),
+      });
+      actor.setStatus("idle");
+      actor.home = desk.seat;
+      actor.place(desk.seat, true);
+      this.actors.set(id, actor);
+    }
   }
 
   /**
@@ -272,7 +313,7 @@ export class Director {
       if (helping) actor.setWorking(true, helping.helper.lastAction ?? helping.helper.task);
     }
     for (const [id, actor] of [...this.actors]) {
-      if (wanted.has(id)) continue;
+      if (wanted.has(id) || isExtraId(id)) continue;
       actor.clear();
       if (isHelperId(id)) {
         // Een helper is klaar: brengt zijn verslag naar de sessie en is weer weg (hij bestond alleen voor deze klus).
@@ -411,6 +452,9 @@ export class Director {
         this.talk(a, target ?? null, text, String(e.data.kind ?? (e.type === "notify" ? "notify" : "comment")));
         break;
       }
+      case "task.done":
+        if (a && this.hush <= 0) a.say(`☑️ Af: ${short(text, 60)}`, 4, "happy");
+        break;
       case "knowledge.query": {
         if (!a) return;
         this.visitKnowledge(a, text, "query");
@@ -714,8 +758,13 @@ export class Director {
     this.halted = on;
     this.hush = 5;
     this.world.setAlarm(on);
-    // Een paar reageren; de rest loopt gewoon terug naar de eigen plek.
-    const speakers = new Set([...this.actors.keys()].sort(() => Math.random() - 0.5).slice(0, 3));
+    // Een paar reageren (figuranten niet: die doen niets); de rest loopt gewoon terug naar de eigen plek.
+    const speakers = new Set(
+      [...this.actors.keys()]
+        .filter((id) => !isExtraId(id))
+        .sort(() => Math.random() - 0.5)
+        .slice(0, 3),
+    );
     if (on) {
       this.meeting = null;
       for (const a of this.actors.values()) {
@@ -762,7 +811,7 @@ export class Director {
     for (const desk of this.layout.desks) {
       const screen = this.world.monitors.get(desk.id);
       if (!screen) continue;
-      const occupant = desk.agentId ?? this.deskOccupant.get(desk.id);
+      const occupant = desk.agentId ?? this.deskOccupant.get(desk.id) ?? (desk.extra ? `fig:${desk.id}` : undefined);
       const a = occupant ? this.actors.get(occupant) : undefined;
       const room = this.layout.rooms.find((r) => r.id === desk.roomId);
       const working = Boolean(a?.working);
@@ -774,6 +823,7 @@ export class Director {
         working,
         task: a?.taskText ?? null,
         accent: room?.accent ?? "#5b6b86",
+        // Een figurant heeft geen naam, ook niet op zijn scherm.
         name: a ? a.info.label : "vrij",
         paused,
         t,
@@ -902,14 +952,16 @@ export class Director {
     }
   }
 
-  /** Als er niets gebeurt: koffie halen, een praatje, even op de bank. */
+  /** Als er niets gebeurt: koffie halen, een praatje, even op de bank. Figuranten doen alleen dit. */
   private ambient(): void {
     if (this.liveliness === "calm") return;
     const lively = this.liveliness === "lively";
+    // Wie gepauzeerd is, blijft zitten (en praat ook niet terug).
+    const social = (x: Actor) => (x.info.kind === "agent" || x.info.kind === "extra") && x.status !== "paused";
     for (const a of this.actors.values()) {
       if (a.restless > 0) continue;
       a.restless = (lively ? 15 : 45) + Math.random() * (lively ? 35 : 90);
-      if (a.info.kind !== "agent" || !a.idle || a.working || a.meeting || !a.home) continue;
+      if (!social(a) || !a.idle || a.working || a.meeting || !a.home) continue;
       if (a.status !== "idle" && a.status !== "active") continue;
       const roll = Math.random();
       if (roll < 0.35) {
@@ -917,7 +969,7 @@ export class Director {
         if (!poi) continue;
         a.queue(standUp(), walkTo(() => this.grid, poi.spot), act("interact-right", 1.8), say("☕", 3, "info"), wait(2), ...this.goHome(a));
       } else if (roll < 0.6) {
-        const other = pick([...this.actors.values()].filter((x) => x !== a && x.info.kind === "agent" && x.idle && !x.working && x.seated));
+        const other = pick([...this.actors.values()].filter((x) => x !== a && social(x) && x.idle && !x.working && x.seated));
         if (!other) continue;
         a.queue(
           standUp(),
@@ -996,4 +1048,7 @@ function reply(kind: string): string {
 
 /** Helpers hebben het id van hun sessie + "~" + hun eigen id. */
 export const isHelperId = (id: string) => id.startsWith("cc:") && id.includes("~");
+
+/** Figuranten hebben "fig:" + het id van hun bureau. */
+export const isExtraId = (id: string) => id.startsWith("fig:");
 export const parentOf = (id: string) => id.slice(0, id.lastIndexOf("~"));

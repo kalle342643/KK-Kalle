@@ -53,6 +53,8 @@ export interface PcAgent {
   pauseReason: string | null;
   metadata: Record<string, unknown> | null;
   lastHeartbeatAt: string | null;
+  /** Wanneer de agent is aangemaakt (Paperclip stuurt dit mee; oudere versies misschien niet). */
+  createdAt?: string;
 }
 
 export type ApprovalType =
@@ -168,6 +170,8 @@ export interface PcIssue {
   createdByAgentId?: string | null;
   createdByUserId?: string | null;
   projectId?: string | null;
+  /** Waar de taak vandaan komt: `manual` of `routine_execution` (een vaste routine). */
+  originKind?: string | null;
 }
 
 /** Regel uit het activiteitenlogboek van een bedrijf (`GET /companies/{id}/activity`, nieuwste eerst). */
