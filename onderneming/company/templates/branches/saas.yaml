@@ -6,7 +6,6 @@ agents:
   - { template: tak-lead, name: Maas, lead: true }
   - { template: verkenner, name: Waal }
   - { template: verkenner, name: Rijn }
-  - { template: pitcher, name: IJssel }
   - { template: criticus, name: Schelde }
   - { template: bouwer, name: Amstel }
 routines:
@@ -22,6 +21,8 @@ routines:
     cron: "0 11 * * 3"
     priority: medium
     description: |
-      Draai de ideeënraad. Waal verkent vragen en klachten van ondernemers (fora, Reddit, nieuws); Rijn verkent
-      zoekwoorden en concurrenten met prijzen. Daarna IJssel (top 5) en Schelde (schiet ≥3 af).
+      Draai de ideeënraad (skill ideeenraad). Lopen er in deze tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over en
+      schrijf in één regel waarom: meer ideeën dan Kalle kan kiezen is weggegooid geld.
+      Waal verkent vragen en klachten van ondernemers (fora, nieuws, wat zoekmachines van Reddit laten zien);
+      Rijn verkent zoekwoorden en concurrenten met prijzen. Daarna maak jij de top 5, dan Schelde (schiet ≥3 af).
       Experimenten in deze tak beginnen met een landingspagina of gratis scan, niet met een volledig product.

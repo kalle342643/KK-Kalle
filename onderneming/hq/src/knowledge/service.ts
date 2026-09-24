@@ -36,6 +36,15 @@ export interface KnowledgeAnswer {
   tip: string;
 }
 
+/**
+ * Hoeveel lessen en notities er zijn. Een graaf helpt pas bij een flinke kennisbank: bij een paar dozijn
+ * notities vindt gewoon zoeken hetzelfde, en kost graaf-uitvoer alleen extra tokens (docs/ONDERZOEK-AGENTS.md).
+ */
+export async function knowledgeSize(db: Db): Promise<number> {
+  const rows = await db.query<{ n: string | number }>("select (select count(*) from lessons) + (select count(*) from notes) as n");
+  return Number(rows[0]?.n ?? 0);
+}
+
 /** Beantwoordt een vraag van een agent uit de kennisbank en laat hem in het kantoor naar de Graphify-kamer lopen. */
 export async function askKnowledge(ctx: AppContext, question: string, agentId: string | null): Promise<KnowledgeAnswer> {
   const terms = searchTerms(question);
@@ -58,10 +67,12 @@ export async function askKnowledge(ctx: AppContext, question: string, agentId: s
     6,
   );
   let graph: string | null = null;
-  try {
-    graph = await graphifyQuery(ctx.config, question);
-  } catch (err) {
-    ctx.log.warn("graphify query mislukt", { error: errorMessage(err) });
+  if ((await knowledgeSize(ctx.db)) >= ctx.config.knowledge.graphifyMinNotes) {
+    try {
+      graph = await graphifyQuery(ctx.config, question);
+    } catch (err) {
+      ctx.log.warn("graphify query mislukt", { error: errorMessage(err) });
+    }
   }
   const graphSource = graph ? (graphPath(ctx.config.knowledge.vaultDir)?.source ?? null) : null;
 
@@ -124,7 +135,11 @@ export async function rebuildKnowledge(ctx: AppContext): Promise<string> {
   const synced = await runVaultSync(ctx);
   if (!synced) return "Geen kennisbank-map ingesteld (HQ_VAULT_DIR).";
   let message = `kennisbank: ${synced.written} bijgewerkt, ${synced.removed} verwijderd`;
-  if (semanticExtractionEnabled(ctx.config)) {
+  const size = await knowledgeSize(ctx.db);
+  const min = ctx.config.knowledge.graphifyMinNotes;
+  if (semanticExtractionEnabled(ctx.config) && size < min) {
+    message += `; Graphify-extractie wacht tot er ${min} lessen en notities zijn (nu ${size}), tot die tijd de gratis HQ-graaf`;
+  } else if (semanticExtractionEnabled(ctx.config)) {
     const res = await graphifyExtract(ctx.config);
     message += `; graphify: ${res.message}`;
     if (!res.ok) throw new Error(message);

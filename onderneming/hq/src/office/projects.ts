@@ -5,6 +5,7 @@ import { experimentCode, listExperiments, snapshot } from "../domain/experiments
 import { round2 } from "../domain/money.js";
 import { addLocalDays, localDayKey, startOfLocalDay } from "../domain/time.js";
 import type { OfficeEvent, OfficeProject, OfficeStats, ProjectDetail, ProjectStatus } from "./types.js";
+import { agentValues } from "./value.js";
 
 /** Alle projecten (experimenten): lopend, voorgesteld en recent afgerond. */
 export async function listProjects(ctx: AppContext, limit = 80): Promise<OfficeProject[]> {
@@ -142,6 +143,7 @@ export async function officeStats(ctx: AppContext, days = 30): Promise<OfficeSta
       tokensToday: Number(runs[0]?.tokens ?? 0),
       runsToday: Number(runs[0]?.n ?? 0),
     },
+    agents: await agentValues(ctx),
   };
 }
 

@@ -8,7 +8,7 @@ import { stringify } from "yaml";
  * voorwaarden het toestaan. Geen inloggegevens of abonnementen van chat-apps hergebruiken, geen stapels
  * accounts om limieten te omzeilen (dat doet OmniRoute wel, en dat schendt de voorwaarden van die aanbieders).
  *
- * De modellen verschuiven vaak. Daarom kiest `hq gratis-ai` ze niet uit een vaste lijst, maar vraagt het elke
+ * De modellen verschuiven vaak. Daarom kiest `dist/main.js gratis-ai` ze niet uit een vaste lijst, maar vraagt het elke
  * aanbieder welke modellen er nu zijn, en pakt het de beste volgens een voorkeurslijst.
  */
 
@@ -157,7 +157,7 @@ export function buildConfig(selections: Selection[], opts: { generatedAt?: Date 
     general_settings: { master_key: "os.environ/LITELLM_MASTER_KEY" },
   };
   const header = [
-    `# Gratis AI-router (LiteLLM). Gemaakt door \`hq gratis-ai --schrijf\`${opts.generatedAt ? ` op ${opts.generatedAt.toISOString().slice(0, 10)}` : ""}.`,
+    `# Gratis AI-router (LiteLLM). Gemaakt door \`dist/main.js gratis-ai --schrijf\`${opts.generatedAt ? ` op ${opts.generatedAt.toISOString().slice(0, 10)}` : ""}.`,
     "# Niet met de hand aanpassen: zet sleutels in ~/.config/hq/gratis-ai.env en draai het commando opnieuw.",
     "",
   ].join("\n");

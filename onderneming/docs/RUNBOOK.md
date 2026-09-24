@@ -13,7 +13,8 @@
   meestal wat tussen een project en de eerste omzet staat, dus begin daar.
 - **Taak geven:** klik op een agent → *Taak geven*; of in de werkplaats een opdracht voor Claude Code.
 - **Maandag:** het portfolio-voorstel (budget per tak) en het weekplan van CEO Atlas.
-- **Woensdag:** de ideeënraad per tak; daar komen 1 à 2 experimentvoorstellen uit.
+- **Woensdag:** de ideeënraad per tak; daar komen 1 à 2 experimentvoorstellen uit (niet als er al 2 lopen of wachten).
+- **Maandag in het dagrapport:** de nut-meter, als er agents zijn die geld kosten zonder aantoonbaar resultaat.
 
 ## Cijfers invoeren
 Agents kunnen omzet niet zelf boeken, dus die moet uit een betrouwbare bron komen:
@@ -55,7 +56,7 @@ voordat je `/hervat` stuurt.
 | Server kwijt | nieuwe VPS, `setup-vps.sh`, back-up terugzetten (zie hieronder), `hq bootstrap`. |
 | Het kantoor blijft op "laden" of is leeg | ververs de pagina; staat WebGL uit in je browser, gebruik dan `/overzicht`. "Niet ingelogd": open `/?token=<HQ_ADMIN_TOKEN>` opnieuw. Geen poppetjes: `hq bootstrap`. |
 | Grijze stip naast de bedrijfsnaam | de live verbinding met HQ is weg; het kantoor verbindt zelf opnieuw en haalt op wat het miste. Blijft hij grijs: `systemctl --user restart hq`. |
-| Hologram in de kennisbank is leeg | er zijn nog geen lessen of notities. Nu opbouwen: `hq kennis`. |
+| Hologram in de kennisbank is leeg | er zijn nog geen lessen of notities. Nu opbouwen: `node --env-file=$HOME/.config/hq/hq.env dist/main.js kennis` (het `hq`-commando is voor agents). |
 | 🔴 "… ligt eruit" | open het project in de werkplaats: de laatste controle zegt waarom (503 = vaak de database, bv. een gepauzeerd gratis Supabase-project; geen antwoord = de site zelf). Kijk in het dashboard van je host (Vercel, Supabase). Als het weer werkt krijg je vanzelf 🟢. |
 | Werkplaats toont "geen toegang" of "token ongeldig" | het GitHub-token mist die repository of een recht (zie SETUP.md stap 11), of het is verlopen. Nieuw token in `hq.env`, `systemctl --user restart hq`. |
 | Claude Code-sessie staat niet in de werkplaats | HQ ziet een sessie pas aan zijn eerste commit (of direct met de hook). Nog niets gepusht = nog niets te zien. |
@@ -79,7 +80,7 @@ paperclipai update                        # Paperclip
 ## Prompts en regels aanpassen
 Alles wat agents "weten" staat in `onderneming/company/`:
 - `agents/*.md`: CEO en analist
-- `templates/agents/*.md`: rollen in een tak (verkenner, pitcher, criticus, bouwer, ...)
+- `templates/agents/*.md`: rollen in een tak (verkenner, criticus, bouwer, ...; `pitcher` staat standaard niet meer in een tak)
 - `skills/*.md`: spelregels die agents delen (HQ-API, onderzoek op het web, kennisgraaf, experiment-protocol,
   geld en regels, ...)
 - `templates/branches/*.yaml`: welke agents en routines een nieuwe tak krijgt

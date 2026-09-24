@@ -90,6 +90,10 @@ die in de werkplaats, zonder er iets aan te veranderen:
   (Claude Code in de cloud zet die er zelf onder) en aan de eigen branch. Eén branch = één sessie. Optioneel meldt
   een hook (`deploy/claude-code/hq-hook.mjs`) elke stap live aan `POST /api/hooks/claude-code`, met een eigen geheim
   dat alleen kan schrijven.
+- **Helpers (sub-agents):** zet een sessie een helper in (tool `Agent`, hooks `SubagentStart`/`SubagentStop`), dan
+  krijgt die een eigen poppetje naast de sessie (`code_helpers`), met zijn opdracht en zijn stappen. De installer
+  zet twee helpers klaar voor je eigen Claude Code: `onderzoeker` (alleen lezen op het web) en `reviewer` (frisse
+  blik op de wijzigingen). Waarom juist deze twee: [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md).
 - **Gezondheidscheck** per site (om de vijf minuten): twee keer mis = storing, met bericht; de uptime van de
   laatste 24 uur staat op het bord.
 - **Jouw beurt:** punten in de backlog onder een kopje dat zegt dat ze bij jou liggen, komen bovenaan in het
@@ -111,7 +115,7 @@ een eerder afgeschoten idee komt zo niet ongemerkt terug.
 ## Gratis AI
 Een LiteLLM-router op de server zet de gratis lagen van een paar aanbieders achter één model ("gratis"), in een
 vaste volgorde. Geeft er één een limietfout (429), dan rust dat model een minuut en neemt de volgende het over.
-`hq gratis-ai` vraagt elke aanbieder welke modellen er nu zijn en schrijft de config; sleutels staan er nooit in.
+`dist/main.js gratis-ai` vraagt elke aanbieder welke modellen er nu zijn en schrijft de config; sleutels staan er nooit in.
 Rollen uit `HQ_GRATIS_AI_ROLES` draaien Claude Code via de router (Anthropic-formaat, met een kleiner
 contextvenster), en Graphify kan er de kennisgraaf mee bouwen. Wat we bewust niet doen: abonnementen of
 inloggegevens van chat-apps hergebruiken of accounts stapelen om limieten te ontlopen (zoals OmniRoute): dat
@@ -121,15 +125,25 @@ schendt de voorwaarden van die aanbieders, en dan ben jij als eigenaar aansprake
 Agents maken dezelfde fout niet twee keer als ze eerst kijken wat al bekend is. Daarom:
 1. **Eerst vragen:** `hq kennis "…"` (= `GET /api/agent/knowledge?q=...`) doorzoekt lessen, notities en de
    kennisgraaf in één keer (skills `hq-api` en `kennisgraaf`). Het poppetje loopt dan naar de kennisbank.
+   Graaf-uitvoer komt er pas bij vanaf `HQ_GRAPHIFY_MIN_NOTES` (100) lessen en notities: daaronder vindt gewoon
+   zoeken hetzelfde en kost de graaf alleen tokens.
    Verbanden zoeken kan ook direct in de graaf: `hq-graaf uitleg|pad|vraag`. Bouwers gebruiken Graphify op hun
    eigen code (`graphify update .`, zonder AI).
 2. **Opschrijven:** lessen (na een experiment) en notities (`POST /api/agent/notes`, max 20 per dag per agent).
 3. **De map:** HQ schrijft elk uur een Obsidian-map (`HQ_VAULT_DIR`) met takken, experimenten, lessen, notities
    en agents, met `[[links]]`. Je kunt hem zelf openen in Obsidian.
 4. **De graaf:** 's nachts bouwt [Graphify](https://github.com/Graphify-Labs/graphify) (Apache-2.0, `pipx install graphifyy`) uit die map een kennisgraaf
-   (met Haiku als `GRAPHIFY_API_KEY` is ingesteld, of gratis via de router met `GRAPHIFY_BACKEND=gratis`). Zonder sleutel maakt HQ zelf een eenvoudigere graaf uit
+   (met Haiku als `GRAPHIFY_API_KEY` is ingesteld, of gratis via de router met `GRAPHIFY_BACKEND=gratis`), maar pas
+   vanaf 100 lessen en notities. Zonder sleutel, of daaronder, maakt HQ zelf een eenvoudigere graaf uit
    de verbanden (tak, experiment, les, tag, agent). Het hologram in de kennisbank toont de graaf; `/kennis` opent
    de interactieve weergave van Graphify zelf.
+
+## De nut-meter
+Per agent zet HQ de AI-kosten van de laatste 30 dagen (Paperclip) naast wat hij aantoonbaar opleverde in HQ: lessen,
+notities, voorstellen, metingen, verzoeken aan jou en taken voor collega's (`src/office/value.ts`, alleen tellen in
+de database). Meer dan €1 uitgegeven zonder iets terug te vinden = "voor de sier?". Je ziet het in de controlekamer
+(📊), bij elk poppetje, en elke maandag in het dagrapport. De controle waar het uit voortkwam, met het onderzoek en
+de keuzes per rol, staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md).
 
 ## Waarom een eigen kantoor (en niet Claw3D of AI Town)
 We keken eerst wat er al bestaat. De keuze: **een eigen, lichte three.js-weergave binnen HQ**, met ideeën van

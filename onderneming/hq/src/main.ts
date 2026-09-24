@@ -294,7 +294,7 @@ async function main(argv: string[]): Promise<void> {
         writeFileSync(g.configFile, yaml, { mode: 0o600 });
         console.log(`\nOpgeslagen in ${g.configFile}. Herstart de router: systemctl --user restart gratis-ai`);
       } else {
-        console.log(`\n${yaml}\n(Nog niet opgeslagen. Klopt het? Draai dan: hq gratis-ai --schrijf)`);
+        console.log(`\n${yaml}\n(Nog niet opgeslagen. Klopt het? Draai dan hetzelfde commando met --schrijf erachter.)`);
       }
       return;
     }

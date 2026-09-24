@@ -5,7 +5,6 @@ monthlyBudgetEur: 30
 agents:
   - { template: tak-lead, name: Eik, lead: true }
   - { template: verkenner, name: Beuk }
-  - { template: pitcher, name: Linde }
   - { template: criticus, name: Wilg }
   - { template: schrijver, name: Berk }
 routines:
@@ -20,5 +19,7 @@ routines:
     cron: "0 10 * * 3"
     priority: medium
     description: |
-      Draai de ideeënraad. Beuk verkent zoekvragen zonder goed antwoord (zoekdata, fora, "vs"-zoekopdrachten)
-      en affiliate-programma's met een eerlijke vergoeding. Daarna Linde (top 5) en Wilg (schiet ≥3 af).
+      Draai de ideeënraad (skill ideeenraad). Lopen er in deze tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over en
+      schrijf in één regel waarom: meer ideeën dan Kalle kan kiezen is weggegooid geld.
+      Beuk verkent zoekvragen zonder goed antwoord (zoekdata, fora, "vs"-zoekopdrachten) en affiliate-programma's
+      met een eerlijke vergoeding. Daarna maak jij de top 5, dan Wilg (schiet ≥3 af).

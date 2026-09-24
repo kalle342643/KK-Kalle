@@ -37,7 +37,8 @@ flowchart LR
 
 ## Hoe een idee geld wordt (of stopt)
 
-1. Verkenners zoeken waarnemingen met links, de pitcher maakt een top 5, de criticus schiet er minstens 3 af.
+1. Verkenners zoeken elk in een eigen bron waarnemingen met links, de tak-lead maakt een top 5, de criticus schiet
+   er minstens 3 af met live data. Lopen er al 2 experimenten, dan slaat de raad een week over.
 2. De tak-lead dient het beste idee in als experiment: hypothese, één meetpunt met drempel, max. €20 en 14 dagen.
 3. **Jij krijgt een Telegram-bericht met ✅/❌.** Pas na ✅ maakt HQ in Paperclip een project met een
    **harde budgetstop** en een taak voor de lead.

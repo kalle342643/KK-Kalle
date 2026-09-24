@@ -111,7 +111,7 @@ bedoeling was. Wat dat opleverde:
 - **GitHub-limiet sparen met ETags.** Een verzoek met `If-None-Match` dat 304 teruggeeft, telt niet mee. Per
   project volgt HQ alleen de hoofdbranch, `claude/…`-branches en branches van open PR's.
 - **Tekst in meldingen niet te grondig opschonen.** De opschoonfunctie voor Paperclip-reacties haalde alle `#` en
-  `_` weg; daardoor werd "PR #7" "PR 7" en `NORMWACHT_KVK` "NORMWACHTKVK". Nu alleen echte Markdown-opmaak weg.
+  `_` weg; daardoor werd "PR #7" "PR 7" en `BEDRIJF_KVK` "BEDRIJFKVK". Nu alleen echte Markdown-opmaak weg.
 - **LiteLLM: `order` + `allowed_fails: 0` + `num_retries` = doorschakelen.** Met een nep-aanbieder die altijd een
   limietfout geeft (`mock_response: litellm.RateLimitError`) antwoordde de tweede, zowel in OpenAI- als in
   Anthropic-formaat (`/v1/messages`). Claude Code zelf werkt via de router (`ANTHROPIC_BASE_URL`), maar kent de
@@ -119,8 +119,35 @@ bedoeling was. Wat dat opleverde:
 - **Gratis ≠ vrij van regels.** OmniRoute stapelt abonnementen en accounts; dat schendt de voorwaarden van de
   aanbieders. Hier: één eigen sleutel per aanbieder. Cohere-proefsleutels zijn niet voor commercieel gebruik (niet
   opgenomen); Mistral (Experiment) en sommige OpenRouter-modellen kunnen je gegevens gebruiken: dat staat erbij.
-- **`pkill -f` doodt je eigen shell** als het patroon ook in je eigen commando staat (exit 144, twee keer gebeurd).
-  Stop processen op PID.
+- **`pkill -f` doodt je eigen shell** als het patroon ook in je eigen commando staat (exit 144, drie keer gebeurd,
+  ondanks deze regel). Stop processen op PID: `ps -eo pid,args | awk '$2=="node" && $3=="x.mjs" {print $1}' | xargs -r kill`.
+
+## Controle en helpers (24 september, avond)
+Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we ervan leerden:
+- **Een extra agent moet iets meebrengen:** een eigen bron, een tegengestelde rol of een frisse blik. De pitcher had
+  geen van drieën en is uit de sjablonen. De dagelijkse analyse deed dubbel wat HQ al zonder AI doet. De CEO en de
+  ideeënraad draaien niet meer als er niets te doen is.
+- **Meet nut, gok het niet.** De nut-meter zet per agent de kosten naast wat terug te vinden is in HQ. Een voorstel
+  maakt zelf ook een verzoek aan: niet dubbel tellen.
+- **Reddit is niet te lezen voor Claude.** Het blokkeert de crawler van Anthropic, en scrapen mag niet. Hacker News
+  heeft een open API (`hn.algolia.com/api/v1/search`, `/items/{id}` voor reacties).
+- **Helpers van Claude Code (sub-agents) zijn te volgen met hooks.** `PreToolUse` van de tool `Agent` heeft de
+  omschrijving en de soort (`subagent_type`), `SubagentStart` en `SubagentStop` hebben `agent_id` en `agent_type`, en
+  elke tool-hook binnen een helper heeft ook `agent_id`. Getest met de echte Claude Code (2.1.281) tegen een nep-model:
+  1. `SubagentStart` komt na `PreToolUse(Agent)`, zonder omschrijving; HQ koppelt ze op soort.
+  2. Helpers draaien standaard op de achtergrond: de sessie meldt `Stop` terwijl de helper nog werkt. Het kantoor
+     zegt dan "wacht op een helper".
+  3. Als de helper klaar is, komt er een `UserPromptSubmit` met `<task-notification>…`. Dat is geen opdracht van
+     jou, dus de hook stuurt het niet door.
+- **Een geheim-filter heeft grenzen nodig.** `sk-[…]{10,}` zonder `\b` poetste "task-notification" en "risk-analyse"
+  half weg. Nu alleen aan het begin van een woord.
+- **Een helper leeft kort: laat hem niet door het hele kantoor lopen.** Vanaf de voordeur duurde de wandeling langer
+  dan de helper bestond. Nu verschijnt hij naast zijn sessie.
+- **Screenshots liegen over snelheid.** De headless browser (SwiftShader) haalt ±2,7 beelden per seconde, en het
+  kantoor begrenst de tijd per beeld. Tekstballonnen en lopen duren in screenshots dus veel langer dan in een echte
+  browser. Meet met `requestAnimationFrame` voordat je iets "te traag" noemt.
+- **Een openbare repo, ook in tests.** In de testbestanden stonden de naam van een privé-repository, een branch en
+  een adres van een eigen project. Nu neutrale voorbeeldnamen. Zoek vóór elke commit ook in `test/` op privénamen.
 
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
@@ -148,6 +175,11 @@ bedoeling was. Wat dat opleverde:
   niet met een echte run. Kijk bij de eerste runs of "🔎 zoekt" en "🌐 leest" in het kantoor verschijnen.
 - **Gratis AI met echte sleutels:** de router is getest met nep-aanbieders en met een door HQ gemaakte config
   (LiteLLM 1.102.1 start en toont het model), niet met echte sleutels. Welke modellen de aanbieders nu hebben,
-  bepaalt `hq gratis-ai` bij het draaien.
+  bepaalt `dist/main.js gratis-ai` bij het draaien.
 - **Hooks vanuit Claude Code in de cloud:** het script en de installatie zijn lokaal getest (geheimen weggepoetst,
-  niets naar stdout, altijd exit 0), de route via Tailscale Funnel en de netwerkinstellingen van een cloud-omgeving niet.
+  niets naar stdout, altijd exit 0), ook met de echte Claude Code CLI en een helper. De route via Tailscale Funnel
+  en de netwerkinstellingen van een cloud-omgeving zijn niet getest.
+- **De nut-meter met echte cijfers:** getest met nep-kosten; of €1 in 30 dagen de goede drempel is, blijkt pas als
+  de agents echt werken.
+- **De helpers `onderzoeker` en `reviewer` in echt werk:** Claude Code laadt ze (getest), maar hoe vaak hij ze uit
+  zichzelf inzet en of dat tokens bespaart, moet in de praktijk blijken. Vraag er eventueel zelf om.

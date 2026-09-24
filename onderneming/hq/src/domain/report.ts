@@ -2,6 +2,7 @@ import { listApprovals } from "./approvals.js";
 import { listBranches } from "./branches.js";
 import { errorMessage, type AppContext } from "./context.js";
 import { codeReportLines } from "../code/overview.js";
+import { computeAgentValues, valueReportLines } from "../office/value.js";
 import { experimentCode, listExperiments, snapshot } from "./experiments.js";
 import { haltState } from "./killswitch.js";
 import { totals, totalsByBranch } from "./ledger.js";
@@ -98,6 +99,16 @@ export async function buildDailyReport(ctx: AppContext): Promise<string> {
     lines.push(...(await codeReportLines(ctx)));
   } catch (err) {
     lines.push("", `🛠️ Werkplaats: stand onbekend (${errorMessage(err)})`);
+  }
+  // Eén keer per week (maandag) de nut-meter: wie kost geld zonder aantoonbaar resultaat?
+  if (new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" }).format(ctx.now()) === "Mon") {
+    try {
+      const values = await computeAgentValues(ctx);
+      const names = new Map((await ctx.paperclip.listAgents(ctx.companyId)).map((a) => [a.id, a.name]));
+      lines.push(...valueReportLines(values, names));
+    } catch (err) {
+      ctx.log.warn("nut-meter voor het rapport mislukt", { error: errorMessage(err) });
+    }
   }
   return lines.join("\n");
 }

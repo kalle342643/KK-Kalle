@@ -140,7 +140,7 @@ describe("plattegrond", () => {
   it("de werkplaats: een bord per project, vrije bureaus voor Claude Code, bereikbaar vanaf de ingang", () => {
     const agents: LayoutAgent[] = [agent("atlas", "holding", { hqRole: "ceo", role: "ceo" })];
     const projects = [
-      { key: "normwacht", name: "Normwacht" },
+      { key: "scanner", name: "Scanner" },
       { key: "fluxgrid", name: "Fluxgrid" },
       { key: "hq", name: "HQ" },
     ];
@@ -148,7 +148,7 @@ describe("plattegrond", () => {
     const room = layout.rooms.find((r) => r.kind === "workshop")!;
     expect(room).toMatchObject({ id: "dept-werkplaats", name: "Werkplaats · Claude Code" });
     const boards = layout.furniture.filter((f) => f.type === "code-board");
-    expect(boards.map((b) => b.ref)).toEqual(["normwacht", "fluxgrid", "hq"]);
+    expect(boards.map((b) => b.ref)).toEqual(["scanner", "fluxgrid", "hq"]);
     for (const b of boards) expect(b.x + 1.4).toBeLessThanOrEqual(room.rect.x + room.rect.w);
     const desks = layout.desks.filter((d) => d.roomId === room.id);
     expect(desks.map((d) => d.id)).toEqual(["werkplaats:0", "werkplaats:1", "werkplaats:2"]);

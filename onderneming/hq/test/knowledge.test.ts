@@ -156,6 +156,10 @@ describe("Graphify als programma", () => {
     expect(out).toContain("NODE retentie mobiel");
     expect(out).toContain(`--graph ${join(dir, ".hq", "graph.json")}`);
     expect(out).not.toContain("[i]");
+    // Agents krijgen graaf-uitvoer pas bij een flinke kennisbank; daaronder is gewoon zoeken genoeg.
+    expect((await askKnowledge(env.ctx, "retentie mobiel", null)).graph).toBeNull();
+    env.ctx.config.knowledge.graphifyMinNotes = 3;
+    expect((await askKnowledge(env.ctx, "retentie mobiel", null)).graph).toContain("NODE retentie mobiel");
   });
 
   it("extract draait alleen met een eigen sleutel en meldt de nieuwe graaf in het kantoor", async () => {
@@ -165,6 +169,10 @@ describe("Graphify als programma", () => {
     expect(without).toContain("staat uit");
 
     env.ctx.config.knowledge.graphifyApiKey = "sk-test";
+    // Met een sleutel, maar een kleine kennisbank: nog geen AI-kosten voor een graaf die weinig toevoegt.
+    await seedKnowledge();
+    expect(await rebuildKnowledge(env.ctx)).toContain("wacht tot er 100 lessen en notities zijn (nu 3)");
+    env.ctx.config.knowledge.graphifyMinNotes = 0;
     const res = await graphifyExtract(env.ctx.config);
     expect(res).toMatchObject({ ok: true });
     expect(res.message).toContain("key=sk-test");

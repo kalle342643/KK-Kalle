@@ -6,7 +6,7 @@
  * afdeling met drie of meer tegelijk aan het werk is.
  */
 import * as THREE from "three";
-import type { CodeSession, OfficeAgent, OfficeEvent, OfficeSnapshot } from "../../src/office/types.js";
+import type { CodeHelper, CodeSession, OfficeAgent, OfficeEvent, OfficeSnapshot } from "../../src/office/types.js";
 import { act, Actor, face, run, say, sitHere, standUp, wait, walkTo, type ActorInfo } from "./actors.js";
 import { defaultLook, type Assets } from "./assets.js";
 import type { Hologram } from "./hologram.js";
@@ -74,7 +74,7 @@ export class Director {
     this.reserved.clear();
     this.meeting = null;
     this.monitorState.clear();
-    this.assignSessionDesks([...this.actors.values()].filter((a) => a.info.kind === "claude").map((a) => a.id));
+    this.assignSessionDesks(this.workshopActors());
     for (const a of this.actors.values()) {
       a.meeting = null;
       a.home = this.homeOf(a.id);
@@ -96,7 +96,10 @@ export class Director {
     return deskId ? this.layout.desks.find((d) => d.id === deskId) : undefined;
   }
 
-  /** Sessies aan de bureaus van de werkplaats: wie er al zat blijft zitten, nieuwe krijgen een vrij bureau. */
+  /**
+   * Sessies aan de bureaus van de werkplaats: wie er al zat blijft zitten, nieuwe krijgen een vrij bureau.
+   * Een helper (sub-agent) krijgt het vrije bureau het dichtst bij zijn sessie.
+   */
   private assignSessionDesks(ids: string[]): void {
     const desks = this.layout.desks.filter((d) => d.id.startsWith(`${WORKSHOP_SLUG}:`));
     const wanted = new Set(ids);
@@ -106,13 +109,33 @@ export class Director {
         this.deskOccupant.delete(deskId);
       }
     }
-    for (const id of ids) {
+    // Eerst de sessies, dan pas de helpers: die zoeken hun sessie op.
+    for (const id of [...ids].sort((a, b) => Number(isHelperId(a)) - Number(isHelperId(b)))) {
       if (this.sessionDesks.has(id)) continue;
-      const free = desks.find((d) => !this.deskOccupant.has(d.id));
+      const parentDesk = isHelperId(id) ? desks.find((d) => d.id === this.sessionDesks.get(parentOf(id))) : undefined;
+      const free = desks
+        .filter((d) => !this.deskOccupant.has(d.id))
+        .sort((a, b) => (parentDesk ? dist(a.seat, parentDesk.seat) - dist(b.seat, parentDesk.seat) : 0))[0];
       if (!free) break;
       this.sessionDesks.set(id, free.id);
       this.deskOccupant.set(free.id, id);
     }
+  }
+
+  /** Iedereen die in de werkplaats hoort: de sessies en hun helpers. */
+  private workshopActors(): string[] {
+    const out: string[] = [];
+    for (const s of this.snap?.code?.sessions ?? []) {
+      if (s.state === "done") continue;
+      out.push(s.actorId, ...(s.helpers ?? []).map((h) => h.actorId));
+    }
+    return out;
+  }
+
+  /** Waar een helper staat als hij zijn sessie iets komt vragen of brengen. */
+  private visitorOf(actorId: string): Spot | null {
+    const deskId = this.sessionDesks.get(actorId);
+    return (deskId ? this.layout.desks.find((d) => d.id === deskId)?.visitor : undefined) ?? null;
   }
 
   private homeOf(id: string): Spot | null {
@@ -174,20 +197,38 @@ export class Director {
     };
   }
 
+  /** Een helper van een sessie: lichter oranje, met wat hij moet uitzoeken als rol. */
+  private helperInfo(s: CodeSession, helper: CodeHelper): ActorInfo {
+    const project = this.snap?.code.projects.find((p) => p.key === s.projectKey)?.name ?? "een project";
+    return {
+      id: helper.actorId,
+      kind: "claude",
+      name: `${helper.label} · ${project}`,
+      label: `↳ ${helper.label}`,
+      role: helper.task ?? `Helper van Claude · ${project}`,
+      accent: "#e9a27f",
+      look: defaultLook(`helper:${helper.agentType}:${helper.actorId}`, null),
+    };
+  }
+
   /** Nieuwe momentopname: poppetjes toevoegen, bijwerken of laten vertrekken. */
   sync(snap: OfficeSnapshot, first = false): void {
     this.snap = snap;
     const sessions = new Map((snap.code?.sessions ?? []).filter((s) => s.state !== "done").map((s) => [s.actorId, s] as const));
-    this.assignSessionDesks([...sessions.keys()]);
+    const helpers = new Map<string, { session: CodeSession; helper: CodeHelper }>();
+    for (const session of sessions.values()) for (const helper of session.helpers ?? []) helpers.set(helper.actorId, { session, helper });
+    this.assignSessionDesks(this.workshopActors());
     const wanted = new Map<string, OfficeAgent | null>([
       [OWNER_ID, null],
       [BOT_ID, null],
       ...snap.agents.filter((a) => a.status !== "terminated").map((a) => [a.id, a] as const),
       ...[...sessions.keys()].map((id) => [id, null] as const),
+      ...[...helpers.keys()].map((id) => [id, null] as const),
     ]);
     for (const [id, agent] of wanted) {
       const session = sessions.get(id);
-      const info = session ? this.sessionInfo(session) : this.infoFor(id, agent);
+      const helping = helpers.get(id);
+      const info = helping ? this.helperInfo(helping.session, helping.helper) : session ? this.sessionInfo(session) : this.infoFor(id, agent);
       let actor = this.actors.get(id);
       const isNew = !actor;
       const home = this.homeOf(id);
@@ -199,6 +240,13 @@ export class Director {
         if (first || !home) {
           if (home) actor.place(home, true);
           else actor.place(this.layout.entrance, false);
+        } else if (helping) {
+          // Een helper duikt op naast zijn sessie (Claude splitst werk af), hoort de opdracht en gaat ernaast aan de slag.
+          const brief = this.visitorOf(helping.session.actorId) ?? home;
+          actor.place(brief, false);
+          this.burst(brief.x, brief.z, "confetti", 8);
+          const task = helping.helper.task;
+          actor.queue(say(task ? `👋 Ik zoek het uit: ${short(task, 60)}` : "👋 Waarmee kan ik helpen?", 4, "happy"), wait(1.5), walkTo(() => this.grid, home, { sit: true }));
         } else {
           // Nieuw: komt binnen door de voordeur. Een sollicitant gaat op de bank zitten, een nieuwe collega naar zijn bureau.
           actor.place(this.layout.entrance, false);
@@ -215,17 +263,33 @@ export class Director {
         actor.home = home;
         if (moved && actor.idle) actor.place(home!, true);
       }
-      const status = session ? (session.state === "working" ? "running" : "idle") : (agent?.status ?? "idle");
+      const status = helping || session?.state === "working" ? "running" : session ? "idle" : (agent?.status ?? "idle");
       // Bij binnenkomst niet iedereen tegelijk laten roepen hoe het met ze gaat.
-      if (actor.status !== status && !isNew && !first && !session) this.statusChanged(actor, actor.status, status);
+      if (actor.status !== status && !isNew && !first && !session && !helping) this.statusChanged(actor, actor.status, status);
       actor.setStatus(status);
       if (agent) actor.setWorking(agent.status === "running", agent.currentTask);
       if (session) actor.setWorking(session.state === "working", session.lastAction ?? session.title);
+      if (helping) actor.setWorking(true, helping.helper.lastAction ?? helping.helper.task);
     }
     for (const [id, actor] of [...this.actors]) {
       if (wanted.has(id)) continue;
-      // Vertrokken: loop naar de uitgang en verdwijn. Een Claude Code-sessie is dan klaar.
       actor.clear();
+      if (isHelperId(id)) {
+        // Een helper is klaar: brengt zijn verslag naar de sessie en is weer weg (hij bestond alleen voor deze klus).
+        const back = this.visitorOf(parentOf(id));
+        actor.queue(
+          standUp(),
+          ...(back ? [walkTo(() => this.grid, back), run((a) => a.turnTo(back.facing))] : []),
+          say("📨 Hier is mijn verslag", 3, "happy"),
+          act("interact-right", 1.4),
+          run((a) => {
+            this.burst(a.pos.x, a.pos.z, "confetti", 8);
+            this.remove(a.id);
+          }),
+        );
+        continue;
+      }
+      // Vertrokken: loop naar de uitgang en verdwijn. Een Claude Code-sessie is dan klaar.
       const bye = actor.info.kind === "claude" ? "✅ Klaar, tot de volgende!" : "👋 Doei!";
       actor.queue(standUp(), say(bye, 3, "info"), walkTo(() => this.grid, this.layout.entrance), run((a) => this.remove(a.id)));
     }
@@ -480,6 +544,26 @@ export class Director {
           if (a.seated && a.idle) a.queue(standUp(), act("emote-yes", 1.2), sitHere(a.home ?? { x: a.pos.x, z: a.pos.z, facing: 0 }));
         } else if (action === "started") {
           a.say("👋 Aan de slag", 3, "happy");
+        } else if (action === "waiting") {
+          a.say("⏳ Even wachten op mijn helpers", 4, "info");
+        }
+        break;
+      }
+      case "code.helper": {
+        if (this.hush > 0) return;
+        const action = String(e.data.action ?? "");
+        const label = String(e.data.label ?? "Helper");
+        const parent = this.actor(e.targetAgentId);
+        if (action === "start") {
+          const task = typeof e.data.task === "string" ? e.data.task : null;
+          parent?.say(`🧑‍🤝‍🧑 ${label} erbij${task ? `: ${short(task, 50)}` : ""}`, 4, "info");
+        } else if (action === "tool") {
+          if (a) {
+            a.setWorking(true, text);
+            a.say(short(text, 64), 3, "info");
+          }
+        } else if (action === "stop") {
+          a?.say("📨 Klaar, ik breng het verslag", 3, "happy");
         }
         break;
       }
@@ -752,10 +836,11 @@ export class Director {
           const working = sessions.filter((s) => s.state === "working").length;
           const down = snap.code.projects.filter((p) => p.health.state === "down").length;
           busy = working > 0 || down > 0;
+          const helping = sessions.reduce((n, s) => n + (s.helpers?.length ?? 0), 0);
           status = down
             ? `🔴 ${down} ${down === 1 ? "site ligt" : "sites liggen"} eruit`
             : sessions.length
-              ? `🤖 ${working}/${sessions.length} Claude-sessies bezig`
+              ? `🤖 ${working}/${sessions.length} Claude-sessies bezig${helping ? ` · 🧑‍🤝‍🧑 ${helping} ${helping === 1 ? "helper" : "helpers"}` : ""}`
               : `${snap.code.projects.length} ${snap.code.projects.length === 1 ? "project" : "projecten"}`;
           break;
         }
@@ -908,3 +993,7 @@ function reply(kind: string): string {
   if (kind === "delegate") return pick(["👍 Komt goed!", "Ik pak het op", "✅ Doe ik"]);
   return pick(["Top, dank je!", "Helder 👌", "Ik kijk ernaar", "👍"]);
 }
+
+/** Helpers hebben het id van hun sessie + "~" + hun eigen id. */
+export const isHelperId = (id: string) => id.startsWith("cc:") && id.includes("~");
+export const parentOf = (id: string) => id.slice(0, id.lastIndexOf("~"));

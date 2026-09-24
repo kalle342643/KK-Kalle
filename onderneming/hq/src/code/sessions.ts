@@ -1,5 +1,5 @@
 import type { Db } from "../db/index.js";
-import type { CiState, CodeSession } from "../office/types.js";
+import type { CiState, CodeHelper, CodeSession } from "../office/types.js";
 
 /**
  * Claude Code-sessies in de werkplaats. HQ ziet ze op twee manieren:
@@ -30,6 +30,102 @@ export interface SessionRow {
 }
 
 export const actorIdOf = (sessionId: string) => `cc:${sessionId}`;
+/** "~" komt niet voor in een git-branch, dus ook niet in het id van de sessie. */
+export const helperActorIdOf = (sessionId: string, agentId: string) => `${actorIdOf(sessionId)}~${agentId}`;
+
+/** Een helper zonder teken van leven verdwijnt na zo lang (als het einde-bericht nooit kwam). */
+export const HELPER_STALE_MS = 30 * 60_000;
+
+const HELPER_NAMES: Record<string, string> = {
+  explore: "Verkenner",
+  plan: "Planner",
+  "general-purpose": "Helper",
+  onderzoeker: "Onderzoeker",
+  reviewer: "Reviewer",
+  "claude-code-guide": "Gids",
+  "statusline-setup": "Instellingen",
+};
+
+/** Leesbare naam voor een soort sub-agent ("plugin:x:security-reviewer" wordt "Security reviewer"). */
+export function helperLabel(agentType: string): string {
+  const base = agentType.split(":").pop()!.trim();
+  const known = HELPER_NAMES[base.toLowerCase()];
+  if (known) return known;
+  const words = base.replace(/[-_]+/g, " ").replace(/\s+/g, " ").trim();
+  return words ? words.charAt(0).toUpperCase() + words.slice(1, 40) : "Helper";
+}
+
+export interface HelperRow {
+  session_id: string;
+  agent_id: string;
+  agent_type: string;
+  task: string | null;
+  last_action: string | null;
+  tools: number;
+  started_at: string | Date;
+  last_activity_at: string | Date;
+  ended_at: string | Date | null;
+}
+
+const toHelper = (r: HelperRow): CodeHelper => ({
+  actorId: helperActorIdOf(r.session_id, r.agent_id),
+  agentType: r.agent_type,
+  label: helperLabel(r.agent_type),
+  task: r.task,
+  lastAction: r.last_action,
+  tools: r.tools,
+  startedAt: new Date(r.started_at).toISOString(),
+  lastActivityAt: new Date(r.last_activity_at).toISOString(),
+});
+
+/** Een sessie zet een helper in (of hij meldde zich pas bij zijn eerste stap). */
+export async function startHelper(
+  db: Db,
+  h: { sessionId: string; agentId: string; agentType: string; task?: string | null; action?: string | null; at: Date; tool?: boolean },
+): Promise<{ created: boolean; row: HelperRow }> {
+  const rows = await db.query<HelperRow & { inserted: boolean }>(
+    `insert into code_helpers (session_id, agent_id, agent_type, task, last_action, tools, started_at, last_activity_at)
+     values ($1, $2, $3, $4, $5, $6, $7, $7)
+     on conflict (session_id, agent_id) do update set
+       task = coalesce(code_helpers.task, excluded.task),
+       last_action = coalesce(excluded.last_action, code_helpers.last_action),
+       tools = code_helpers.tools + excluded.tools,
+       last_activity_at = greatest(code_helpers.last_activity_at, excluded.last_activity_at)
+     returning *, (xmax = 0) as inserted`,
+    [h.sessionId, h.agentId, h.agentType, h.task ?? null, h.action ?? null, h.tool ? 1 : 0, h.at.toISOString()],
+  );
+  const { inserted, ...row } = rows[0]!;
+  return { created: Boolean(inserted), row };
+}
+
+/** De helper is klaar (of de sessie sloot). Geeft de helper terug als hij nog bezig was. */
+export async function stopHelper(db: Db, sessionId: string, agentId: string, at: Date): Promise<HelperRow | undefined> {
+  const rows = await db.query<HelperRow>(
+    `update code_helpers set ended_at = $3, last_activity_at = greatest(last_activity_at, $3)
+     where session_id = $1 and agent_id = $2 and ended_at is null returning *`,
+    [sessionId, agentId, at.toISOString()],
+  );
+  return rows[0];
+}
+
+export async function stopAllHelpers(db: Db, sessionId: string, at: Date): Promise<void> {
+  await db.query("update code_helpers set ended_at = $2 where session_id = $1 and ended_at is null", [sessionId, at.toISOString()]);
+}
+
+/** Helpers per sessie: wie nu werkt, en hoeveel er in totaal waren. */
+export async function helpersOf(db: Db, sessionIds: string[], now: Date): Promise<Map<string, { active: CodeHelper[]; used: number }>> {
+  const out = new Map<string, { active: CodeHelper[]; used: number }>();
+  if (!sessionIds.length) return out;
+  const rows = await db.query<HelperRow>("select * from code_helpers where session_id = any($1::text[]) order by started_at", [sessionIds]);
+  for (const r of rows) {
+    const entry = out.get(r.session_id) ?? { active: [], used: 0 };
+    entry.used += 1;
+    const alive = !r.ended_at && now.getTime() - new Date(r.last_activity_at).getTime() < HELPER_STALE_MS;
+    if (alive) entry.active.push(toHelper(r));
+    out.set(r.session_id, entry);
+  }
+  return out;
+}
 
 export function toSession(r: SessionRow, now: Date): CodeSession {
   const last = new Date(r.last_activity_at);
@@ -49,6 +145,8 @@ export function toSession(r: SessionRow, now: Date): CodeSession {
     state,
     commits: r.commits,
     pr: r.pr,
+    helpers: [],
+    helpersUsed: 0,
   };
 }
 
@@ -66,7 +164,15 @@ export async function listSessions(db: Db, now: Date, opts: { projectKey?: strin
     `select * from code_sessions where ${where} order by last_activity_at desc limit $${params.length}`,
     params,
   );
-  return rows.map((r) => toSession(r, now));
+  const sessions = rows.map((r) => toSession(r, now));
+  const helpers = await helpersOf(db, sessions.map((s) => s.id), now);
+  for (const s of sessions) {
+    const h = helpers.get(s.id);
+    s.helpersUsed = h?.used ?? 0;
+    // Een sessie die klaar is, heeft geen werkende helpers meer.
+    s.helpers = s.state === "done" ? [] : (h?.active ?? []);
+  }
+  return sessions;
 }
 
 /** Zoekt de sessie die op deze branch van dit project werkt (de laatste dag). */

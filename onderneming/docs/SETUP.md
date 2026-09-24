@@ -136,7 +136,7 @@ Stuur `/status` naar je bot: je hoort *🟢 Alles draait* terug.
 ## 9. Eerste tak en eerste ronde
 De holding heeft nu een CEO en een analist, maar nog geen takken. Twee manieren:
 - **Zelf** (snel): `node --env-file=$HOME/.config/hq/hq.env dist/main.js branch games games "Games-studio"`
-  maakt de games-tak met 7 agents en de routines *Weekstart* (maandag) en *Ideeënraad* (woensdag).
+  maakt de games-tak met 6 agents en de routines *Weekstart* (maandag) en *Ideeënraad* (woensdag).
 - **Via de CEO**: wacht op de maandelijkse kansenverkenning, of geef Atlas in Paperclip een taak
   ("Stel een eerste tak voor op basis van ..."). Zijn voorstel komt als Telegram-bericht met knoppen.
 
@@ -194,6 +194,12 @@ In het kantoor zie je het terug: *"Rigel 🔎 zoekt: …"*, *"🌐 leest: crazyg
 ## Optioneel
 **Claude Code live in het kantoor.** Zonder extra's ziet HQ je Claude Code-werk aan de commits (om de paar
 minuten). Wil je elke stap live zien (opdracht, zoeken, bestanden, tests), dan stuurt een kleine hook dat naar HQ.
+Zet een sessie een helper (sub-agent) in, dan verschijnt die als eigen poppetje naast de sessie: je ziet wat hij
+moet uitzoeken, wat hij zoekt en leest, en wanneer hij zijn verslag terugbrengt. De installer zet ook twee helpers
+klaar in `~/.claude/agents`: een **onderzoeker** (zoekt iets uit op het web, verandert niets) en een **reviewer**
+(kijkt klaar werk na met een frisse blik). Claude Code zet ze zelf in waar het past; je kunt er ook om vragen
+("laat de onderzoeker uitzoeken …"). Zonder helpers: `HQ_SKIP_AGENTS=1`. Waarom deze twee: zie
+[ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md).
 De hook stuurt nooit bestandsinhoud of volledige commando's, poetst alles weg wat op een sleutel lijkt, en kan
 Claude Code niet ophouden.
 - *Op je eigen computer:* `bash onderneming/deploy/claude-code/install-hook.sh http://<servernaam>:8080/api/hooks/claude-code <HQ_HOOK_TOKEN>`
@@ -206,7 +212,7 @@ Claude Code niet ophouden.
   *Edit*): zet `HQ_HOOK_URL` (dat https-adres) en `HQ_HOOK_TOKEN` bij de omgevingsvariabelen, voeg
   `<servernaam>.<tailnet>.ts.net` toe aan de toegestane domeinen onder *Network access*, en zet als setup-script:
   `curl -fsSL https://raw.githubusercontent.com/kalle342643/KK-Kalle/main/onderneming/deploy/claude-code/install-hook.sh | bash`.
-  Nieuwe sessies melden zich dan live. Alleen `/api/hooks` staat open, en dat adres kan alleen meldingen
+  (Dat adres wijst naar `main`: het werkt zodra deze code daar staat.) Nieuwe sessies melden zich dan live. Alleen `/api/hooks` staat open, en dat adres kan alleen meldingen
   ontvangen met het geheim; het kantoor zelf blijft alleen via Tailscale bereikbaar.
 
 **Gratis AI (LiteLLM-router).** Laat agents of Graphify op de gratis lagen van een paar aanbieders draaien;
@@ -226,7 +232,9 @@ sleutel binnen hun gratis laag.
 elk uur alle lessen, notities en experimenten als notities in `~/vault`. Wil je dat Graphify daar 's nachts een
 echte kennisgraaf van maakt (het hologram in de kennisbank), maak dan in de Anthropic Console een **aparte**
 API-sleutel met een eigen lage limiet (bv. $5 per maand) en zet die als `GRAPHIFY_API_KEY` in `hq.env`. Zonder
-sleutel maakt HQ zelf een eenvoudigere graaf. Nu meteen bouwen: `node --env-file=$HOME/.config/hq/hq.env dist/main.js kennis`.
+sleutel maakt HQ zelf een eenvoudigere graaf. Graphify gaat pas echt aan de slag (en kost pas tokens) vanaf 100
+lessen en notities (`HQ_GRAPHIFY_MIN_NOTES`): daaronder vindt gewoon zoeken hetzelfde. Nu meteen bouwen:
+`node --env-file=$HOME/.config/hq/hq.env dist/main.js kennis`.
 De map in Obsidian bekijken: kopieer hem naar je laptop (`scp -r ai@<servernaam>:vault .`) en open hem als vault.
 
 **Supabase in plaats van de lokale database.** Voordeel: je geld- en experimentdata staan los van de server,

@@ -58,6 +58,8 @@ const envSchema = z.object({
   GRAPHIFY_API_KEY: z.string().optional(),
   GRAPHIFY_BACKEND: z.string().default("claude"),
   GRAPHIFY_MODEL: z.string().default("claude-haiku-4-5"),
+  /** Pas vanaf zoveel lessen en notities bouwt Graphify een graaf met AI en krijgen agents graaf-uitvoer. */
+  HQ_GRAPHIFY_MIN_NOTES: z.coerce.number().int().min(0).default(100),
 
   /** Werkplaats: token (fine-grained, alleen lezen) waarmee HQ je repositories volgt. */
   HQ_GITHUB_TOKEN: z.string().optional(),
@@ -69,7 +71,7 @@ const envSchema = z.object({
   /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
   HQ_OWNER_NAMES: z.string().default("Kalle"),
 
-  /** Gratis AI: de LiteLLM-router op deze server (zie `hq gratis-ai`). */
+  /** Gratis AI: de LiteLLM-router op deze server (zie `dist/main.js gratis-ai`). */
   HQ_GRATIS_AI_URL: z.string().default("http://127.0.0.1:4000"),
   /** De master key van de router (LITELLM_MASTER_KEY). Leeg = gratis AI staat uit. */
   HQ_GRATIS_AI_KEY: z.string().optional(),
@@ -137,6 +139,8 @@ export interface Config {
     graphifyApiKey: string | undefined;
     graphifyBackend: string;
     graphifyModel: string;
+    /** Onder dit aantal lessen en notities voegt een graaf weinig toe: geen AI-extractie, geen graaf-uitvoer. */
+    graphifyMinNotes: number;
   };
   gratisAi: {
     url: string;
@@ -220,6 +224,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       graphifyApiKey: e.GRAPHIFY_API_KEY,
       graphifyBackend: e.GRAPHIFY_BACKEND,
       graphifyModel: e.GRAPHIFY_MODEL,
+      graphifyMinNotes: e.HQ_GRAPHIFY_MIN_NOTES,
     },
     gratisAi: {
       url: e.HQ_GRATIS_AI_URL.replace(/\/+$/, ""),

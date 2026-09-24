@@ -5,6 +5,7 @@
  * een naam geven), alleen gebeurt er niets buiten deze pagina. Niets hiervan is echt.
  */
 import type {
+  AgentValue,
   BacklogItem,
   CodeProject,
   CodeSession,
@@ -44,7 +45,6 @@ interface Seed {
 const TITLES: Record<string, string> = {
   "tak-lead": "Tak-lead",
   verkenner: "Verkenner",
-  pitcher: "Pitcher",
   criticus: "Criticus",
   bouwer: "Bouwer",
   publicist: "Publicist",
@@ -53,7 +53,6 @@ const TITLES: Record<string, string> = {
 const ROLES: Record<string, string> = {
   "tak-lead": "pm",
   verkenner: "researcher",
-  pitcher: "general",
   criticus: "researcher",
   bouwer: "engineer",
   publicist: "cmo",
@@ -70,7 +69,6 @@ const BRANCHES: Array<{ slug: string; name: string; template: string; budget: nu
       { name: "Vega", template: "tak-lead", lead: true },
       { name: "Rigel", template: "verkenner" },
       { name: "Deneb", template: "verkenner" },
-      { name: "Sirius", template: "pitcher" },
       { name: "Castor", template: "criticus" },
       { name: "Pollux", template: "bouwer" },
       { name: "Capella", template: "publicist" },
@@ -84,7 +82,6 @@ const BRANCHES: Array<{ slug: string; name: string; template: string; budget: nu
     agents: [
       { name: "Eik", template: "tak-lead", lead: true },
       { name: "Beuk", template: "verkenner" },
-      { name: "Linde", template: "pitcher" },
       { name: "Wilg", template: "criticus" },
       { name: "Berk", template: "schrijver" },
     ],
@@ -98,7 +95,6 @@ const BRANCHES: Array<{ slug: string; name: string; template: string; budget: nu
       { name: "Maas", template: "tak-lead", lead: true },
       { name: "Waal", template: "verkenner" },
       { name: "Rijn", template: "verkenner" },
-      { name: "IJssel", template: "pitcher" },
       { name: "Schelde", template: "criticus" },
       { name: "Amstel", template: "bouwer" },
     ],
@@ -114,19 +110,17 @@ const NEW_BRANCH = {
   agents: [
     { name: "Kompas", template: "tak-lead", lead: true },
     { name: "Radar", template: "verkenner" },
-    { name: "Vonk", template: "pitcher" },
     { name: "Smid", template: "bouwer" },
   ] as Seed[],
 };
 
 const TASKS: Record<string, string[]> = {
   ceo: ["Weekplan voor de holding schrijven", "Portfolio bekijken: waar moet het budget heen?", "Onderzoek: is e-commerce een goede nieuwe tak?", "Taken verdelen over de tak-leads"],
-  analyst: ["Dagelijkse analyse van gisteren", "Kosten zonder resultaat opsporen", "Lessen schrijven voor afgeronde experimenten", "Metingen van EXP-1 controleren"],
-  "tak-lead": ["Weekstart: lopende experimenten nalopen", "Taken voor deze week verdelen", "Ideeënraad voorbereiden", "Meting van dit experiment controleren"],
+  analyst: ["Lessen schrijven voor EXP-2 (gestopt)", "Voorspelling van de raad naast de uitkomst leggen", "Lessen schrijven voor afgeronde experimenten", "Metingen van EXP-1 controleren"],
+  "tak-lead": ["Weekstart: lopende experimenten nalopen", "Taken voor deze week verdelen", "Top 5 maken uit de waarnemingen van de verkenners", "Meting van dit experiment controleren"],
   "verkenner:games": ["Trending games op CrazyGames bekijken", "Reddit r/WebGames doorzoeken op wensen", "Top 20 puzzelgames vergelijken", "Wat spelen mensen deze week op Poki?"],
   "verkenner:content": ["Zoekvolume voor 'beste budget microfoon' checken", "Affiliate-programma's vergelijken", "Concurrerende vergelijkingssites bekijken"],
   "verkenner:saas": ["Klachten over boekhoudtools verzamelen", "Prijzen van concurrenten van ComplyScan", "Zzp-forums doorzoeken op irritaties"],
-  pitcher: ["Top 5 ideeën uitwerken voor de ideeënraad", "Pitch schrijven met een meetbaar doel", "Voorspelling vooraf opschrijven"],
   criticus: ["Ideeën afschieten: waarom werkt dit níet?", "Risico's en kosten op een rij", "Is het doel wel meetbaar?"],
   "bouwer:games": ["EXP-1 Fluxgrid: level 12-20 bouwen", "Bug in de kleurmenging oplossen", "Build klaarzetten voor jou (jij publiceert)", "Laadtijd onder 2 seconden krijgen"],
   "bouwer:saas": ["EXP-4 landingspagina: aanmeldformulier", "Gratis versie van ComplyScan bouwen", "Factuur-OCR: tweede poging"],
@@ -238,6 +232,8 @@ function demoSessions(): CodeSession[] {
     state,
     commits,
     pr,
+    helpers: [],
+    helpersUsed: 0,
   });
   return [
     s("demo-1", "cookiewacht", "Laat zien waarom een pagina niet openging", "🧪 npm test", "working", 3, 2, "claude/foutcode-tonen", { number: 12, url: "https://github.com", state: "open", ci: "running" }),
@@ -256,6 +252,24 @@ const CODE_COMMITS: Record<string, string[]> = {
   fluxgrid: ["Level 9: extra kleur", "Mengen: geel + blauw = groen", "Tutorial korter"],
   hq: ["Werkplaats: bord per project", "Hooks: geheimen wegpoetsen"],
 };
+/**
+ * Helpers (sub-agents) die een sessie inzet, op vaste momenten in elke ronde van drie minuten: een onderzoeker
+ * zoekt iets uit op het web, een verkenner leest code, een reviewer kijkt het werk na voor de PR samengaat.
+ */
+const DEMO_HELPERS: Array<{ at: number; until: number; project: string | null; type: string; label: string; task: string; steps: string[] }> = [
+  {
+    at: 20,
+    until: 75,
+    project: "cookiewacht",
+    type: "onderzoeker",
+    label: "Onderzoeker",
+    task: "Zoek uit hoe vergelijkbare tools hun eerste klanten vinden",
+    steps: ["🔎 cookie scanner mkb eerste klanten", "🌐 cookiebot.com/pricing", "🔎 compliance tool koude mail resultaten", "🌐 ondernemersplein.nl/cookies"],
+  },
+  { at: 35, until: 58, project: "fluxgrid", type: "Explore", label: "Verkenner", task: "Zoek waar de levels worden geladen", steps: [] },
+  { at: 62, until: 88, project: null, type: "reviewer", label: "Reviewer", task: "Kijk de wijzigingen na tegen de opdracht", steps: ["🧪 npm test"] },
+];
+
 const NEW_TASKS: Array<[string, string]> = [
   ["cookiewacht", "Meld een cookiemuur apart in het rapport"],
   ["fluxgrid", "Voeg een dagelijkse puzzel toe"],
@@ -272,7 +286,6 @@ const REPOS: RepoChoice[] = [
 const WEB_STEPS: Record<string, string[]> = {
   verkenner: ["🔎 zoekt: browser puzzle games trending 2026", "🌐 leest: crazygames.com/t/puzzle", "📈 trends: cookie consent scanner", "🌐 leest: poki.com/en/puzzle", "🔎 zoekt: webshop compliance tool prijzen"],
   criticus: ["🔎 zoekt: color mixing puzzle game", "🌐 leest: crazygames.com/game/color-flow", "🕸️ kennisgraaf: pad Fluxgrid mobiel", "🌐 leest: g2.com/categories/cookie-consent"],
-  pitcher: ["🕸️ kennisgraaf: uitleg retentie", "🔎 zoekt: idle game retention benchmarks"],
   bouwer: ["🕸️ kennisgraaf: query LevelLoader", "✍️ bewerkt: levels.ts", "🌐 leest: developer.crazygames.com/sdk", "✍️ bewerkt: scanner.ts"],
   schrijver: ["🔎 zoekt: AI Act artikel 50 chatbot melding", "🌐 leest: eur-lex.europa.eu/eli/reg/2024/1689"],
   publicist: ["🌐 leest: docs.crazygames.com/requirements", "🔎 zoekt: crazygames upload thumbnail size"],
@@ -495,6 +508,39 @@ export class DemoSource implements DataSource {
     }
   }
 
+  /** De nut-meter in de demo: vaste cijfers per rol, en één agent die alleen geld kost (om te laten zien hoe dat eruitziet). */
+  private agentValues(): AgentValue[] {
+    const zero = { lessons: 0, notes: 0, proposals: 0, measurements: 0, requests: 0, delegations: 0 };
+    const byRole: Record<string, [number, Partial<AgentValue["outputs"]>]> = {
+      ceo: [8.4, { requests: 4, delegations: 9 }],
+      analyst: [2.1, { lessons: 14 }],
+      "tak-lead": [5.2, { proposals: 3, delegations: 12, measurements: 2 }],
+      verkenner: [1.6, { notes: 6 }],
+      criticus: [1.9, { notes: 5 }],
+      bouwer: [7.8, { measurements: 4, notes: 2 }],
+      publicist: [2.3, { requests: 3 }],
+      schrijver: [3.1, { notes: 4, requests: 2 }],
+    };
+    const values = this.agents
+      .filter((a) => a.status !== "terminated" && a.status !== "pending_approval")
+      .map((a): AgentValue => {
+        const [cost, got] = a.name === "Wilg" ? [1.35, {}] : (byRole[a.hqRole === "ceo" ? "ceo" : a.hqRole === "analyst" ? "analyst" : (a.template ?? "")] ?? [1, {}]);
+        const outputs = { ...zero, ...got };
+        const outputTotal = Object.values(outputs).reduce((x, n) => x + n, 0);
+        return {
+          agentId: a.id,
+          costEur: cost,
+          runs: 6 + Math.round(cost * 3),
+          failedRuns: a.name === "Wilg" ? 2 : 0,
+          outputs,
+          outputTotal,
+          verdict: outputTotal ? "levert" : cost >= 1 ? "niets" : "rustig",
+          costPerOutputEur: outputTotal ? round2(cost / outputTotal) : null,
+        };
+      });
+    return values.sort((x, y) => Number(y.verdict === "niets") - Number(x.verdict === "niets") || y.costEur - x.costEur);
+  }
+
   // ---------------------------------------------------------------- DataSource
 
   async snapshot(): Promise<OfficeSnapshot> {
@@ -551,6 +597,7 @@ export class DemoSource implements DataSource {
           tokensToday: 1_284_000 + this.events.filter((e) => e.type === "run.finished").length * 41_000,
           runsToday: 57 + this.events.filter((e) => e.type === "run.finished").length,
         },
+        agents: this.agentValues(),
       },
       approvals: this.approvals.map(({ projectId: _p, hireAgentId: _h, branch: _b, ...a }) => a),
       knowledge: { source: "graphify", nodes: graph.totalNodes, edges: graph.totalEdges, builtAt: graph.builtAt },
@@ -637,8 +684,69 @@ export class DemoSource implements DataSource {
     return { repos: REPOS, error: null };
   }
 
+  /** Een sessie zet een helper in, of een helper levert op. Geeft true als er iets gebeurde. */
+  private helperStep(): boolean {
+    const moment = this.clock % 180;
+    const working = this.codeSessions.filter((s) => s.state === "working");
+    for (const plan of DEMO_HELPERS) {
+      if (moment === plan.at) {
+        const s = (plan.project ? working.find((x) => x.projectKey === plan.project) : undefined) ?? working[0];
+        if (!s) return false;
+        const project = this.codeProjects.find((p) => p.key === s.projectKey);
+        const now = new Date().toISOString();
+        const helper = { actorId: `${s.actorId}~demo-${plan.type}-${this.clock}`, agentType: plan.type, label: plan.label, task: plan.task, lastAction: null, tools: 0, startedAt: now, lastActivityAt: now };
+        s.helpers = [...(s.helpers ?? []), helper];
+        s.helpersUsed = (s.helpersUsed ?? 0) + 1;
+        s.lastAction = `🧑‍🤝‍🧑 ${plan.label}: ${plan.task}`;
+        this.emit({
+          type: "code.helper",
+          agentId: helper.actorId,
+          targetAgentId: s.actorId,
+          text: `🧑‍🤝‍🧑 ${plan.label} erbij: ${plan.task}`,
+          data: { action: "start", session: s.actorId, label: plan.label, agentType: plan.type, task: plan.task, project: s.projectKey, projectName: project?.name },
+        });
+        return true;
+      }
+      if (moment === plan.until) {
+        for (const s of this.codeSessions) {
+          const helper = (s.helpers ?? []).find((x) => x.agentType === plan.type);
+          if (!helper) continue;
+          s.helpers = s.helpers.filter((x) => x !== helper);
+          const project = this.codeProjects.find((p) => p.key === s.projectKey);
+          this.emit({
+            type: "code.helper",
+            agentId: helper.actorId,
+            targetAgentId: s.actorId,
+            text: `📨 ${plan.label} levert op: ${plan.task}`,
+            data: { action: "stop", session: s.actorId, label: plan.label, agentType: plan.type, task: plan.task, tools: helper.tools, project: s.projectKey, projectName: project?.name },
+          });
+          return true;
+        }
+        return false;
+      }
+    }
+    // Een helper die aan het werk is, zet een stap (zoekt, leest, draait de tests).
+    const busy = this.codeSessions.flatMap((s) => (s.helpers ?? []).map((helper) => ({ s, helper, plan: DEMO_HELPERS.find((x) => x.type === helper.agentType) })));
+    const one = busy.length && Math.random() < 0.5 ? pick(busy.filter((b) => b.plan?.steps.length)) : undefined;
+    if (!one?.plan) return false;
+    const step = pick(one.plan.steps);
+    one.helper.lastAction = step;
+    one.helper.tools += 1;
+    one.helper.lastActivityAt = new Date().toISOString();
+    const project = this.codeProjects.find((p) => p.key === one.s.projectKey);
+    this.emit({
+      type: "code.helper",
+      agentId: one.helper.actorId,
+      targetAgentId: one.s.actorId,
+      text: step,
+      data: { action: "tool", session: one.s.actorId, label: one.helper.label, agentType: one.helper.agentType, project: one.s.projectKey, projectName: project?.name },
+    });
+    return true;
+  }
+
   /** Iets in de werkplaats: een stap van Claude, een commit, tests, een uitrol, af en toe een storing. */
   private codeStep(): void {
+    if (this.helperStep()) return;
     const cookie = this.codeProjects.find((p) => p.key === "cookiewacht");
     // Eens in de zes minuten ligt de demo-site even plat, om te laten zien wat er dan gebeurt.
     if (cookie && this.clock % 360 === 200) {
@@ -683,6 +791,8 @@ export class DemoSource implements DataSource {
         state: "working",
         commits: 0,
         pr: null,
+        helpers: [],
+        helpersUsed: 0,
       });
       this.emit({ type: "code.session", agentId: `cc:${id}`, text: `Nieuwe opdracht voor Claude Code (${project?.name ?? projectKey}): ${title}`, data: { project: projectKey, projectName: project?.name, action: "task" } });
       return;
@@ -869,8 +979,8 @@ export class DemoSource implements DataSource {
   }
 
   private taskFor(a: OfficeAgent): string {
-    const key = a.hqRole === "ceo" ? "ceo" : a.hqRole === "analyst" ? "analyst" : TASKS[`${a.template}:${a.branch}`] ? `${a.template}:${a.branch}` : (a.template ?? "pitcher");
-    const list = TASKS[key] ?? TASKS[`${a.template}:games`] ?? TASKS.pitcher!;
+    const key = a.hqRole === "ceo" ? "ceo" : a.hqRole === "analyst" ? "analyst" : TASKS[`${a.template}:${a.branch}`] ? `${a.template}:${a.branch}` : (a.template ?? "criticus");
+    const list = TASKS[key] ?? TASKS[`${a.template}:games`] ?? TASKS.criticus!;
     return pick(list);
   }
 
@@ -922,7 +1032,9 @@ export class DemoSource implements DataSource {
     // Wie aan het werk is, gaat soms het web op.
     if (this.runs.size && Math.random() < 0.22) this.webStep();
     // De werkplaats: Claude Code aan het werk, en af en toe iets met een project.
-    if (Math.random() < 0.18 || this.clock % 180 === 90 || this.clock % 180 === 110 || this.clock % 360 === 200 || this.clock % 360 === 230) this.codeStep();
+    const moment = this.clock % 180;
+    const planned = moment === 90 || moment === 110 || DEMO_HELPERS.some((x) => x.at === moment || x.until === moment) || this.clock % 360 === 200 || this.clock % 360 === 230;
+    if (Math.random() < 0.18 || planned) this.codeStep();
     // Elke 2 à 3 seconden gebeurt er iets.
     if (this.clock % 2 !== 0 && Math.random() < 0.5) return;
     const roll = Math.random();

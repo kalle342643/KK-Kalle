@@ -249,4 +249,23 @@ create table code_health (
 create index code_health_idx on code_health(project_key, at desc);
 `,
   },
+  {
+    id: "005_helpers",
+    sql: `
+-- Helpers (sub-agents) die een Claude Code-sessie inzet: iets uitzoeken, een plan maken, een review.
+create table code_helpers (
+  session_id text not null references code_sessions(id) on delete cascade,
+  agent_id text not null,
+  agent_type text not null,
+  task text,
+  last_action text,
+  tools integer not null default 0,
+  started_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  ended_at timestamptz,
+  primary key (session_id, agent_id)
+);
+create index code_helpers_activity_idx on code_helpers(last_activity_at desc);
+`,
+  },
 ];

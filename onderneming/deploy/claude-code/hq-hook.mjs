@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Claude Code-hook voor het kantoor van HQ: meldt wanneer Claude Code begint, een opdracht krijgt,
-// het web op gaat, code aanpast of tests draait, en wanneer het klaar is. Zo zie je in de werkplaats
-// live wat er gebeurt.
+// het web op gaat, code aanpast of tests draait, een helper (sub-agent) inzet, en wanneer het klaar is.
+// Zo zie je in de werkplaats live wat er gebeurt, ook wat de helpers doen.
 //
 // Privacy: er gaat nooit bestandsinhoud, een volledig commando of een omgevingsvariabele mee. Alleen
 // de soort stap en een korte omschrijving (zoekvraag, adres zonder query, bestandsnaam), met alles wat
@@ -29,9 +29,9 @@ function config() {
   return null;
 }
 
-// Sleutels, tokens en lange willekeurige reeksen worden •••.
+// Sleutels, tokens en lange willekeurige reeksen worden •••. (\b: "task-notification" of "risk-analyse" is geen sleutel.)
 const SECRET =
-  /(sk-[A-Za-z0-9_-]{10,}|gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|xox[abpr]-[A-Za-z0-9-]{10,}|AKIA[0-9A-Z]{16}|eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|[A-Za-z0-9+/_=-]{32,})/g;
+  /(\bsk-[A-Za-z0-9_-]{10,}|\bgh[pousr]_[A-Za-z0-9]{20,}|\bgithub_pat_[A-Za-z0-9_]{20,}|\bxox[abpr]-[A-Za-z0-9-]{10,}|\bAKIA[0-9A-Z]{16}|\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+|[A-Za-z0-9+/_=-]{32,})/g;
 export const scrub = (s, n) =>
   String(s ?? "")
     .replace(SECRET, "•••")
@@ -47,6 +47,16 @@ export function shortUrl(raw) {
     return scrub(raw, 90);
   }
 }
+
+/** Is dit een opdracht van jou? Systeemberichten (<task-notification>, <system-reminder>) en /commando's niet. */
+export const isTask = (prompt) => {
+  const p = String(prompt ?? "").trim();
+  return Boolean(p) && !p.startsWith("<") && !/^\/[\w:-]+(\s|$)/.test(p);
+};
+
+/** Soort sub-agent (Explore, Plan, general-purpose, onderzoeker, plugin:x:reviewer); alleen veilige tekens. */
+export const agentType = (t) => String(t || "general-purpose").replace(/[^\w.: -]/g, "").slice(0, 80) || "general-purpose";
+const agentIdOf = (id) => String(id ?? "").replace(/[^\w.-]/g, "").slice(0, 100) || null;
 
 const firstArg = (s) => {
   const m = String(s).match(/^\s*(?:"([^"]*)"|'([^']*)'|(\S+))/);
@@ -71,6 +81,10 @@ export function classify(tool, input = {}) {
       const skill = input.skill ?? input.name ?? input.command;
       return skill ? { kind: "skill", detail: scrub(skill, 60) } : null;
     }
+    // Een helper (sub-agent) inzetten. Oudere versies van Claude Code noemen de tool Task.
+    case "Agent":
+    case "Task":
+      return { kind: "helper", detail: scrub(input.description ?? input.prompt, 90) || null, agentType: agentType(input.subagent_type) };
     case "Bash": {
       const cmd = String(input.command ?? "");
       let m;
@@ -117,13 +131,21 @@ async function main() {
     branch: git(cwd, ["rev-parse", "--abbrev-ref", "HEAD"]),
     where: process.env.CLAUDE_CODE_REMOTE_ENVIRONMENT_TYPE || process.env.CLAUDE_CODE_REMOTE ? "cloud" : "local",
   };
+  // Binnen een helper (sub-agent) geeft Claude Code zijn id en soort mee.
+  const agentId = agentIdOf(h.agent_id);
+  if (agentId) Object.assign(payload, { agentId, agentType: agentType(h.agent_type) });
   if (event === "UserPromptSubmit") {
+    // Geen opdracht van jou: een bericht van Claude Code zelf (<task-notification> als een helper op de achtergrond
+    // klaar is) of een commando als /clear.
+    if (!isTask(h.prompt)) finish();
     payload.prompt = scrub(h.prompt, 200);
     if (!payload.prompt) finish();
   } else if (event === "PreToolUse" || event === "PostToolUse") {
     const step = classify(h.tool_name, h.tool_input ?? {});
     if (!step) finish();
     Object.assign(payload, step);
+  } else if (event === "SubagentStart" || event === "SubagentStop") {
+    if (!agentId) finish();
   } else if (!["SessionStart", "Stop", "SessionEnd"].includes(event)) {
     finish();
   }

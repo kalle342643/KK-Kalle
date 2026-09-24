@@ -5,7 +5,6 @@ monthlyBudgetEur: 30
 agents:
   - { template: tak-lead, name: Kompas, lead: true }
   - { template: verkenner, name: Radar }
-  - { template: pitcher, name: Vonk }
   - { template: criticus, name: Spiegel }
   - { template: bouwer, name: Smid }
 routines:
@@ -18,4 +17,6 @@ routines:
     assignee: Kompas
     cron: "0 12 * * 3"
     priority: medium
-    description: Draai de ideeënraad (skill ideeenraad) en dien de 1-2 beste ideeën in als experiment.
+    description: |
+      Draai de ideeënraad (skill ideeenraad) en dien de 1-2 beste ideeën in als experiment.
+      Lopen er al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over.

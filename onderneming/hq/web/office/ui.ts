@@ -3,7 +3,7 @@
  * ergens op klikt (een poppetje, het projectenbord, de cijfermuur, het team, de kennisbank,
  * jouw bureau), meldingen en de noodstop.
  */
-import type { CodeProject, CodeSession, OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+import type { AgentValue, CodeProject, CodeSession, OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
 import { codeStatus, COLUMNS, progressOf } from "./boards.js";
 import { hideTip, lineChart, pairedBars } from "./charts.js";
 import type { DataSource } from "./data.js";
@@ -48,6 +48,12 @@ const STATUS: Record<string, { label: string; tone: string }> = {
   error: { label: "loopt vast", tone: "bad" },
   pending_approval: { label: "wacht op jouw ja", tone: "info" },
   terminated: { label: "vertrokken", tone: "muted" },
+};
+/** De nut-meter: wat een agent de afgelopen 30 dagen aantoonbaar opleverde tegenover wat hij kostte. */
+const VALUE_VERDICT: Record<AgentValue["verdict"], { label: string; tone: string }> = {
+  levert: { label: "levert", tone: "good" },
+  niets: { label: "voor de sier?", tone: "warn" },
+  rustig: { label: "nog weinig gebruikt", tone: "muted" },
 };
 const PROJECT_STATUS: Record<OfficeProject["status"], string> = {
   proposed: "voorstel",
@@ -234,7 +240,12 @@ export class Ui {
 
   label(id: string | null): string {
     if (!id) return "Iemand";
-    if (id.startsWith("cc:")) return this.deps.director.actors.get(id)?.info.label ?? "Claude Code";
+    if (id.startsWith("cc:")) {
+      const known = this.deps.director.actors.get(id)?.info.label;
+      if (known) return known;
+      const helper = this.snap?.code.sessions.flatMap((x) => x.helpers ?? []).find((x) => x.actorId === id);
+      return helper ? `↳ ${helper.label}` : "Claude Code";
+    }
     if (id === OWNER_ID) return this.snap?.people.find((p) => p.id === OWNER_ID)?.nickname || "Jij";
     if (id === BOT_ID) return this.snap?.people.find((p) => p.id === BOT_ID)?.nickname || "HQ-bot";
     const a = this.snap?.agents.find((x) => x.id === id);
@@ -369,6 +380,12 @@ export class Ui {
         return t.startsWith("🔴") || t.startsWith("🟢") ? t : `📋 ${t}`;
       case "code.session":
         return e.data.action === "tool" ? `${who} ${t}` : `🤖 ${t}`;
+      case "code.helper": {
+        const label = String(e.data.label ?? "Helper");
+        const project = String(e.data.projectName ?? "een project");
+        if (e.data.action === "tool") return `${label} (${project}) ${t}`;
+        return `Claude · ${project}: ${t}`;
+      }
       case "halt":
         return `⛔ Noodstop: ${t}`;
       case "resume":
@@ -446,7 +463,8 @@ export class Ui {
     if (!pick) return;
     switch (pick.kind) {
       case "agent":
-        this.open(pick.id.startsWith("cc:") ? "session" : "agent", pick.id);
+        // Een helper hoort bij zijn sessie: dan zie je daar wat hij doet.
+        this.open(pick.id.startsWith("cc:") ? "session" : "agent", pick.id.startsWith("cc:") && pick.id.includes("~") ? pick.id.slice(0, pick.id.lastIndexOf("~")) : pick.id);
         break;
       case "desk": {
         const desk = this.deps.layout().desks.find((d) => d.id === pick.id);
@@ -673,6 +691,7 @@ export class Ui {
           stat("Laatst actief", ago(agent.lastActiveAt)),
           tokens ? stat("Tokens vandaag", tokens.toLocaleString("nl-NL")) : null,
         ),
+        this.valueCard(id),
       );
       const buttons = h(
         "div",
@@ -915,9 +934,47 @@ export class Ui {
       h("div", { class: "chart-host", "data-chart": "days" }),
       h("h3", {}, "Per tak (30 dagen)"),
       h("div", { class: "chart-host", "data-chart": "branches" }),
+      s.agents?.length ? h("h3", {}, "Nut per agent (30 dagen)") : null,
+      s.agents?.length
+        ? h(
+            "ul",
+            { class: "value-list" },
+            ...s.agents.slice(0, 12).map((v) => {
+              const a = snap.agents.find((x) => x.id === v.agentId);
+              const verdict = VALUE_VERDICT[v.verdict];
+              return h(
+                "li",
+                {},
+                h("button", { class: "linkish", onclick: () => this.open("agent", v.agentId) }, a ? a.nickname || a.name : "onbekend"),
+                h("span", { class: `pill ${verdict.tone}` }, verdict.label),
+                h("span", { class: "small muted" }, ` ${eur(v.costEur)} · ${valueParts(v).join(", ") || "niets terug te vinden"}`),
+              );
+            }),
+          )
+        : null,
       top.length ? h("h3", {}, "Wie kostte vandaag het meest") : null,
       top.length ? h("ol", { class: "rank" }, ...top.map((a) => h("li", {}, h("button", { class: "linkish", onclick: () => this.open("agent", a.id) }, a.nickname || a.name), h("span", {}, eur(a.costTodayEur))))) : null,
       this.deps.source.mode === "live" ? h("p", { class: "small" }, h("a", { href: "/overzicht" }, "Alles in één lijst (oud overzicht) →")) : null,
+    );
+  }
+
+  /** Wat een agent de afgelopen 30 dagen opleverde, naast wat hij kostte. */
+  private valueCard(id: string): HTMLElement | null {
+    const v = this.snap?.stats.agents?.find((x) => x.agentId === id);
+    if (!v) return null;
+    const verdict = VALUE_VERDICT[v.verdict];
+    const done = valueParts(v);
+    return h(
+      "section",
+      { class: "card value" },
+      h("div", { class: "row" }, h("h3", {}, "Nut (30 dagen)"), h("span", { class: `pill ${verdict.tone}` }, verdict.label)),
+      h("p", { class: done.length ? "" : "muted" }, done.length ? done.join(" · ") : "Nog niets terug te vinden in HQ: geen les, notitie, voorstel, meting of taak."),
+      h(
+        "p",
+        { class: "small muted" },
+        `${eur(v.costEur)} aan AI · ${v.runs} ${v.runs === 1 ? "run" : "runs"}${v.failedRuns ? ` (${v.failedRuns} mislukt)` : ""}${v.costPerOutputEur !== null ? ` · ${eur(v.costPerOutputEur)} per resultaat` : ""}`,
+      ),
+      v.verdict === "niets" ? h("p", { class: "small" }, "💤 Kost geld zonder aantoonbaar resultaat. Pauzeer hem, of geef hem een duidelijke taak.") : null,
     );
   }
 
@@ -1214,7 +1271,11 @@ export class Ui {
         h("b", {}, `Claude · ${project}`),
         h("span", { class: "muted" }, ` ${s.title ?? s.branch ?? "sessie"}`),
       ),
-      h("div", { class: "small muted indent" }, `${st.label} · ${s.lastAction ?? "–"} · ${ago(s.lastActivityAt)}`),
+      h(
+        "div",
+        { class: "small muted indent" },
+        `${st.label} · ${s.lastAction ?? "–"} · ${ago(s.lastActivityAt)}${s.helpers?.length ? ` · 🧑‍🤝‍🧑 ${s.helpers.map((x) => x.label).join(", ")}` : ""}`,
+      ),
     );
   }
 
@@ -1346,7 +1407,9 @@ export class Ui {
     if (!s) return h("div", {}, h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"), h("p", { class: "muted" }, "Deze sessie is klaar en uit de werkplaats vertrokken."));
     const st = SESSION_STATE[s.state];
     const project = this.snap!.code.projects.find((p) => p.key === s.projectKey);
-    const mine = this.events.filter((e) => e.agentId === actorId).slice(-12).reverse();
+    // Ook wat de helpers van deze sessie deden.
+    const mine = this.events.filter((e) => e.agentId === actorId || e.targetAgentId === actorId || e.agentId?.startsWith(`${actorId}~`)).slice(-14).reverse();
+    const helpers = s.helpers ?? [];
     return h(
       "div",
       { class: "agent-panel" },
@@ -1368,7 +1431,27 @@ export class Ui {
         stat("Commits", String(s.commits)),
         stat("Pull request", s.pr ? `#${s.pr.number} ${s.pr.state === "merged" ? "samengevoegd" : s.pr.state === "closed" ? "gesloten" : "open"}` : "nog niet"),
         s.pr?.ci ? stat("Tests", CI_LABEL[s.pr.ci] ?? s.pr.ci) : null,
+        stat("Helpers ingezet", String(s.helpersUsed ?? 0)),
       ),
+      helpers.length
+        ? h(
+            "section",
+            { class: "card" },
+            h("h3", {}, `🧑‍🤝‍🧑 Helpers aan het werk (${helpers.length})`),
+            h(
+              "ul",
+              { class: "people" },
+              ...helpers.map((x) =>
+                h(
+                  "li",
+                  {},
+                  h("button", { class: "person", onclick: () => this.focusActor(x.actorId) }, h("span", { class: "dot good" }), h("b", {}, x.label), h("span", { class: "muted" }, ` ${x.task ?? ""}`)),
+                  h("div", { class: "small muted indent" }, `${x.lastAction ?? "leest en zoekt"} · ${x.tools} ${x.tools === 1 ? "stap" : "stappen"} · sinds ${time(x.startedAt)}`),
+                ),
+              ),
+            ),
+          )
+        : null,
       h(
         "div",
         { class: "buttons" },
@@ -1529,6 +1612,20 @@ function chip(label: string, value: string, sub: string, onClick?: () => void, a
 
 function tile(label: string, value: string): HTMLElement {
   return h("div", { class: "tile" }, h("span", {}, label), h("b", {}, value));
+}
+
+/** "3 lessen · 1 voorstel": wat een agent aantoonbaar opleverde. */
+function valueParts(v: AgentValue): string[] {
+  const o = v.outputs;
+  const n = (k: number, one: string, more: string) => (k ? `${k} ${k === 1 ? one : more}` : null);
+  return [
+    n(o.lessons, "les", "lessen"),
+    n(o.notes, "notitie", "notities"),
+    n(o.proposals, "voorstel", "voorstellen"),
+    n(o.measurements, "meting", "metingen"),
+    n(o.requests, "verzoek aan jou", "verzoeken aan jou"),
+    n(o.delegations, "taak voor een collega", "taken voor collega's"),
+  ].filter((x): x is string => x !== null);
 }
 
 function stat(label: string, value: string, fraction?: number): HTMLElement {

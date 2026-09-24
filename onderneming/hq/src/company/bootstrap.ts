@@ -179,6 +179,17 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
       report.warnings.push(`routine ${r.title}: ${errorMessage(err)}`);
     }
   }
+  // Routines die we niet meer willen (bv. een dagelijkse run die HQ nu zelf doet): pauzeren, niet weggooien.
+  for (const title of def.company.retiredRoutines) {
+    const old = routines.find((x) => x.title === title && x.status === "active");
+    if (!old) continue;
+    try {
+      await paperclip.updateRoutine(old.id, { status: "paused" });
+      report.routines.updated.push(`${title} (gepauzeerd)`);
+    } catch (err) {
+      report.warnings.push(`routine ${title} pauzeren: ${errorMessage(err)}`);
+    }
+  }
 
   // 5. Agents van bestaande takken bijwerken als hun sjabloon veranderde.
   const refreshed = await factory.refreshBranchAgents(ctx);

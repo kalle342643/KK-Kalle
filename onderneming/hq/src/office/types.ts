@@ -51,7 +51,9 @@ export type OfficeEventType =
   /** Werkplaats: de backlog veranderde (nieuwe punten voor jou). */
   | "code.backlog"
   /** Werkplaats: een Claude Code-sessie begint, krijgt een opdracht, gebruikt een tool of stopt. */
-  | "code.session";
+  | "code.session"
+  /** Werkplaats: een Claude Code-sessie zet een helper (sub-agent) in, die werkt en levert op. */
+  | "code.helper";
 
 export interface OfficeEvent {
   id: number;
@@ -139,6 +141,22 @@ export interface OfficeStats {
   days: Array<{ date: string; revenueEur: number; costEur: number }>;
   branches: Array<{ slug: string; name: string; revenue30Eur: number; cost30Eur: number; budgetEur: number }>;
   totals: { revenue30Eur: number; cost30Eur: number; tokensToday: number; runsToday: number };
+  /** De nut-meter: per agent wat hij de afgelopen 30 dagen kostte en opleverde (duurste eerst). */
+  agents: AgentValue[];
+}
+
+/** Wat een agent de afgelopen 30 dagen kostte en aantoonbaar opleverde. */
+export interface AgentValue {
+  agentId: string;
+  costEur: number;
+  runs: number;
+  failedRuns: number;
+  /** Wat terug te vinden is in HQ: lessen, notities, voorstellen, metingen, verzoeken aan jou, taken voor collega's. */
+  outputs: { lessons: number; notes: number; proposals: number; measurements: number; requests: number; delegations: number };
+  outputTotal: number;
+  /** levert = aantoonbaar werk; niets = kost geld zonder resultaat; rustig = te weinig uitgegeven om iets te zeggen. */
+  verdict: "levert" | "niets" | "rustig";
+  costPerOutputEur: number | null;
 }
 
 export interface ProjectDetail {
@@ -276,6 +294,26 @@ export interface CodeSession {
   state: "working" | "idle" | "done";
   commits: number;
   pr: { number: number; url: string; state: "open" | "merged" | "closed"; ci: CiState } | null;
+  /** Helpers (sub-agents) die nu voor deze sessie werken. */
+  helpers: CodeHelper[];
+  /** Hoeveel helpers deze sessie in totaal inzette. */
+  helpersUsed: number;
+}
+
+/** Een sub-agent van een Claude Code-sessie: zoekt iets uit, maakt een plan of kijkt het werk na. */
+export interface CodeHelper {
+  /** Poppetje: het poppetje van de sessie + "~" + het id van de sub-agent. */
+  actorId: string;
+  /** Soort sub-agent zoals Claude Code hem noemt (Explore, Plan, general-purpose, onderzoeker, ...). */
+  agentType: string;
+  /** Leesbare naam, bv. "Onderzoeker". */
+  label: string;
+  /** Wat de sessie hem vroeg (de korte omschrijving). */
+  task: string | null;
+  lastAction: string | null;
+  tools: number;
+  startedAt: string;
+  lastActivityAt: string;
 }
 
 export interface OfficeCode {

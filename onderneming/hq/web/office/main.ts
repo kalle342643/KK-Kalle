@@ -42,7 +42,9 @@ const isNight = () => {
 
 /** De werkplaats: een bord per project, bureaus voor de sessies (in stappen van drie). */
 function workshopOf(snap: OfficeSnapshot): LayoutWorkshop | undefined {
-  const active = snap.code.sessions.filter((s) => s.state !== "done").length;
+  const live = snap.code.sessions.filter((s) => s.state !== "done");
+  // Helpers (sub-agents) krijgen ook een bureau, naast hun sessie.
+  const active = live.length + live.reduce((n, s) => n + (s.helpers?.length ?? 0), 0);
   if (!snap.code.projects.length && !active) return undefined;
   return { projects: snap.code.projects.map((p) => ({ key: p.key, name: p.name })), seats: workshopSeats(active) };
 }
