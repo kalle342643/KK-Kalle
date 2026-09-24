@@ -156,10 +156,13 @@ In de kamer *Werkplaats · Claude Code* staat per project een bord (online?, tes
 wacht) en zit elke Claude Code-sessie die aan dat project werkt als poppetje aan een bureau. HQ leest daarvoor
 alleen mee op GitHub; het verandert niets aan je repositories.
 
-1. **GitHub-token (alleen lezen).** github.com → *Settings → Developer settings → Personal access tokens →
-   Fine-grained tokens → Generate new token*. Kies *Only select repositories* en vink de repositories aan die
-   je wilt volgen. Onder *Repository permissions* zet je op **Read-only**: *Contents*, *Metadata*, *Pull requests*,
-   *Commit statuses*, *Deployments* en *Actions*. Zet het token als `HQ_GITHUB_TOKEN` in `hq.env` en herstart HQ.
+1. **GitHub-token (alleen lezen).** Open
+   [dit vooraf ingevulde formulier](https://github.com/settings/personal-access-tokens/new?name=HQ%20werkplaats%20%28alleen%20lezen%29&description=HQ%20leest%20commits%2C%20pull%20requests%2C%20tests%20en%20uitrol%20van%20mijn%20projecten%20mee.%20Alleen%20lezen.&expires_in=366&contents=read&metadata=read&pull_requests=read&statuses=read&deployments=read&actions=read):
+   naam, looptijd en de rechten (**Read-only**: *Contents*, *Metadata*, *Pull requests*, *Commit statuses*,
+   *Deployments* en *Actions*) staan al goed. Zelf doen: bij *Repository access* kies je *Only select repositories*
+   en vink je de repositories aan die je wilt volgen, dan *Generate token*. (Met de hand: github.com → *Settings →
+   Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*.) Zet het token als
+   `HQ_GITHUB_TOKEN` in `hq.env` en herstart HQ.
 2. **Project volgen.** In het kantoor: 🛠️ *Werkplaats* → *Project volgen*. Kies de repository (de lijst komt uit
    je token), geef een naam, het adres van de site en, als je die hebt, een gezondheidscheck (een adres dat 200
    geeft als alles werkt, bijvoorbeeld `/api/gezondheid`). Een project zonder GitHub (alleen een site) kan ook;
