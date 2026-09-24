@@ -6,8 +6,11 @@ AI-gebruik, niet de server. Daarom worden agents alleen op schema of bij een taa
 ## Vaste kosten
 | Wat | Per maand |
 |---|---|
-| Hetzner CX33 (4 vCPU, 8 GB) | ~€7 (prijs na de verhoging van april 2026, volgens je onderzoek) |
+| Server: Oracle Cloud Always Free (ARM, 4 cores, 24 GB) | **€0** (zie SETUP.md stap 1 voor de voorwaarden) |
+| of: een computer thuis | €0, plus stroom ±€2–5 |
+| of: Hetzner CX33 (4 vCPU, 8 GB) | ~€7 (prijs na de verhoging van april 2026, volgens je onderzoek) |
 | Tailscale, Telegram, Supabase (gratis laag) | €0 |
+| Het 3D-kantoor | €0: het draait in je browser en gebruikt geen AI |
 | Domeinnaam (alleen als een experiment er een nodig heeft, via een uitgaveverzoek) | ~€1 |
 
 ## AI-gebruik (variabel)
@@ -31,6 +34,7 @@ een groot deel van de invoer is goedkoop.
 | Ideeënraad per tak (2 verkenners, pitcher, criticus, lead) | wekelijks | €6–10 per tak |
 | Weekstart per tak (Sonnet) | wekelijks | €1–2 per tak |
 | Bouwen tijdens een experiment (Sonnet) | 2–3 stevige sessies per week à ~€2,70 | €20–35 zolang er gebouwd wordt |
+| Kennisgraaf (Graphify met Haiku, optioneel) | 's nachts, over de kennisbank-map | centen per nacht zolang de map klein is; eigen sleutel met eigen limiet |
 
 Let op: Paperclip maakt een agent ook wakker als hij een taak krijgt of als jij over zijn verzoek beslist. Elke ✅/❌
 kost dus een korte run van de aanvrager (in de test: een paar cent).

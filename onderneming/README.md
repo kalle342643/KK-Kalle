@@ -4,9 +4,16 @@ Het besturingssysteem van een holding van AI-agents. Agents zoeken uit waar geld
 kleine experimenten, meten de resultaten en schuiven budget naar wat werkt. Jij bent de eigenaar: je keurt
 geld, publicaties en nieuwe agents goed vanaf je telefoon, en je hebt altijd een noodstop.
 
+**Het kantoor.** Je bestuurt alles vanuit een 3D-kantoor in je browser. Elke agent is een poppetje dat echt
+werkt: typen aan het bureau als er een taak loopt, naar een collega lopen om iets te bespreken, naar de
+kennisbank (met de Graphify-kennisgraaf als hologram) als het iets wil weten, en een papiertje naar jouw bureau
+brengen als er iets goedgekeurd moet worden. Klik op een poppetje om het een naam te geven, een ander uiterlijk
+te kiezen en te zien waar het mee bezig is. Het projectenbord hangt in de vergaderzaal, alle cijfers staan in de
+controlekamer van de HQ-bot, en de rode knop in jouw kantoor is de noodstop.
+
 ```mermaid
 flowchart LR
-    K["Jij<br/>Telegram + dashboard"] <--> HQ["HQ<br/>geld · experimenten<br/>goedkeuringen · kill switch"]
+    K["Jij<br/>3D-kantoor + Telegram"] <--> HQ["HQ<br/>geld · experimenten<br/>goedkeuringen · kill switch"]
     HQ <-->|REST| P["Paperclip<br/>agents · taken · budgetten"]
     P -->|start| A["Agents<br/>(Claude Code)"]
     A -->|"$HQ_URL"| HQ
@@ -16,8 +23,8 @@ flowchart LR
 - **Paperclip** (open source, MIT) regelt de agents: organigram, taken, heartbeats, budget per agent,
   aannames, audit-log en een web-UI.
 - **HQ** (deze map) is wat we er zelf omheen bouwden: het grootboek, experimenten met harde budgetten,
-  automatische KEEP/ITERATE/KILL-beslissingen, portfolio-verdeling, lessen, goedkeuringen via Telegram en
-  de kill switch.
+  automatische KEEP/ITERATE/KILL-beslissingen, portfolio-verdeling, lessen, de kennisbank, goedkeuringen via
+  Telegram, de kill switch en het 3D-kantoor.
 - **company/** beschrijft het bedrijf als code: de CEO, de analist, hun spelregels (skills), routines en
   sjablonen waarmee de Agent Factory nieuwe agents en hele takken maakt.
 
@@ -51,6 +58,16 @@ node dist/main.js help    # alle commando's
 
 Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR en elke push naar `main`.
 
+Het kantoor bekijken zonder server of echte gegevens: start HQ en open `/demo`, of bouw de losse demo-pagina
+met `npm run demo` (één HTML-bestand in `dist/demo/kantoor-demo.html`, werkt ook offline).
+
+| Adres | Wat |
+|---|---|
+| `/` of `/kantoor` | het 3D-kantoor (eenmalig inloggen met `/?token=<HQ_ADMIN_TOKEN>`) |
+| `/overzicht` | alles in lijsten: agents, experimenten, grootboek, goedkeuringen |
+| `/kennis` | de interactieve kennisgraaf van Graphify |
+| `/demo` | het kantoor met een verzonnen bedrijf (geen login nodig, niets echt) |
+
 ## Commando's (`node dist/main.js <commando>`)
 | Commando | Wat |
 |---|---|
@@ -61,6 +78,7 @@ Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR en elke 
 | `status`, `report` | status of dagrapport in de terminal |
 | `halt [reden]`, `resume` | noodstop aan/uit |
 | `import-csv bestand.csv` | omzet importeren |
+| `kennis` | kennisbank-map bijwerken en (met `GRAPHIFY_API_KEY`) de kennisgraaf opbouwen |
 
 ## Telegram
 `/status` · `/rapport` · `/goedkeuringen` · `/experimenten` · `/agents` · `/budget` ·
@@ -77,9 +95,11 @@ Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR en elke 
 ```
 onderneming/
   hq/          de HQ-service (TypeScript, Node 22+)
-    src/       domain/ (geld, experimenten, regels), api/ (REST + dashboard), bot/ (Telegram),
+    src/       domain/ (geld, experimenten, regels), api/ (REST + pagina's), bot/ (Telegram),
                company/ (bootstrap, Agent Factory), jobs/ (planner), importers/ (Stripe, CSV),
-               paperclip/ (client), notify/ (Telegram, WhatsApp)
+               paperclip/ (client), notify/ (Telegram, WhatsApp), office/ (gebeurtenissen voor het
+               kantoor, Paperclip meekijken), knowledge/ (kennisbank, Obsidian-map, Graphify)
+    web/       het 3D-kantoor (three.js): office/ (code), assets/ (Kenney-poppetjes en -meubels, CC0)
     test/      tests met een in-memory Postgres en een nep-Paperclip
   company/     het bedrijf als code: company.yaml, agents/, skills/, templates/
   deploy/      installatiescript, systemd-services, back-up, update

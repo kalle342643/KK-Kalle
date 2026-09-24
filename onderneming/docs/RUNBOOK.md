@@ -1,6 +1,9 @@
 # Runbook: dagelijks gebruik en noodgevallen
 
 ## Je dag (±15 minuten)
+- **Het kantoor** (`http://<servernaam>:8080/`): wie werkt waaraan (klik op een poppetje), papiertjes op jouw
+  bureau = verzoeken, het projectenbord in de vergaderzaal, alle cijfers in de controlekamer van de HQ-bot.
+  Links onder staat het logboek met alles wat er gebeurde.
 - **08:00 dagrapport** in Telegram: omzet en kosten van gisteren, per tak, lopende experimenten, besluiten, en wat
   op je wacht.
 - **Knoppen:** elk verzoek komt als bericht met ✅/❌. Twijfel je, laat het staan: niets gebeurt zonder jou.
@@ -23,7 +26,7 @@ Komma of puntkomma als scheidingsteken; `12,50` en `12.50` mogen allebei. Twee k
 importeren telt niets dubbel.
 
 ## Noodstop
-**`/stop [reden]`** in Telegram (of de rode knop in het dashboard, of `hq halt`):
+**`/stop [reden]`** in Telegram (of de rode knop in je kantoor, of 🛑 Noodstop bovenin, of `hq halt`):
 1. het bedrijf in Paperclip gaat op *paused* (geen nieuwe runs),
 2. alle actieve agents worden gepauzeerd,
 3. lopende runs worden afgebroken,
@@ -46,6 +49,9 @@ voordat je `/hervat` stuurt.
 | ⚠️ "Uitvoeren mislukte" | HQ probeert het elke twee minuten opnieuw. Blijft het mislukken, dan staat de fout in het dashboard en de logs. |
 | ⚠️ "Taak '…' mislukt al 3 keer" | `journalctl --user -u hq` voor de fout; vaak is Paperclip of de database even weg. |
 | Server kwijt | nieuwe VPS, `setup-vps.sh`, back-up terugzetten (zie hieronder), `hq bootstrap`. |
+| Het kantoor blijft op "laden" of is leeg | ververs de pagina; staat WebGL uit in je browser, gebruik dan `/overzicht`. "Niet ingelogd": open `/?token=<HQ_ADMIN_TOKEN>` opnieuw. Geen poppetjes: `hq bootstrap`. |
+| Grijze stip naast de bedrijfsnaam | de live verbinding met HQ is weg; het kantoor verbindt zelf opnieuw en haalt op wat het miste. Blijft hij grijs: `systemctl --user restart hq`. |
+| Hologram in de kennisbank is leeg | er zijn nog geen lessen of notities. Nu opbouwen: `hq kennis`. |
 
 ## Back-ups
 - HQ-database: elke nacht om 03:30 naar `~/backups/hq-JJJJ-MM-DD.sql.gz` (14 dagen bewaard).

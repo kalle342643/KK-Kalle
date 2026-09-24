@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Eenmalige inrichting van een verse Ubuntu 24.04-VPS (bv. Hetzner CX33) voor de AI-onderneming.
+# Eenmalige inrichting van een verse Ubuntu 24.04-server voor de AI-onderneming: een VPS (bv. Hetzner CX33),
+# een gratis Oracle Cloud-server (ARM) of een eigen computer thuis. Werkt op x86-64 en ARM64.
 # Draai als root:   curl -fsSL <raw-url>/onderneming/deploy/setup-vps.sh | bash
 #            of:    bash setup-vps.sh
 # Het script is idempotent: opnieuw draaien kan geen kwaad.
@@ -7,8 +8,8 @@
 # Wat het doet:
 #   1. systeemupdates, firewall (alleen SSH + Tailscale), automatische beveiligingsupdates
 #   2. gebruiker 'ai' die alles draait (niet als root)
-#   3. Node.js 24, PostgreSQL (database voor HQ), Tailscale, Claude Code CLI, Paperclip
-#   4. HQ bouwen uit deze repository en als service klaarzetten
+#   3. Node.js 24, PostgreSQL (database voor HQ), Tailscale, Claude Code CLI, Paperclip, Graphify
+#   4. HQ (met het 3D-kantoor) bouwen uit deze repository en als service klaarzetten
 # Wat je daarna zelf doet staat in onderneming/docs/SETUP.md (stap 4 en verder).
 set -euo pipefail
 
@@ -28,7 +29,7 @@ log "Systeem bijwerken"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -y
 apt-get upgrade -y
-apt-get install -y ca-certificates curl git gnupg ufw unattended-upgrades postgresql jq
+apt-get install -y ca-certificates curl git gnupg ufw unattended-upgrades postgresql jq pipx
 dpkg-reconfigure -f noninteractive unattended-upgrades
 
 log "Firewall: alleen SSH en Tailscale"
@@ -74,6 +75,11 @@ npm install -g @anthropic-ai/claude-code
 if ! command -v paperclipai >/dev/null; then
   curl -fsSL https://paperclip.ing/install.sh | bash -s -- --no-prompt --no-onboard
 fi
+# Graphify maakt van de kennisbank een graaf (de hologram-kamer in het kantoor).
+if ! command -v graphify >/dev/null; then
+  pipx install graphifyy
+fi
+mkdir -p ~/vault
 AS_AI
 
 log "HQ ophalen en bouwen"
@@ -114,4 +120,5 @@ cat <<'NEXT'
                                   node --env-file=$HOME/.config/hq/hq.env dist/main.js check
                                   node --env-file=$HOME/.config/hq/hq.env dist/main.js bootstrap
                                   systemctl --user enable --now hq hq-backup.timer
+  6. Het kantoor openen:          http://<servernaam>:8080/?token=<HQ_ADMIN_TOKEN>   (via Tailscale)
 NEXT

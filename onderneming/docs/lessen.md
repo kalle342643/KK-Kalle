@@ -63,6 +63,30 @@ bedoeling was. Wat dat opleverde:
 - Een headless Chrome-screenshot met `--window-size=390` gaf een vertekend beeld. Playwright met een echte
   mobiele viewport liet zien dat het dashboard op 390 px goed past.
 
+## Het 3D-kantoor (24 september)
+- **Eerst kijken wat er al is.** Claw3D, AI Town, Generative Agents, Axial Studio, The Delegation en Pixel Agents
+  vergeleken (zie ARCHITECTUUR.md). Geen ervan past op Paperclip + HQ zonder een tweede systeem ernaast; de ideeën
+  (kamers met live status, projectenbord, kluis, logboek) wel. Een eigen lichte three.js-weergave in HQ was
+  minder werk dan een koppeling onderhouden.
+- **Meten, niet gokken.** De Kenney-poppetjes hebben een `sit`-animatie voor op de grond (heupen op 4 cm). Op een
+  stoel moet het poppetje omhoog met de zithoogte (bureaustoel 0,37 m, barkruk 0,70 m). Zithoogtes, planken en
+  afmetingen zijn gemeten met raycasts op de modellen; de modellen kijken naar +z.
+- **Screenshots per kamer vonden fouten die tests niet zien:** vloer en sokkel op dezelfde hoogte (flikkeren),
+  naamlabels boven de panelen (CSS2DRenderer geeft labels een z-index: geef de 3D-laag een eigen stapel-laag),
+  `display: flex` wint van het `hidden`-attribuut (zet `[hidden] { display: none !important }`), één afdeling
+  alleen in een enorme zaal (rijen gelijk verdelen), en iedereen die tegelijk "gepauzeerd" roept bij het laden
+  of bij een noodstop.
+- **Een losse pagina (artifact) is streng:** geen WebAssembly en geen `fetch` van `blob:`/`data:`-adressen. De demo
+  heeft daarom ongecomprimeerde modellen (base64, uitgepakt met `atob`) en laat three.js texturen via `<img>`
+  laden. De meshopt-uitpakker wordt alleen geladen als het nodig is.
+- three.js r186: `PCFSoftShadowMap` bestaat niet meer (wordt `PCFShadowMap`), `Clock` is vervangen door `Timer`.
+- **Paperclip-projecten:** de idempotency-sleutel bevat nu ook het aanmaakmoment van het experiment. Met alleen
+  `hq-exp-<id>` botste een nieuwe EXP-1 (na een lege HQ-database) met het oude project: `409`.
+- Paperclip wil Node 24.11 of nieuwer; op Node 20 weigert `paperclipai run` te starten (doctor).
+- Paperclip-activiteit (`GET /companies/{id}/activity`) komt nieuwste eerst. Reacties zijn `issue.comment_added`
+  (tekst in `details.bodySnippet`), nieuwe taken `issue.created`, sollicitanten `agent.hire_created`, budgetstops
+  `budget.hard_threshold_crossed`. Tokens en kosten van een run staan in `usageJson` van `/heartbeat-runs/{id}`.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.
@@ -78,3 +102,8 @@ bedoeling was. Wat dat opleverde:
 - WhatsApp tegen Meta en Stripe tegen de echte API: alleen met nep-antwoorden getest.
 - **Langere agent-runs:** alleen een paar korte runs zijn echt gedraaid (zie hierboven). Kijk bij de eerste weken
   mee in de Paperclip-UI (run-logs) hoe de ideeënraad en de bouwer het doen, en schaaf de skills bij.
+- **Het kantoor met echte runs:** getest met de demo en met een echte HQ + Paperclip (verzoek, goedkeuren, naam
+  geven, kennisbank), maar nog niet met agents die dagenlang echt werken.
+- **Graphify met een echte sleutel** (`graphify extract`): alleen de aanroep en het inlezen van de graaf zijn getest.
+- **Een gratis Oracle-server (ARM):** het installatiescript is niet op ARM gedraaid; Node, PostgreSQL, Tailscale en
+  Paperclip hebben wel ARM-versies.
