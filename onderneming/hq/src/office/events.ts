@@ -44,7 +44,10 @@ export function shortText(s: string | null | undefined, max = 140): string | nul
   if (!s) return null;
   const plain = s
     .replace(/```[\s\S]*?```/g, " ")
-    .replace(/[*_`#>]+/g, "")
+    // Markdown-opmaak weg, maar "PR #7" en NAMEN_MET_LIGSTREEPJES heel laten.
+    .replace(/^\s{0,3}#{1,6}\s+/gm, "")
+    .replace(/^\s{0,3}>\s?/gm, "")
+    .replace(/[*`]+/g, "")
     .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
     .replace(/\s+/g, " ")
     .trim();

@@ -6,11 +6,11 @@
  * afdeling met drie of meer tegelijk aan het werk is.
  */
 import * as THREE from "three";
-import type { OfficeAgent, OfficeEvent, OfficeSnapshot } from "../../src/office/types.js";
+import type { CodeSession, OfficeAgent, OfficeEvent, OfficeSnapshot } from "../../src/office/types.js";
 import { act, Actor, face, run, say, sitHere, standUp, wait, walkTo, type ActorInfo } from "./actors.js";
 import { defaultLook, type Assets } from "./assets.js";
 import type { Hologram } from "./hologram.js";
-import { BOT_ID, OWNER_ID, roomAt, type Desk, type Layout, type Poi, type PoiKind, type Spot } from "./layout.js";
+import { BOT_ID, OWNER_ID, roomAt, WORKSHOP_SLUG, type Desk, type Layout, type Poi, type PoiKind, type Spot } from "./layout.js";
 import { drawMonitor } from "./screens.js";
 import type { World } from "./world.js";
 
@@ -39,6 +39,9 @@ export class Director {
   private meeting: { branch: string; members: Set<string>; chatter: number } | null = null;
   private readonly reserved = new Map<string, string>();
   private readonly monitorState = new Map<string, string>();
+  /** Werkplaats: welke Claude Code-sessie aan welk bureau zit (en andersom). */
+  private readonly sessionDesks = new Map<string, string>();
+  private readonly deskOccupant = new Map<string, string>();
   /** Even stil na een noodstop of hervatten: anders roept iedereen tegelijk iets. */
   private hush = 0;
   private monitorClock = 0;
@@ -71,6 +74,7 @@ export class Director {
     this.reserved.clear();
     this.meeting = null;
     this.monitorState.clear();
+    this.assignSessionDesks([...this.actors.values()].filter((a) => a.info.kind === "claude").map((a) => a.id));
     for (const a of this.actors.values()) {
       a.meeting = null;
       a.home = this.homeOf(a.id);
@@ -92,7 +96,28 @@ export class Director {
     return deskId ? this.layout.desks.find((d) => d.id === deskId) : undefined;
   }
 
+  /** Sessies aan de bureaus van de werkplaats: wie er al zat blijft zitten, nieuwe krijgen een vrij bureau. */
+  private assignSessionDesks(ids: string[]): void {
+    const desks = this.layout.desks.filter((d) => d.id.startsWith(`${WORKSHOP_SLUG}:`));
+    const wanted = new Set(ids);
+    for (const [actorId, deskId] of [...this.sessionDesks]) {
+      if (!wanted.has(actorId) || !desks.some((d) => d.id === deskId)) {
+        this.sessionDesks.delete(actorId);
+        this.deskOccupant.delete(deskId);
+      }
+    }
+    for (const id of ids) {
+      if (this.sessionDesks.has(id)) continue;
+      const free = desks.find((d) => !this.deskOccupant.has(d.id));
+      if (!free) break;
+      this.sessionDesks.set(id, free.id);
+      this.deskOccupant.set(free.id, id);
+    }
+  }
+
   private homeOf(id: string): Spot | null {
+    const sessionDesk = this.sessionDesks.get(id);
+    if (sessionDesk) return this.layout.desks.find((d) => d.id === sessionDesk)?.seat ?? null;
     const desk = this.deskOf(id);
     if (desk) return desk.seat;
     const bench = this.layout.benchOf.get(id);
@@ -135,16 +160,34 @@ export class Director {
     };
   }
 
+  /** Een Claude Code-sessie als poppetje: oranje label met het project, de opdracht als rol. */
+  private sessionInfo(s: CodeSession): ActorInfo {
+    const project = this.snap?.code.projects.find((p) => p.key === s.projectKey)?.name ?? "een project";
+    return {
+      id: s.actorId,
+      kind: "claude",
+      name: `Claude · ${project}`,
+      label: `Claude · ${project}`,
+      role: s.title ?? "Claude Code",
+      accent: "#d97757",
+      look: defaultLook(`claude:${s.projectKey ?? s.id}`, null),
+    };
+  }
+
   /** Nieuwe momentopname: poppetjes toevoegen, bijwerken of laten vertrekken. */
   sync(snap: OfficeSnapshot, first = false): void {
     this.snap = snap;
+    const sessions = new Map((snap.code?.sessions ?? []).filter((s) => s.state !== "done").map((s) => [s.actorId, s] as const));
+    this.assignSessionDesks([...sessions.keys()]);
     const wanted = new Map<string, OfficeAgent | null>([
       [OWNER_ID, null],
       [BOT_ID, null],
       ...snap.agents.filter((a) => a.status !== "terminated").map((a) => [a.id, a] as const),
+      ...[...sessions.keys()].map((id) => [id, null] as const),
     ]);
     for (const [id, agent] of wanted) {
-      const info = this.infoFor(id, agent);
+      const session = sessions.get(id);
+      const info = session ? this.sessionInfo(session) : this.infoFor(id, agent);
       let actor = this.actors.get(id);
       const isNew = !actor;
       const home = this.homeOf(id);
@@ -159,10 +202,12 @@ export class Director {
         } else {
           // Nieuw: komt binnen door de voordeur. Een sollicitant gaat op de bank zitten, een nieuwe collega naar zijn bureau.
           actor.place(this.layout.entrance, false);
-          actor.queue(
-            say(status === "pending_approval" ? `👋 Hoi! Ik ben ${info.label}` : `👋 Hallo allemaal, ik ben ${info.label}`, 5, "happy"),
-            walkTo(() => this.grid, home, { sit: true }),
-          );
+          const hello = session
+            ? `👋 Claude Code hier, ik werk aan ${info.name.replace(/^Claude · /, "")}`
+            : status === "pending_approval"
+              ? `👋 Hoi! Ik ben ${info.label}`
+              : `👋 Hallo allemaal, ik ben ${info.label}`;
+          actor.queue(say(hello, 5, "happy"), walkTo(() => this.grid, home, { sit: true }));
         }
       } else {
         actor.setInfo(info);
@@ -170,17 +215,19 @@ export class Director {
         actor.home = home;
         if (moved && actor.idle) actor.place(home!, true);
       }
-      const status = agent?.status ?? "idle";
+      const status = session ? (session.state === "working" ? "running" : "idle") : (agent?.status ?? "idle");
       // Bij binnenkomst niet iedereen tegelijk laten roepen hoe het met ze gaat.
-      if (actor.status !== status && !isNew && !first) this.statusChanged(actor, actor.status, status);
+      if (actor.status !== status && !isNew && !first && !session) this.statusChanged(actor, actor.status, status);
       actor.setStatus(status);
       if (agent) actor.setWorking(agent.status === "running", agent.currentTask);
+      if (session) actor.setWorking(session.state === "working", session.lastAction ?? session.title);
     }
     for (const [id, actor] of [...this.actors]) {
       if (wanted.has(id)) continue;
-      // Vertrokken: loop naar de uitgang en verdwijn.
+      // Vertrokken: loop naar de uitgang en verdwijn. Een Claude Code-sessie is dan klaar.
       actor.clear();
-      actor.queue(standUp(), say("👋 Doei!", 3, "info"), walkTo(() => this.grid, this.layout.entrance), run((a) => this.remove(a.id)));
+      const bye = actor.info.kind === "claude" ? "✅ Klaar, tot de volgende!" : "👋 Doei!";
+      actor.queue(standUp(), say(bye, 3, "info"), walkTo(() => this.grid, this.layout.entrance), run((a) => this.remove(a.id)));
     }
     this.world.setInbox(snap.approvals.length);
     this.setHalted(snap.halted, false);
@@ -417,6 +464,71 @@ export class Director {
         if (a.idle && !a.seated) a.queue(act("jump"));
         break;
       }
+      case "code.session": {
+        if (!a || this.hush > 0) return;
+        const action = String(e.data.action ?? "");
+        if (action === "task") {
+          const task = text.replace(/^Nieuwe opdracht[^:]*:\s*/, "");
+          a.setWorking(true, `📋 ${task}`);
+          a.say(`📋 ${short(task, 80)}`, 5, "info");
+        } else if (action === "tool") {
+          a.setWorking(true, a.taskText);
+          a.say(short(text, 64), 3, "info");
+        } else if (action === "stopped") {
+          a.setWorking(false, a.taskText);
+          a.say("✅ Klaar, jouw beurt!", 4, "happy");
+          if (a.seated && a.idle) a.queue(standUp(), act("emote-yes", 1.2), sitHere(a.home ?? { x: a.pos.x, z: a.pos.z, facing: 0 }));
+        } else if (action === "started") {
+          a.say("👋 Aan de slag", 3, "happy");
+        }
+        break;
+      }
+      case "code.commit": {
+        if (e.data.summary) return;
+        if (a) {
+          a.setWorking(true, `✍️ ${text}`);
+          a.say(`✍️ ${short(text, 60)}`, 4, "info");
+        }
+        this.boardBurst(String(e.data.project ?? ""), "#8bd3ff", 5);
+        break;
+      }
+      case "code.pr": {
+        const action = String(e.data.action ?? "");
+        if (a) a.say(action === "merged" ? "🎉 Samengevoegd!" : action === "opened" ? `🔀 ${short(text, 60)}` : "🚪 PR gesloten", 4, action === "merged" ? "happy" : "info");
+        if (action === "merged") this.boardBurst(String(e.data.project ?? ""), "confetti", 18);
+        break;
+      }
+      case "code.ci": {
+        const red = e.data.state === "failed";
+        if (a) a.say(red ? "😬 Tests rood, ik kijk ernaar" : "✅ Tests weer groen", 4, red ? "alert" : "happy");
+        break;
+      }
+      case "code.deploy":
+        if (e.data.state === "success") this.boardBurst(String(e.data.project ?? ""), "confetti", 14);
+        break;
+      case "code.health": {
+        // De HQ-bot rent naar het bord van dat project.
+        const down = e.data.state === "down";
+        const bot = this.actor(BOT_ID);
+        const poi = this.layout.pois.find((p) => p.id === `code-board-${String(e.data.project ?? "")}`);
+        if (bot && poi && bot.queueLength < 2) {
+          bot.queue(
+            standUp(),
+            walkTo(() => this.grid, poi.spot, { run: down }),
+            run((x) => x.turnTo(poi.spot.facing)),
+            say(down ? "🚨 Deze ligt eruit!" : "😮‍💨 Weer online", 5, down ? "alert" : "happy"),
+            act("interact-right", 2),
+            ...this.goHome(bot),
+          );
+        }
+        break;
+      }
+      case "code.backlog": {
+        const added = Array.isArray(e.data.added) ? e.data.added.length : 0;
+        const bot = this.actor(BOT_ID);
+        if (added && bot) this.deliver(bot, `📋 ${short(text, 80)}`, false);
+        break;
+      }
       case "halt":
         this.setHalted(true, true);
         break;
@@ -507,6 +619,12 @@ export class Director {
     );
   }
 
+  /** Muntjes of confetti bij het bord van een project in de werkplaats. */
+  private boardBurst(projectKey: string, color: string, n: number): void {
+    const board = this.layout.furniture.find((f) => f.type === "code-board" && f.ref === projectKey);
+    if (board) this.burst(board.x, board.z + 0.8, color, n);
+  }
+
   private setHalted(on: boolean, announce: boolean): void {
     if (this.halted === on) return;
     this.halted = on;
@@ -560,7 +678,8 @@ export class Director {
     for (const desk of this.layout.desks) {
       const screen = this.world.monitors.get(desk.id);
       if (!screen) continue;
-      const a = desk.agentId ? this.actors.get(desk.agentId) : undefined;
+      const occupant = desk.agentId ?? this.deskOccupant.get(desk.id);
+      const a = occupant ? this.actors.get(occupant) : undefined;
       const room = this.layout.rooms.find((r) => r.id === desk.roomId);
       const working = Boolean(a?.working);
       const paused = a?.status === "paused";
@@ -626,6 +745,18 @@ export class Director {
           const ceo = snap.agents.find((a) => a.hqRole === "ceo");
           busy = ceo?.status === "running";
           status = ceo ? (ceo.status === "running" ? "aan het werk" : ceo.status === "paused" ? "gepauzeerd" : "beschikbaar") : "vacature";
+          break;
+        }
+        case "workshop": {
+          const sessions = snap.code.sessions.filter((s) => s.state !== "done");
+          const working = sessions.filter((s) => s.state === "working").length;
+          const down = snap.code.projects.filter((p) => p.health.state === "down").length;
+          busy = working > 0 || down > 0;
+          status = down
+            ? `🔴 ${down} ${down === 1 ? "site ligt" : "sites liggen"} eruit`
+            : sessions.length
+              ? `🤖 ${working}/${sessions.length} Claude-sessies bezig`
+              : `${snap.code.projects.length} ${snap.code.projects.length === 1 ? "project" : "projecten"}`;
           break;
         }
         case "hall": {

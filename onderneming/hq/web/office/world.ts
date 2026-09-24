@@ -18,6 +18,7 @@ export type PickKind =
   | "red-button"
   | "hologram"
   | "whiteboard"
+  | "code-project"
   | "room";
 
 export interface Pick {
@@ -122,6 +123,7 @@ const FLOOR_STYLE: Record<Room["kind"], string> = {
   pantry: "tile",
   dept: "wood",
   control: "carpet",
+  workshop: "tile",
 };
 
 export class World {
@@ -140,6 +142,8 @@ export class World {
   kanban: CanvasScreen | null = null;
   readonly videoWall: CanvasScreen[] = [];
   kpiScreen: CanvasScreen | null = null;
+  /** Werkplaats: een bord per project (sleutel → scherm). */
+  readonly codeBoards = new Map<string, CanvasScreen>();
   inboxPapers: THREE.Group | null = null;
   hologramAnchor = new THREE.Vector3();
   readonly roomLabels = new Map<string, HTMLElement>();
@@ -220,6 +224,7 @@ export class World {
     this.videoWall.length = 0;
     this.kanban = null;
     this.kpiScreen = null;
+    this.codeBoards.clear();
     this.inboxPapers = null;
     for (const el of this.roomLabels.values()) el.remove();
     this.roomLabels.clear();
@@ -260,7 +265,8 @@ export class World {
   private buildFloor(room: Room): void {
     const { x, z, w, d } = room.rect;
     const style = FLOOR_STYLE[room.kind];
-    const color = room.kind === "dept" || room.kind === "control" ? room.floor : style === "wood" ? (room.kind === "owner" ? "#e8dcc9" : "#e5d2b3") : room.floor;
+    const tinted = room.kind === "dept" || room.kind === "control" || room.kind === "workshop";
+    const color = tinted ? room.floor : style === "wood" ? (room.kind === "owner" ? "#e8dcc9" : "#e5d2b3") : room.floor;
     const tex = floorTexture(style, color);
     tex.repeat.set(w / 2, d / 2);
     const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.92, metalness: 0 });
@@ -268,7 +274,7 @@ export class World {
     floor.position.set(x + w / 2, -0.04, z + d / 2);
     floor.receiveShadow = true;
     this.office.add(floor);
-    if (room.kind === "dept" || room.kind === "control") {
+    if (tinted) {
       // Gekleurde rand langs de binnenkant van de afdeling.
       const edge = new THREE.Mesh(
         new THREE.BoxGeometry(w - 0.4, 0.02, 0.12),
@@ -572,6 +578,22 @@ export class World {
         this.inboxPapers = papers;
         break;
       }
+      case "code-board": {
+        // Een scherm op een voet: de stand van één project (live, tests, uitrol, wat op jou wacht).
+        const w = f.w ?? 2.8;
+        const s = new CanvasScreen(w, 1.45, 210, { glow: true });
+        s.mesh.position.set(f.x, 1.5, f.z + 0.1);
+        const bezel = box(w + 0.1, 1.55, 0.06, "#161b27", { y: 0.72 });
+        bezel.position.set(f.x, 0.72, f.z + 0.05);
+        const foot = box(0.5, 0.72, 0.22, "#2c3447", { y: 0 });
+        foot.position.set(f.x, 0.36, f.z);
+        this.office.add(foot, bezel, s.mesh);
+        if (f.ref) {
+          this.codeBoards.set(f.ref, s);
+          for (const o of [s.mesh, bezel, foot]) this.registerPick(o, { kind: "code-project", id: f.ref });
+        }
+        break;
+      }
       case "screen": {
         const s = new CanvasScreen(f.w ?? 2.6, 1.3, 200, { glow: true });
         s.mesh.position.set(f.x, 1.55, f.z + 0.12);
@@ -841,7 +863,7 @@ export class World {
     this.raycaster.setFromCamera(ndc, this.camera);
     const objects = this.pickables.map((p) => p.object);
     const hits = this.raycaster.intersectObjects(objects, true);
-    const order: PickKind[] = ["agent", "red-button", "vault", "video-wall", "kanban", "hologram", "owner-desk", "whiteboard", "desk", "room"];
+    const order: PickKind[] = ["agent", "red-button", "vault", "video-wall", "kanban", "hologram", "owner-desk", "code-project", "whiteboard", "desk", "room"];
     let best: Pick | null = null;
     let bestRank = Infinity;
     let bestDist = Infinity;

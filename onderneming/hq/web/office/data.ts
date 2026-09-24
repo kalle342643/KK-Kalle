@@ -1,7 +1,27 @@
 /**
  * Waar het kantoor zijn gegevens vandaan haalt: HQ (live) of een verzonnen demobedrijf.
  */
-import type { KnowledgeGraph, OfficeEvent, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+import type { CodeProject, KnowledgeGraph, OfficeEvent, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+
+/** Wat je invult bij "project volgen" in de werkplaats. */
+export interface CodeProjectInput {
+  key?: string;
+  name: string;
+  repo?: string | null;
+  url?: string | null;
+  healthUrl?: string | null;
+  branch?: string | null;
+  backlogPath?: string;
+  description?: string | null;
+}
+
+export interface RepoChoice {
+  repo: string;
+  private: boolean;
+  homepage: string | null;
+  description: string | null;
+  pushedAt: string | null;
+}
 
 export interface DataSource {
   readonly mode: "live" | "demo";
@@ -15,6 +35,11 @@ export interface DataSource {
   setProfile(agentId: string, profile: { nickname?: string | null; avatar?: number | null }): Promise<void>;
   project(id: number): Promise<ProjectDetail>;
   graph(): Promise<KnowledgeGraph>;
+  /** Werkplaats: een project volgen of bijwerken, weghalen, nu verversen, en repositories om uit te kiezen. */
+  saveCodeProject(input: CodeProjectInput): Promise<void>;
+  removeCodeProject(key: string): Promise<void>;
+  refreshCodeProject(key: string): Promise<CodeProject | null>;
+  codeRepos(): Promise<{ repos: RepoChoice[]; error: string | null }>;
 }
 
 export class HttpError extends Error {
@@ -104,5 +129,17 @@ export class LiveSource implements DataSource {
   }
   graph(): Promise<KnowledgeGraph> {
     return request("GET", "/api/owner/knowledge/graph?max=400");
+  }
+  async saveCodeProject(input: CodeProjectInput): Promise<void> {
+    await request("POST", "/api/owner/code/projects", input);
+  }
+  async removeCodeProject(key: string): Promise<void> {
+    await request("DELETE", `/api/owner/code/projects/${encodeURIComponent(key)}`);
+  }
+  refreshCodeProject(key: string): Promise<CodeProject | null> {
+    return request("POST", `/api/owner/code/projects/${encodeURIComponent(key)}/refresh`, {});
+  }
+  codeRepos(): Promise<{ repos: RepoChoice[]; error: string | null }> {
+    return request("GET", "/api/owner/code/repos");
   }
 }

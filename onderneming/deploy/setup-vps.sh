@@ -118,6 +118,7 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
   chmod 600 ~/.config/hq/hq.env
   # Willekeurige geheimen alvast invullen.
   sed -i "s|^HQ_ADMIN_TOKEN=.*|HQ_ADMIN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
+  sed -i "s|^HQ_HOOK_TOKEN=.*|HQ_HOOK_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
 fi
 cp ../deploy/hq.service ~/.config/systemd/user/hq.service
 cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ~/.config/systemd/user/

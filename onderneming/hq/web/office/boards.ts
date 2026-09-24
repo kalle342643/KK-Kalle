@@ -3,7 +3,7 @@
  * de whiteboards per afdeling, de cijfermuur in de controlekamer en het scherm van de CEO.
  * Echte cijfers uit HQ; de uitgebreide versies (met tooltips) staan in de panelen.
  */
-import type { OfficeBranch, OfficeProject, OfficeSnapshot } from "../../src/office/types.js";
+import type { CodeProject, OfficeBranch, OfficeProject, OfficeSnapshot } from "../../src/office/types.js";
 import { FONT, fitText, roundRect, type CanvasScreen } from "./screens.js";
 
 const eur = (n: number, digits = 0) =>
@@ -238,4 +238,73 @@ function screenBg(ctx: CanvasRenderingContext2D, w: number, h: number, title: st
   ctx.font = `700 ${h * 0.075}px ${FONT}`;
   ctx.textAlign = "left";
   ctx.fillText(title, w * 0.05, h * 0.13);
+}
+
+/** Hoe lang geleden, kort: "net", "12 min", "3 u", "2 d". */
+export function ago(iso: string | null | undefined, now = Date.now()): string {
+  if (!iso) return "–";
+  const s = Math.max(0, (now - Date.parse(iso)) / 1000);
+  if (s < 90) return "net";
+  if (s < 3600) return `${Math.round(s / 60)} min`;
+  if (s < 86_400) return `${Math.round(s / 3600)} u`;
+  return `${Math.round(s / 86_400)} d`;
+}
+
+/** De stand van een project in één oogopslag, in woorden én kleur (niet alleen kleur). */
+export function codeStatus(p: CodeProject): Array<{ icon: string; text: string; tone: "good" | "bad" | "warn" | "muted" }> {
+  const out: Array<{ icon: string; text: string; tone: "good" | "bad" | "warn" | "muted" }> = [];
+  const h = p.health;
+  if (h.state === "down") out.push({ icon: "●", text: `Ligt eruit${h.status ? ` (${h.status})` : ""}`, tone: "bad" });
+  else if (h.state === "up") out.push({ icon: "●", text: `Online${h.uptime24h !== null ? ` · ${Math.round(h.uptime24h * 100)}% vandaag` : ""}`, tone: "good" });
+  else out.push({ icon: "○", text: p.url || p.healthUrl ? "Nog niet gecontroleerd" : "Geen site-adres", tone: "muted" });
+  if (p.empty) out.push({ icon: "∅", text: "Nog geen code op GitHub", tone: "warn" });
+  if (p.ci?.state === "failed") out.push({ icon: "✖", text: "Tests rood", tone: "bad" });
+  else if (p.ci?.state === "passed") out.push({ icon: "✔", text: "Tests groen", tone: "good" });
+  else if (p.ci?.state === "running") out.push({ icon: "◌", text: "Tests lopen", tone: "warn" });
+  if (p.deploy) {
+    const failed = p.deploy.state === "failure" || p.deploy.state === "error";
+    out.push({ icon: failed ? "✖" : "🚀", text: failed ? "Uitrollen mislukt" : `Live gezet ${ago(p.deploy.at)} geleden`, tone: failed ? "bad" : "good" });
+  }
+  if (p.openPrs.length) out.push({ icon: "⇄", text: `${p.openPrs.length} open PR`, tone: "muted" });
+  if (p.error) out.push({ icon: "⚠", text: p.error, tone: "warn" });
+  return out;
+}
+
+const TONE = { good: "#1f9d63", bad: "#e5484d", warn: "#d99a00", muted: "#8a93a6" } as const;
+
+export function drawCodeBoard(s: CanvasScreen, p: CodeProject | undefined, sessions: number): void {
+  s.draw((ctx, w, h) => {
+    ctx.fillStyle = "#141a26";
+    ctx.fillRect(0, 0, w, h);
+    if (!p) return;
+    const down = p.health.state === "down";
+    ctx.fillStyle = down ? "#5c1d22" : "#d97757";
+    ctx.fillRect(0, 0, w, h * 0.16);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${h * 0.1}px ${FONT}`;
+    ctx.textAlign = "left";
+    fitText(ctx, `${down ? "🔴 " : ""}${p.name}`, w * 0.04, h * 0.115, w * 0.92, h * 0.1, 1);
+    let y = h * 0.27;
+    ctx.font = `600 ${h * 0.068}px ${FONT}`;
+    for (const line of codeStatus(p).slice(0, 5)) {
+      ctx.fillStyle = TONE[line.tone];
+      ctx.fillText(line.icon, w * 0.05, y);
+      ctx.fillStyle = "#e6ebf5";
+      fitText(ctx, line.text, w * 0.13, y, w * 0.83, h * 0.07, 1);
+      y += h * 0.1;
+    }
+    // Onderaan: wat er op jou wacht en wie eraan werkt.
+    const mine = p.backlog?.ownerCount ?? 0;
+    ctx.fillStyle = mine ? "#3b2f14" : "#1d2433";
+    roundRect(ctx, w * 0.04, h * 0.8, w * 0.44, h * 0.15, 10);
+    ctx.fill();
+    ctx.fillStyle = "#1d2433";
+    roundRect(ctx, w * 0.52, h * 0.8, w * 0.44, h * 0.15, 10);
+    ctx.fill();
+    ctx.font = `700 ${h * 0.062}px ${FONT}`;
+    ctx.fillStyle = mine ? "#ffd166" : "#8a93a6";
+    fitText(ctx, mine ? `📋 ${mine} voor jou` : "📋 niets voor jou", w * 0.07, h * 0.9, w * 0.4, h * 0.07, 1);
+    ctx.fillStyle = sessions ? "#ffb38a" : "#8a93a6";
+    fitText(ctx, sessions ? `🤖 ${sessions} ${sessions === 1 ? "sessie" : "sessies"}` : "🤖 niemand bezig", w * 0.55, h * 0.9, w * 0.4, h * 0.07, 1);
+  });
 }

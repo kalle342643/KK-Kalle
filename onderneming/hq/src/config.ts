@@ -59,6 +59,16 @@ const envSchema = z.object({
   GRAPHIFY_BACKEND: z.string().default("claude"),
   GRAPHIFY_MODEL: z.string().default("claude-haiku-4-5"),
 
+  /** Werkplaats: token (fine-grained, alleen lezen) waarmee HQ je repositories volgt. */
+  HQ_GITHUB_TOKEN: z.string().optional(),
+  /** Hoe vaak HQ GitHub bekijkt (seconden) en de sites controleert. */
+  HQ_GITHUB_POLL_SECONDS: z.coerce.number().int().min(30).default(120),
+  HQ_HEALTH_CHECK_SECONDS: z.coerce.number().int().min(60).default(300),
+  /** Geheim waarmee Claude Code-hooks live meldingen sturen (alleen schrijven). Leeg = uit. */
+  HQ_HOOK_TOKEN: z.string().min(16).optional(),
+  /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
+  HQ_OWNER_NAMES: z.string().default("Kalle"),
+
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
   HQ_SYNC_CRON: z.string().default("*/2 * * * *"),
@@ -115,6 +125,13 @@ export interface Config {
     graphifyApiKey: string | undefined;
     graphifyBackend: string;
     graphifyModel: string;
+  };
+  code: {
+    githubToken: string | undefined;
+    pollMs: number;
+    healthMs: number;
+    hookToken: string | undefined;
+    ownerNames: string[];
   };
   cron: {
     dailyReport: string;
@@ -184,6 +201,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       graphifyBackend: e.GRAPHIFY_BACKEND,
       graphifyModel: e.GRAPHIFY_MODEL,
     },
+    code: {
+      githubToken: e.HQ_GITHUB_TOKEN,
+      pollMs: e.HQ_GITHUB_POLL_SECONDS * 1000,
+      healthMs: e.HQ_HEALTH_CHECK_SECONDS * 1000,
+      hookToken: e.HQ_HOOK_TOKEN,
+      ownerNames: e.HQ_OWNER_NAMES.split(",").map((n) => n.trim()).filter(Boolean),
+    },
     cron: {
       dailyReport: e.HQ_DAILY_REPORT_CRON,
       weeklyPortfolio: e.HQ_WEEKLY_PORTFOLIO_CRON,
@@ -205,5 +229,6 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     ...overrides,
     money: { ...base.money, ...(overrides.money ?? {}) },
     knowledge: { ...base.knowledge, ...(overrides.knowledge ?? {}) },
+    code: { ...base.code, ...(overrides.code ?? {}) },
   };
 }

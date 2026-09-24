@@ -37,7 +37,21 @@ export type OfficeEventType =
   /** Je gaf een agent een bijnaam of ander uiterlijk. */
   | "agent.profile"
   | "halt"
-  | "resume";
+  | "resume"
+  /** Werkplaats: een commit op een project (vaak van een Claude Code-sessie). */
+  | "code.commit"
+  /** Werkplaats: pull request geopend, samengevoegd of gesloten. */
+  | "code.pr"
+  /** Werkplaats: de tests (CI) werden rood of weer groen. */
+  | "code.ci"
+  /** Werkplaats: een nieuwe versie staat live (of het uitrollen mislukte). */
+  | "code.deploy"
+  /** Werkplaats: de site ligt eruit of is weer bereikbaar. */
+  | "code.health"
+  /** Werkplaats: de backlog veranderde (nieuwe punten voor jou). */
+  | "code.backlog"
+  /** Werkplaats: een Claude Code-sessie begint, krijgt een opdracht, gebruikt een tool of stopt. */
+  | "code.session";
 
 export interface OfficeEvent {
   id: number;
@@ -197,6 +211,82 @@ export interface KnowledgeGraph {
   totalEdges: number;
 }
 
+export type CiState = "passed" | "failed" | "running" | null;
+
+/** Een punt uit de backlog van een project (BACKLOG.md), met of het op jouw bord ligt. */
+export interface BacklogItem {
+  title: string;
+  text: string;
+  section: string;
+  owner: boolean;
+}
+
+export interface CodeHealth {
+  /** up = bereikbaar, down = twee keer op rij niet, unknown = nog niet gecontroleerd of geen adres. */
+  state: "up" | "down" | "unknown";
+  status: number | null;
+  ms: number | null;
+  checkedAt: string | null;
+  /** Sinds wanneer in deze toestand. */
+  since: string | null;
+  /** Deel van de controles in de laatste 24 uur dat goed ging (0-1). */
+  uptime24h: number | null;
+  note: string | null;
+}
+
+/** Een project dat je (met Claude Code) bouwt: de repository, de live site en wat er openstaat. */
+export interface CodeProject {
+  key: string;
+  name: string;
+  repo: string | null;
+  repoUrl: string | null;
+  url: string | null;
+  healthUrl: string | null;
+  branch: string | null;
+  description: string | null;
+  defaultBranch: string | null;
+  /** Repository zonder één commit (er is nog niets gepusht). */
+  empty: boolean;
+  health: CodeHealth;
+  deploy: { state: string; url: string | null; at: string | null; environment: string; sha: string | null } | null;
+  ci: { state: CiState; url: string | null; at: string | null } | null;
+  lastCommit: { sha: string; title: string; at: string; url: string | null; session: string | null; branch: string } | null;
+  openPrs: Array<{ number: number; title: string; url: string; draft: boolean; branch: string; ci: CiState; updatedAt: string }>;
+  backlog: { path: string; updatedAt: string | null; items: BacklogItem[]; ownerCount: number; totalCount: number } | null;
+  activeSessions: number;
+  /** Laatste fout bij GitHub (bv. geen toegang), zodat je weet waarom iets ontbreekt. */
+  error: string | null;
+  polledAt: string | null;
+}
+
+/** Een Claude Code-sessie die aan een project werkt (gezien via commits of hooks). */
+export interface CodeSession {
+  id: string;
+  /** Poppetje in het kantoor: `cc:` + id. */
+  actorId: string;
+  projectKey: string | null;
+  source: "cloud" | "local" | "action";
+  url: string | null;
+  branch: string | null;
+  title: string | null;
+  lastAction: string | null;
+  startedAt: string;
+  lastActivityAt: string;
+  /** working = bezig (net nog actief), idle = stil, done = klaar (PR dicht of lang stil). */
+  state: "working" | "idle" | "done";
+  commits: number;
+  pr: { number: number; url: string; state: "open" | "merged" | "closed"; ci: CiState } | null;
+}
+
+export interface OfficeCode {
+  projects: CodeProject[];
+  sessions: CodeSession[];
+  /** Staat er een GitHub-token? Zonder token alleen de gezondheidscheck. */
+  github: boolean;
+  /** Kunnen Claude Code-hooks live meldingen sturen? */
+  hooks: boolean;
+}
+
 export interface OfficeSnapshot {
   generatedAt: string;
   companyName: string;
@@ -223,4 +313,6 @@ export interface OfficeSnapshot {
   lastEventId: number;
   /** Fout bij het ophalen van agents uit Paperclip (kantoor toont dan wat het nog weet). */
   paperclipError: string | null;
+  /** De werkplaats: projecten en Claude Code-sessies. */
+  code: OfficeCode;
 }

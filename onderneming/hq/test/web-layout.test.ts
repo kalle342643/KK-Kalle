@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildLayout, roomAt, type LayoutAgent } from "../web/office/layout.js";
+import { buildLayout, roomAt, workshopSeats, type LayoutAgent } from "../web/office/layout.js";
 import { canStep, cellOf, findPath, isBlocked, lineOfSight, pathLength } from "../web/office/path.js";
 
 const agent = (id: string, branch: string, extra: Partial<LayoutAgent> = {}): LayoutAgent => ({
@@ -135,5 +135,28 @@ describe("plattegrond", () => {
     expect(canStep(layout.grid, door.x, door.z - 1, 0, 1)).toBe(true);
     expect(canStep(layout.grid, door.x + 3, door.z - 1, 0, 1)).toBe(false);
     expect(lineOfSight(layout.grid, { x: door.x + 4.5, z: door.z - 1.5 }, { x: door.x + 4.5, z: door.z + 1.5 })).toBe(false);
+  });
+
+  it("de werkplaats: een bord per project, vrije bureaus voor Claude Code, bereikbaar vanaf de ingang", () => {
+    const agents: LayoutAgent[] = [agent("atlas", "holding", { hqRole: "ceo", role: "ceo" })];
+    const projects = [
+      { key: "normwacht", name: "Normwacht" },
+      { key: "fluxgrid", name: "Fluxgrid" },
+      { key: "hq", name: "HQ" },
+    ];
+    const layout = buildLayout({ branches: [{ slug: "games", name: "Games", template: "games" }], agents, workshop: { projects, seats: workshopSeats(2) } });
+    const room = layout.rooms.find((r) => r.kind === "workshop")!;
+    expect(room).toMatchObject({ id: "dept-werkplaats", name: "Werkplaats · Claude Code" });
+    const boards = layout.furniture.filter((f) => f.type === "code-board");
+    expect(boards.map((b) => b.ref)).toEqual(["normwacht", "fluxgrid", "hq"]);
+    for (const b of boards) expect(b.x + 1.4).toBeLessThanOrEqual(room.rect.x + room.rect.w);
+    const desks = layout.desks.filter((d) => d.roomId === room.id);
+    expect(desks.map((d) => d.id)).toEqual(["werkplaats:0", "werkplaats:1", "werkplaats:2"]);
+    expect(desks.every((d) => d.agentId === null)).toBe(true);
+    for (const d of desks) expect(findPath(layout.grid, layout.entrance, d.seat), d.id).not.toBeNull();
+    // Stappen van drie: een vierde sessie geeft een extra rij bureaus.
+    expect([0, 1, 2, 3, 5, 6].map(workshopSeats)).toEqual([3, 3, 3, 6, 6, 9]);
+    // Zonder projecten en sessies geen werkplaats.
+    expect(company({ games: 2 }).rooms.some((r) => r.kind === "workshop")).toBe(false);
   });
 });

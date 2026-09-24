@@ -1,6 +1,7 @@
 import { listApprovals } from "./approvals.js";
 import { listBranches } from "./branches.js";
 import { errorMessage, type AppContext } from "./context.js";
+import { codeReportLines } from "../code/overview.js";
 import { experimentCode, listExperiments, snapshot } from "./experiments.js";
 import { haltState } from "./killswitch.js";
 import { totals, totalsByBranch } from "./ledger.js";
@@ -93,6 +94,11 @@ export async function buildDailyReport(ctx: AppContext): Promise<string> {
   );
   const nLessons = Number(lessons[0]?.n ?? 0);
   if (nLessons > 0) lines.push(`📚 ${nLessons} nieuwe les(sen) vastgelegd.`);
+  try {
+    lines.push(...(await codeReportLines(ctx)));
+  } catch (err) {
+    lines.push("", `🛠️ Werkplaats: stand onbekend (${errorMessage(err)})`);
+  }
   return lines.join("\n");
 }
 

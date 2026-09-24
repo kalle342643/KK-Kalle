@@ -7,6 +7,7 @@ import { totals } from "../domain/ledger.js";
 import { round2, usdCentsToEur } from "../domain/money.js";
 import { computePortfolio } from "../domain/portfolio.js";
 import { addLocalDays, startOfLocalDay, startOfLocalMonth } from "../domain/time.js";
+import { codeOverview } from "../code/overview.js";
 import { knowledgeGraph } from "../knowledge/service.js";
 import type { PcAgent } from "../paperclip/types.js";
 import { listProfiles, people } from "./profiles.js";
@@ -154,5 +155,6 @@ export async function buildOfficeSnapshot(ctx: AppContext): Promise<OfficeSnapsh
     events: await ctx.events.recent(40),
     lastEventId: await ctx.events.lastId(),
     paperclipError,
+    code: await codeOverview(ctx),
   };
 }

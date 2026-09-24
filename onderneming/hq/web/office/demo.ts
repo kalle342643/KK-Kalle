@@ -5,6 +5,9 @@
  * een naam geven), alleen gebeurt er niets buiten deze pagina. Niets hiervan is echt.
  */
 import type {
+  BacklogItem,
+  CodeProject,
+  CodeSession,
   KnowledgeGraph,
   OfficeAgent,
   OfficeApproval,
@@ -15,7 +18,7 @@ import type {
   OfficeSnapshot,
   ProjectDetail,
 } from "../../src/office/types.js";
-import type { DataSource } from "./data.js";
+import type { CodeProjectInput, DataSource, RepoChoice } from "./data.js";
 import { BOT_ID, OWNER_ID } from "./layout.js";
 
 const DAY = 86_400_000;
@@ -131,6 +134,140 @@ const TASKS: Record<string, string[]> = {
   schrijver: ["Artikel: beste budget-microfoons 2026", "Vergelijkingstabel bijwerken", "Gids: e-bike verzekeren"],
 };
 
+// ---------------------------------------------------------------- werkplaats (verzonnen)
+
+const ago = (min: number) => new Date(Date.now() - min * 60_000).toISOString();
+const item = (title: string, text: string, section: string, owner: boolean): BacklogItem => ({ title, text, section, owner });
+
+function demoCodeProjects(): CodeProject[] {
+  const base = {
+    empty: false,
+    error: null,
+    polledAt: ago(1),
+    activeSessions: 0,
+    description: null,
+  };
+  const cookieBacklog = [
+    item("Inschrijven bij de KvK", "Zet de bedrijfsgegevens in de omgeving: zonder zakt de site voor zijn eigen handelsinfo-controle.", "Voor de eerste betaling — dit ligt bij Kalle", true),
+    item("Domein kopen", "cookiewacht.nl is vrij; daarna de redirect-URL in de database toestaan.", "Voor de eerste betaling — dit ligt bij Kalle", true),
+    item("Hosting naar een betaald plan", "Het gratis plan is niet voor commercieel gebruik.", "Voor de eerste betaling — dit ligt bij Kalle", true),
+    item("Cookiemuren apart melden", "De scan ziet nu alleen de muur.", "Product", false),
+    item("Een pagina die niet bereikbaar was, één keer opnieuw proberen", "", "Product", false),
+    item("Melding bij een regressie", "De sterkste reden voor een abonnement.", "Herhaalscans", false),
+  ];
+  return [
+    {
+      ...base,
+      key: "cookiewacht",
+      name: "Cookiewacht",
+      repo: "demo-holding/cookiewacht",
+      repoUrl: null,
+      url: "https://cookiewacht.example",
+      healthUrl: "https://cookiewacht.example/api/gezondheid",
+      branch: "saas",
+      description: "Controleert webshops op cookies vóór toestemming, handelsinformatie en de AI-melding (demo).",
+      defaultBranch: "main",
+      health: { state: "up", status: 200, ms: 240, checkedAt: ago(2), since: ago(3000), uptime24h: 0.99, note: null },
+      deploy: { state: "success", url: "https://cookiewacht.example", at: ago(25), environment: "Production", sha: "a1b2c3d" },
+      ci: { state: "passed", url: null, at: ago(24) },
+      lastCommit: { sha: "a1b2c3d", title: "Scan: toon de foutcode van de browser", at: ago(26), url: null, session: null, branch: "claude/foutcode-tonen" },
+      openPrs: [{ number: 12, title: "Laat zien waarom een pagina niet openging", url: "https://github.com", draft: true, branch: "claude/foutcode-tonen", ci: "running", updatedAt: ago(6) }],
+      backlog: { path: "BACKLOG.md", updatedAt: ago(60), items: cookieBacklog, ownerCount: 3, totalCount: cookieBacklog.length },
+    },
+    {
+      ...base,
+      key: "fluxgrid",
+      name: "Fluxgrid",
+      repo: "demo-holding/fluxgrid",
+      repoUrl: null,
+      url: "https://fluxgrid.example",
+      healthUrl: null,
+      branch: "games",
+      description: "Routing-puzzel met kleurmenging voor CrazyGames (demo).",
+      defaultBranch: "main",
+      health: { state: "up", status: 200, ms: 180, checkedAt: ago(3), since: ago(9000), uptime24h: 1, note: null },
+      deploy: { state: "success", url: "https://fluxgrid.example", at: ago(140), environment: "Production", sha: "f00d123" },
+      ci: { state: "passed", url: null, at: ago(139) },
+      lastCommit: { sha: "f00d123", title: "Levels 8 t/m 12: meer kleuren", at: ago(12), url: null, session: null, branch: "claude/levels-moeilijker" },
+      openPrs: [],
+      backlog: {
+        path: "BACKLOG.md",
+        updatedAt: ago(200),
+        items: [
+          item("Uploaden naar CrazyGames", "Doe je zelf met je eigen account; het pakket staat klaar in /release.", "Dit ligt bij Kalle", true),
+          item("Geluid bij een gemengde kleur", "", "Spel", false),
+          item("Dagelijkse puzzel", "", "Later", false),
+        ],
+        ownerCount: 1,
+        totalCount: 3,
+      },
+    },
+    {
+      ...base,
+      key: "hq",
+      name: "HQ-kantoor",
+      repo: "demo-holding/hq",
+      repoUrl: null,
+      url: null,
+      healthUrl: null,
+      branch: null,
+      description: "Dit kantoor zelf.",
+      defaultBranch: "main",
+      health: { state: "unknown", status: null, ms: null, checkedAt: null, since: null, uptime24h: null, note: null },
+      deploy: null,
+      ci: { state: "passed", url: null, at: ago(90) },
+      lastCommit: { sha: "c0ffee1", title: "Werkplaats: Claude Code in het kantoor", at: ago(95), url: null, session: null, branch: "main" },
+      openPrs: [],
+      backlog: null,
+    },
+  ];
+}
+
+function demoSessions(): CodeSession[] {
+  const s = (id: string, projectKey: string, title: string, lastAction: string, state: CodeSession["state"], commits: number, minutes: number, branch: string, pr: CodeSession["pr"] = null): CodeSession => ({
+    id,
+    actorId: `cc:${id}`,
+    projectKey,
+    source: "cloud",
+    url: "https://claude.ai/code",
+    branch,
+    title,
+    lastAction,
+    startedAt: ago(minutes + 40),
+    lastActivityAt: ago(minutes),
+    state,
+    commits,
+    pr,
+  });
+  return [
+    s("demo-1", "cookiewacht", "Laat zien waarom een pagina niet openging", "🧪 npm test", "working", 3, 2, "claude/foutcode-tonen", { number: 12, url: "https://github.com", state: "open", ci: "running" }),
+    s("demo-2", "fluxgrid", "Maak level 8 tot 12 moeilijker", "✍️ levels.ts", "working", 5, 4, "claude/levels-moeilijker"),
+    s("demo-3", "hq", "Werkplaats in het kantoor", "✅ Klaar, wacht op jou", "idle", 7, 70, "claude/werkplaats"),
+  ];
+}
+
+const CODE_STEPS: Record<string, string[]> = {
+  cookiewacht: ["🔎 playwright timeout vercel functions", "🌐 docs.vercel.com/functions/limits", "🧪 npm test", "✍️ scan.ts", "✍️ rapport.ts", "🔎 ERR_CONNECTION_RESET chromium datacenter"],
+  fluxgrid: ["✍️ levels.ts", "🧪 npm test", "🌐 developer.crazygames.com/sdk", "✍️ kleuren.ts"],
+  hq: ["✍️ ui.ts", "🧪 npm test", "🕸️ query CodeWatcher"],
+};
+const CODE_COMMITS: Record<string, string[]> = {
+  cookiewacht: ["Scan: probeer een onbereikbare pagina één keer opnieuw", "Rapport: foutcode tussen haakjes", "Colofon leest de bedrijfsgegevens uit de omgeving"],
+  fluxgrid: ["Level 9: extra kleur", "Mengen: geel + blauw = groen", "Tutorial korter"],
+  hq: ["Werkplaats: bord per project", "Hooks: geheimen wegpoetsen"],
+};
+const NEW_TASKS: Array<[string, string]> = [
+  ["cookiewacht", "Meld een cookiemuur apart in het rapport"],
+  ["fluxgrid", "Voeg een dagelijkse puzzel toe"],
+  ["cookiewacht", "Zet de KvK-gegevens in de colofon"],
+];
+
+const REPOS: RepoChoice[] = [
+  { repo: "demo-holding/cookiewacht", private: true, homepage: "https://cookiewacht.example", description: "Cookie- en compliance-scanner", pushedAt: ago(5) },
+  { repo: "demo-holding/fluxgrid", private: true, homepage: "https://fluxgrid.example", description: "Puzzelgame", pushedAt: ago(12) },
+  { repo: "demo-holding/hq", private: false, homepage: null, description: "HQ en het kantoor", pushedAt: ago(95) },
+];
+
 /** Wat agents in de demo op het web en in de kennisgraaf doen (zoals HQ het uit hun run-logboek haalt). */
 const WEB_STEPS: Record<string, string[]> = {
   verkenner: ["🔎 zoekt: browser puzzle games trending 2026", "🌐 leest: crazygames.com/t/puzzle", "📈 trends: cookie consent scanner", "🌐 leest: poki.com/en/puzzle", "🔎 zoekt: webshop compliance tool prijzen"],
@@ -215,6 +352,9 @@ export class DemoSource implements DataSource {
   private clock = 0;
   private hires = 0;
   private graphCache: KnowledgeGraph | null = null;
+  private codeProjects: CodeProject[] = demoCodeProjects();
+  private codeSessions: CodeSession[] = demoSessions();
+  private taskIndex = 0;
 
   constructor() {
     const rnd = seeded(42);
@@ -417,6 +557,12 @@ export class DemoSource implements DataSource {
       events: this.events.slice(-40),
       lastEventId: this.nextId - 1,
       paperclipError: null,
+      code: {
+        projects: this.codeProjects.map((p) => ({ ...p, activeSessions: this.codeSessions.filter((s) => s.projectKey === p.key && s.state !== "done").length })),
+        sessions: this.codeSessions.filter((s) => s.state !== "done"),
+        github: true,
+        hooks: true,
+      },
     } satisfies OfficeSnapshot);
   }
 
@@ -431,6 +577,132 @@ export class DemoSource implements DataSource {
         this.timer = null;
       }
     };
+  }
+
+  async saveCodeProject(input: CodeProjectInput): Promise<void> {
+    const key = input.key ?? (input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project");
+    const existing = this.codeProjects.find((p) => p.key === key);
+    const next: CodeProject = {
+      ...(existing ?? {
+        key,
+        empty: false,
+        error: null,
+        polledAt: new Date().toISOString(),
+        activeSessions: 0,
+        defaultBranch: "main",
+        health: { state: "unknown", status: null, ms: null, checkedAt: null, since: null, uptime24h: null, note: null },
+        deploy: null,
+        ci: null,
+        lastCommit: null,
+        openPrs: [],
+        backlog: null,
+        repoUrl: null,
+        description: null,
+      }),
+      name: input.name,
+      repo: input.repo ?? null,
+      url: input.url ?? null,
+      healthUrl: input.healthUrl ?? null,
+      branch: input.branch ?? null,
+    };
+    if (existing) this.codeProjects = this.codeProjects.map((p) => (p.key === key ? next : p));
+    else this.codeProjects.push(next);
+    this.emit({ type: "code.backlog", agentId: null, text: `${next.name} staat in de werkplaats`, data: { project: key, projectName: next.name, added: [] } });
+  }
+  async removeCodeProject(key: string): Promise<void> {
+    this.codeProjects = this.codeProjects.filter((p) => p.key !== key);
+    this.codeSessions = this.codeSessions.filter((s) => s.projectKey !== key);
+  }
+  async refreshCodeProject(key: string): Promise<CodeProject | null> {
+    const p = this.codeProjects.find((x) => x.key === key);
+    if (p) p.polledAt = new Date().toISOString();
+    return p ?? null;
+  }
+  async codeRepos(): Promise<{ repos: RepoChoice[]; error: string | null }> {
+    return { repos: REPOS, error: null };
+  }
+
+  /** Iets in de werkplaats: een stap van Claude, een commit, tests, een uitrol, af en toe een storing. */
+  private codeStep(): void {
+    const cookie = this.codeProjects.find((p) => p.key === "cookiewacht");
+    // Eens in de zes minuten ligt de demo-site even plat, om te laten zien wat er dan gebeurt.
+    if (cookie && this.clock % 360 === 200) {
+      cookie.health = { ...cookie.health, state: "down", status: 503, since: new Date().toISOString(), note: "de gezondheidscheck zegt nee (503): vaak ligt de database eruit" };
+      this.emit({ type: "code.health", agentId: null, text: "🔴 Cookiewacht ligt eruit: de gezondheidscheck zegt nee (503). Adres: https://cookiewacht.example/api/gezondheid", data: { project: "cookiewacht", projectName: "Cookiewacht", state: "down", status: 503 } });
+      return;
+    }
+    if (cookie && cookie.health.state === "down" && this.clock % 360 === 230) {
+      cookie.health = { ...cookie.health, state: "up", status: 200, since: new Date().toISOString(), note: null };
+      this.emit({ type: "code.health", agentId: null, text: "🟢 Cookiewacht is weer bereikbaar (lag 1 min plat).", data: { project: "cookiewacht", projectName: "Cookiewacht", state: "up", minutes: 1 } });
+      return;
+    }
+    // Eens in de drie minuten rondt een sessie af (PR samengevoegd) en komt er een nieuwe opdracht.
+    const working = this.codeSessions.filter((s) => s.state === "working");
+    if (this.clock % 180 === 90 && working.length) {
+      const s = working[0]!;
+      s.state = "done";
+      const project = this.codeProjects.find((p) => p.key === s.projectKey);
+      const pr = s.pr ?? { number: 13 + (this.clock % 50), url: "https://github.com", state: "open" as const, ci: "passed" as const };
+      this.emit({ type: "code.pr", agentId: s.actorId, text: `Samengevoegd: PR #${pr.number} ${s.title ?? ""}`, data: { project: s.projectKey, projectName: project?.name, action: "merged", number: pr.number } });
+      if (project) {
+        project.openPrs = project.openPrs.filter((x) => x.branch !== s.branch);
+        project.deploy = { state: "success", url: project.url, at: new Date().toISOString(), environment: "Production", sha: "d3m0" };
+      }
+      return;
+    }
+    if (this.clock % 180 === 110) {
+      const [projectKey, title] = NEW_TASKS[this.taskIndex++ % NEW_TASKS.length]!;
+      const id = `demo-${this.clock}`;
+      const project = this.codeProjects.find((p) => p.key === projectKey);
+      this.codeSessions.push({
+        id,
+        actorId: `cc:${id}`,
+        projectKey,
+        source: "cloud",
+        url: "https://claude.ai/code",
+        branch: `claude/${title.toLowerCase().split(" ").slice(0, 3).join("-")}`,
+        title,
+        lastAction: `📋 ${title}`,
+        startedAt: new Date().toISOString(),
+        lastActivityAt: new Date().toISOString(),
+        state: "working",
+        commits: 0,
+        pr: null,
+      });
+      this.emit({ type: "code.session", agentId: `cc:${id}`, text: `Nieuwe opdracht voor Claude Code (${project?.name ?? projectKey}): ${title}`, data: { project: projectKey, projectName: project?.name, action: "task" } });
+      return;
+    }
+    const s = pick(working);
+    if (!s) return;
+    const project = this.codeProjects.find((p) => p.key === s.projectKey);
+    const roll = Math.random();
+    if (roll < 0.6) {
+      const step = pick(CODE_STEPS[s.projectKey ?? ""] ?? CODE_STEPS.hq!);
+      s.lastAction = step;
+      s.lastActivityAt = new Date().toISOString();
+      this.emit({ type: "code.session", agentId: s.actorId, text: step, data: { project: s.projectKey, projectName: project?.name, action: "tool" } });
+    } else if (roll < 0.85) {
+      const title = pick(CODE_COMMITS[s.projectKey ?? ""] ?? CODE_COMMITS.hq!);
+      s.commits += 1;
+      s.lastAction = `✍️ ${title}`;
+      s.lastActivityAt = new Date().toISOString();
+      if (project) project.lastCommit = { sha: Math.random().toString(16).slice(2, 9), title, at: new Date().toISOString(), url: null, session: s.url, branch: s.branch ?? "main" };
+      this.emit({ type: "code.commit", agentId: s.actorId, text: title, data: { project: s.projectKey, projectName: project?.name, branch: s.branch } });
+    } else if (project) {
+      const pr = project.openPrs.find((x) => x.branch === s.branch);
+      if (pr) {
+        pr.ci = pr.ci === "running" ? (Math.random() < 0.8 ? "passed" : "failed") : "running";
+        if (s.pr) s.pr.ci = pr.ci;
+        if (pr.ci !== "running") {
+          this.emit({ type: "code.ci", agentId: s.actorId, text: pr.ci === "failed" ? `Tests rood op PR #${pr.number}: ${pr.title}` : `Tests weer groen op PR #${pr.number}`, data: { project: project.key, projectName: project.name, state: pr.ci } });
+        }
+      } else {
+        const number = 20 + (this.clock % 70);
+        project.openPrs.push({ number, title: s.title ?? "Werk van Claude", url: "https://github.com", draft: true, branch: s.branch ?? "claude/x", ci: "running", updatedAt: new Date().toISOString() });
+        s.pr = { number, url: "https://github.com", state: "open", ci: "running" };
+        this.emit({ type: "code.pr", agentId: s.actorId, text: `PR #${number}: ${s.title ?? ""}`, data: { project: project.key, projectName: project.name, action: "opened", number } });
+      }
+    }
   }
 
   async decide(approvalId: number, decision: "approve" | "reject"): Promise<void> {
@@ -634,6 +906,8 @@ export class DemoSource implements DataSource {
     if (this.halted) return;
     // Wie aan het werk is, gaat soms het web op.
     if (this.runs.size && Math.random() < 0.22) this.webStep();
+    // De werkplaats: Claude Code aan het werk, en af en toe iets met een project.
+    if (Math.random() < 0.18 || this.clock % 180 === 90 || this.clock % 180 === 110 || this.clock % 360 === 200 || this.clock % 360 === 230) this.codeStep();
     // Elke 2 à 3 seconden gebeurt er iets.
     if (this.clock % 2 !== 0 && Math.random() < 0.5) return;
     const roll = Math.random();

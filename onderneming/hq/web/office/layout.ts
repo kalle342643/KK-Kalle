@@ -11,7 +11,10 @@ import { addWall, blockRect, createGrid, removeWall, type Grid } from "./path.js
 export const OWNER_ID = "owner";
 export const BOT_ID = "hq-bot";
 
-export type RoomKind = "hall" | "corridor" | "ceo" | "knowledge" | "meeting" | "pantry" | "owner" | "dept" | "control";
+export type RoomKind = "hall" | "corridor" | "ceo" | "knowledge" | "meeting" | "pantry" | "owner" | "dept" | "control" | "workshop";
+
+/** De werkplaats: waar Claude Code-sessies aan je projecten werken. */
+export const WORKSHOP_SLUG = "werkplaats";
 
 export interface Rect {
   x: number;
@@ -112,7 +115,8 @@ export type FurnitureType =
   | "lamp"
   | "kanban"
   | "vault"
-  | "video-wall";
+  | "video-wall"
+  | "code-board";
 
 export interface Furniture {
   type: FurnitureType;
@@ -172,6 +176,16 @@ export interface LayoutBranch {
   template: string | null;
 }
 
+/** Wat de werkplaats nodig heeft: één bord per project en genoeg bureaus voor de sessies. */
+export interface LayoutWorkshop {
+  projects: Array<{ key: string; name: string }>;
+  /** Aantal bureaus (de regisseur zet de sessies erop). */
+  seats: number;
+}
+
+/** Bureaus in de werkplaats: in stappen van 3, zodat niet elke nieuwe sessie een verbouwing is. */
+export const workshopSeats = (sessions: number) => Math.max(3, Math.ceil((sessions + 1) / 3) * 3);
+
 /** Kleuren per soort tak (vloer licht, accent verzadigd). */
 export const DEPT_COLORS: Record<string, { floor: string; accent: string }> = {
   games: { floor: "#ebe4fb", accent: "#8b5cf6" },
@@ -179,6 +193,7 @@ export const DEPT_COLORS: Record<string, { floor: string; accent: string }> = {
   saas: { floor: "#e2ecfb", accent: "#2f7ff0" },
   generiek: { floor: "#fbeddd", accent: "#e0781f" },
   holding: { floor: "#f2ebe3", accent: "#a47551" },
+  werkplaats: { floor: "#f6ebe3", accent: "#d97757" },
 };
 const EXTRA_COLORS = [
   { floor: "#fbe3ea", accent: "#e0457b" },
@@ -200,7 +215,7 @@ const GLASS_H = 1.25;
 
 const isLead = (a: LayoutAgent) => a.hqRole === "lead" || a.template === "tak-lead";
 
-export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAgent[]; ownerName?: string }): Layout {
+export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAgent[]; ownerName?: string; workshop?: LayoutWorkshop }): Layout {
   const agents = input.agents.filter((a) => a.status !== "terminated");
   const pending = agents.filter((a) => a.status === "pending_approval");
   const staff = agents.filter((a) => a.status !== "pending_approval");
@@ -219,7 +234,18 @@ export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAge
     ...input.branches.filter((b) => b.slug !== "holding").map((b, k) => ({ ...b, index: k + 1 })),
   ];
 
+  const workshop = input.workshop && (input.workshop.projects.length || input.workshop.seats > 0) ? input.workshop : null;
+  if (workshop) depts.push({ slug: WORKSHOP_SLUG, name: "Werkplaats · Claude Code", template: WORKSHOP_SLUG, index: depts.length });
+
   const deptSpecs = depts.map((b) => {
+    if (b.slug === WORKSHOP_SLUG) {
+      const seats = Math.max(3, workshop!.seats);
+      const cols = 3;
+      const rows = Math.ceil(seats / cols);
+      // Breed genoeg voor een bord per project aan de noordmuur.
+      const w = Math.max(11, 3 * cols + 2, Math.ceil(6.4 + workshop!.projects.length * 3.2));
+      return { branch: b, list: [] as LayoutAgent[], cols, rows, w, d: 3 * rows + 4 };
+    }
     const list = [...(members.get(b.slug) ?? [])].sort(
       (x, y) =>
         Number(y.hqRole === "analyst") - Number(x.hqRole === "analyst") ||
@@ -398,7 +424,7 @@ export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAge
       const rect = { x: rx, z: rowZ[k]!, w: spec.w, d: rowD[k]! };
       const room: Room = {
         id: `dept-${spec.branch.slug}`,
-        kind: spec.branch.slug === "holding" ? "control" : "dept",
+        kind: spec.branch.slug === "holding" ? "control" : spec.branch.slug === WORKSHOP_SLUG ? "workshop" : "dept",
         name: spec.branch.name,
         rect,
         floor: colors.floor,
@@ -409,7 +435,8 @@ export function buildLayout(input: { branches: LayoutBranch[]; agents: LayoutAge
       };
       addRoom(room);
       roomOfBranch.set(spec.branch.slug, room.id);
-      furnishDept(room, spec, { put, poi, desks, deskOf });
+      if (room.kind === "workshop") furnishWorkshop(room, spec, workshop!, { put, poi, desks, deskOf });
+      else furnishDept(room, spec, { put, poi, desks, deskOf });
       rx += spec.w;
     }
   });
@@ -626,6 +653,51 @@ function furnishDept(
   const wbx = x + w - 3.5;
   c.put({ type: "whiteboard", x: wbx, z: z + 0.35, rot: 0, w: 3, d: 0.5, roomId: id, ref: spec.branch.slug });
   c.poi({ id: `whiteboard-${spec.branch.slug}`, kind: "whiteboard", roomId: id, spot: { x: wbx, z: z + 1.45, facing: Math.PI } });
+  c.put({ type: "plant", x: x + 0.5, z: z + d - 0.5, rot: 0, w: 1, d: 1, roomId: id });
+  c.put({ type: "plant", x: x + w - 0.5, z: z + d - 0.5, rot: 0, w: 1, d: 1, roomId: id });
+}
+
+/**
+ * De werkplaats: aan de noordmuur een bord per project (live, tests, uitrol, wat op jou wacht), daaronder
+ * bureaus voor de Claude Code-sessies. De bureaus zijn nog van niemand: de regisseur zet de sessies erop.
+ */
+function furnishWorkshop(
+  room: Room,
+  spec: { cols: number; rows: number },
+  workshop: LayoutWorkshop,
+  c: Ctx,
+): void {
+  const { x, z, w, d } = room.rect;
+  const id = room.id;
+  c.put({ type: "sign", x: x + 2.4, z: z + 0.1, rot: 0, w: 3.2, d: 0.1, roomId: id, label: "Werkplaats", color: room.accent }, false);
+  const boards = workshop.projects.slice(0, Math.max(1, Math.floor((w - 5.2) / 3.2)));
+  boards.forEach((p, k) => {
+    const bx = x + 5.6 + k * 3.2;
+    c.put({ type: "code-board", x: bx, z: z + 0.2, rot: 0, w: 2.8, d: 0.3, roomId: id, ref: p.key, label: p.name });
+    c.poi({ id: `code-board-${p.key}`, kind: "whiteboard", roomId: id, spot: { x: bx, z: z + 1.45, facing: Math.PI } });
+  });
+  const x0 = x + Math.max(2, (w - 3 * spec.cols) / 2 + 0.5);
+  for (let k = 0; k < spec.cols * spec.rows; k++) {
+    const col = k % spec.cols;
+    const row = Math.floor(k / spec.cols);
+    const dx = x0 + 3 * col;
+    const dz = z + 4.5 + 3 * row;
+    const desk: Desk = {
+      id: `${WORKSHOP_SLUG}:${k}`,
+      roomId: id,
+      kind: "desk",
+      x: dx,
+      z: dz,
+      width: 2,
+      seat: { x: dx, z: dz + 0.95, facing: Math.PI },
+      visitor: { x: dx + 0.95, z: dz + 1.05, facing: -Math.PI / 2 },
+      agentId: null,
+      lead: false,
+    };
+    c.desks.push(desk);
+    c.put({ type: "desk", x: dx, z: dz, rot: 0, w: 2, d: 1, roomId: id, ref: desk.id, color: room.accent });
+    c.put({ type: "chair", x: desk.seat.x, z: desk.seat.z, rot: Math.PI, roomId: id, ref: desk.id }, false);
+  }
   c.put({ type: "plant", x: x + 0.5, z: z + d - 0.5, rot: 0, w: 1, d: 1, roomId: id });
   c.put({ type: "plant", x: x + w - 0.5, z: z + d - 0.5, rot: 0, w: 1, d: 1, roomId: id });
 }

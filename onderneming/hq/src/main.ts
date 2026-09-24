@@ -23,6 +23,10 @@ import { OfficeEvents } from "./office/events.js";
 import { OfficeNotifier } from "./office/notifier.js";
 import { PaperclipWatcher } from "./office/watcher.js";
 import { HttpPaperclipClient } from "./paperclip/client.js";
+import { GitHubClient } from "./code/github.js";
+import { codeReportLines } from "./code/overview.js";
+import { listCodeProjects } from "./code/projects.js";
+import { CodeWatcher } from "./code/watch.js";
 
 const USAGE = `hq <commando>
 
@@ -36,6 +40,7 @@ const USAGE = `hq <commando>
   halt [reden] | resume     noodstop aan/uit
   import-csv <bestand>      omzet importeren (kolommen: date, amount_eur, branch, source, ...)
   kennis                    kennisbank-map bijwerken en (met GRAPHIFY_API_KEY) de Graphify-graaf opbouwen
+  werkplaats                projecten één keer bij GitHub bijwerken, sites controleren en de stand tonen
 `;
 
 function die(msg: string): never {
@@ -99,7 +104,10 @@ function factoryFor(ctx: AppContext): AgentFactory {
 async function serveCommand(config: Config): Promise<void> {
   const { ctx, telegram } = await makeContext(config);
   const factory = factoryFor(ctx);
-  const app = createApp(ctx, { factory, jobs: defaultJobs(ctx) });
+  // De werkplaats: je projecten op GitHub volgen en de sites controleren.
+  const github = config.code.githubToken ? new GitHubClient(config.code.githubToken) : null;
+  const codeWatcher = new CodeWatcher(ctx, github);
+  const app = createApp(ctx, { factory, jobs: defaultJobs(ctx), code: { watcher: codeWatcher, github } });
   const server = serve({ fetch: app.fetch, port: config.port, hostname: config.host });
   ctx.log.info("HQ luistert", { url: `http://${config.host}:${config.port}`, agentUrl: config.agentUrl });
 
@@ -108,6 +116,8 @@ async function serveCommand(config: Config): Promise<void> {
   // Het kantoor: kijk mee in Paperclip wie er werkt en wie met wie praat.
   const watcher = new PaperclipWatcher(ctx);
   watcher.start();
+  codeWatcher.start();
+  if (!github) ctx.log.warn("Geen HQ_GITHUB_TOKEN: de werkplaats controleert alleen of je sites bereikbaar zijn");
   // Direct één keer synchroniseren, zodat openstaande verzoeken meteen in Telegram staan.
   for (const job of defaultJobs(ctx).filter((j) => j.name === "approvals-sync" || j.name === "cost-sync")) {
     await runJob(ctx, job);
@@ -131,6 +141,7 @@ async function serveCommand(config: Config): Promise<void> {
     controller.abort();
     scheduler.stop();
     watcher.stop();
+    codeWatcher.stop();
     server.close();
     await ctx.db.close();
     process.exit(0);
@@ -249,6 +260,19 @@ async function main(argv: string[]): Promise<void> {
     case "kennis": {
       const { ctx } = await makeContext(config);
       console.log(await rebuildKnowledge(ctx));
+      await ctx.db.close();
+      return;
+    }
+    case "werkplaats": {
+      const { ctx } = await makeContext(config);
+      const github = config.code.githubToken ? new GitHubClient(config.code.githubToken) : null;
+      const cw = new CodeWatcher(ctx, github);
+      const projects = await listCodeProjects(ctx.db);
+      if (!projects.length) console.log("Nog geen projecten. Voeg ze toe in het kantoor: klik op de werkplaats → Project volgen.");
+      if (!github) console.log("⚠️ Geen HQ_GITHUB_TOKEN: alleen de gezondheidscheck.");
+      await cw.pollAll();
+      await cw.checkAll();
+      console.log((await codeReportLines(ctx)).join("\n").trim() || "Niets te melden.");
       await ctx.db.close();
       return;
     }

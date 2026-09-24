@@ -899,7 +899,7 @@ button.chip:hover {
   gap: 6px;
   margin: 10px 0;
 }
-.panel-body :where(button:not(.linkish, .person, .project-card, .look, .avatar)),
+.panel-body :where(button:not(.linkish, .person, .project-card, .code-card, .look, .avatar)),
 .modal button {
   padding: 8px 13px;
   border-radius: 10px;
@@ -909,7 +909,7 @@ button.chip:hover {
   font-size: 13.5px;
   cursor: pointer;
 }
-.panel-body :where(button:not(.linkish, .person, .project-card, .look, .avatar)):hover {
+.panel-body :where(button:not(.linkish, .person, .project-card, .code-card, .look, .avatar)):hover {
   border-color: var(--focus);
 }
 .panel-body button.good,
@@ -943,7 +943,10 @@ button.chip:hover {
   text-underline-offset: 2px;
 }
 input[type="text"],
-input[type="search"] {
+input[type="search"],
+input[type="url"],
+.panel-body select,
+.panel-body textarea {
   font: inherit;
   font-size: 14px;
   padding: 8px 11px;
@@ -1133,6 +1136,161 @@ input[type="search"] {
   flex-wrap: wrap;
   gap: 0 8px;
   font-variant-numeric: tabular-nums;
+}
+
+/* Werkplaats: je projecten en Claude Code. */
+.code-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 10px 0;
+}
+.code-card {
+  display: block;
+  width: 100%;
+  padding: 10px 12px;
+  text-align: left;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  border-left: 4px solid #d97757;
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.35;
+  cursor: pointer;
+}
+.code-card:hover {
+  border-color: var(--focus);
+  border-left-color: #d97757;
+}
+.code-card.down {
+  border-left-color: var(--bad);
+  background: color-mix(in srgb, var(--bad) 7%, var(--card));
+}
+.code-card .pc-title {
+  display: block;
+  font-size: 14px;
+}
+.code-card .pc-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.code-card .pc-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  margin-top: 4px;
+}
+.status-lines {
+  list-style: none;
+  margin: 6px 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.status-lines li {
+  display: flex;
+  gap: 6px;
+  align-items: baseline;
+  min-width: 0;
+}
+.status-lines li span:last-child {
+  overflow-wrap: anywhere;
+}
+.status-lines.big {
+  font-size: 14px;
+  gap: 4px;
+}
+.status-lines .icon {
+  flex: none;
+  width: 1.2em;
+  text-align: center;
+  font-weight: 800;
+}
+.tone-good .icon {
+  color: var(--good-ink);
+}
+.tone-bad,
+.tone-bad .icon {
+  color: var(--bad-ink);
+}
+.tone-warn .icon {
+  color: var(--warn-ink);
+}
+.tone-muted {
+  color: var(--muted);
+}
+.backlog,
+.prs {
+  margin: 4px 0 10px;
+  padding-left: 18px;
+}
+.backlog li,
+.prs li {
+  margin: 4px 0;
+}
+.backlog li p {
+  margin: 1px 0 0;
+}
+.sessions .indent {
+  padding-left: 22px;
+  margin-top: -2px;
+}
+.card.hint {
+  border-color: var(--warn);
+  background: color-mix(in srgb, var(--warn) 10%, var(--card));
+}
+.warn-text {
+  color: var(--warn-ink);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 8px 0;
+  font-size: 13px;
+  font-weight: 650;
+}
+.field .small,
+.field input,
+.field select {
+  font-weight: 400;
+}
+.panel-body ::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.panel-body textarea {
+  resize: vertical;
+  margin: 6px 0;
+}
+a.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 13px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 650;
+  font-size: 13.5px;
+  text-decoration: none;
+}
+a.button:hover {
+  border-color: var(--focus);
+}
+a.button.good {
+  background: var(--good);
+  color: #ffffff;
+  border-color: transparent;
+}
+details.backlog-rest summary {
+  cursor: pointer;
+  font-weight: 650;
+  margin: 8px 0;
 }
 
 /* Cijfers. */

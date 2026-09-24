@@ -14,7 +14,7 @@ export type BubbleKind = "talk" | "think" | "alert" | "happy" | "info";
 
 export interface ActorInfo {
   id: string;
-  kind: "agent" | "owner" | "bot" | "guest";
+  kind: "agent" | "owner" | "bot" | "guest" | "claude";
   name: string;
   label: string;
   role: string;

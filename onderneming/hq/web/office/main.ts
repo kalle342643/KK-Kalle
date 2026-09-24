@@ -6,12 +6,12 @@
 import * as THREE from "three";
 import type { OfficeSnapshot } from "../../src/office/types.js";
 import { Assets, CHARACTERS } from "./assets.js";
-import { drawKanban, drawKpiScreen, drawVideoWall, drawWhiteboard } from "./boards.js";
+import { drawCodeBoard, drawKanban, drawKpiScreen, drawVideoWall, drawWhiteboard } from "./boards.js";
 import { HttpError, LiveSource, type DataSource } from "./data.js";
 import { DemoSource } from "./demo.js";
 import { Director } from "./director.js";
 import { Hologram } from "./hologram.js";
-import { buildLayout, OWNER_ID, type Layout } from "./layout.js";
+import { buildLayout, OWNER_ID, workshopSeats, type Layout, type LayoutWorkshop } from "./layout.js";
 import { Ui } from "./ui.js";
 import { World } from "./world.js";
 
@@ -40,6 +40,13 @@ const isNight = () => {
   return h < 7 || h >= 21;
 };
 
+/** De werkplaats: een bord per project, bureaus voor de sessies (in stappen van drie). */
+function workshopOf(snap: OfficeSnapshot): LayoutWorkshop | undefined {
+  const active = snap.code.sessions.filter((s) => s.state !== "done").length;
+  if (!snap.code.projects.length && !active) return undefined;
+  return { projects: snap.code.projects.map((p) => ({ key: p.key, name: p.name })), seats: workshopSeats(active) };
+}
+
 /** Welke dingen bepalen de plattegrond? Verandert dit, dan bouwen we het kantoor opnieuw op. */
 function layoutKey(snap: OfficeSnapshot): string {
   return JSON.stringify([
@@ -49,6 +56,7 @@ function layoutKey(snap: OfficeSnapshot): string {
       .map((a) => [a.id, a.name, a.branch, a.hqRole, a.template, a.status === "pending_approval"])
       .sort((x, y) => String(x[0]).localeCompare(String(y[0]))),
     ownerName(snap),
+    workshopOf(snap) ?? null,
   ]);
 }
 
@@ -59,6 +67,7 @@ function layoutFor(snap: OfficeSnapshot): Layout {
     branches: snap.branches.map((b) => ({ slug: b.slug, name: b.name, template: b.template })),
     agents: snap.agents.map((a) => ({ id: a.id, name: a.name, branch: a.branch, hqRole: a.hqRole, template: a.template, role: a.role, status: a.status })),
     ownerName: ownerName(snap),
+    workshop: workshopOf(snap),
   });
 }
 
@@ -154,6 +163,9 @@ async function boot(): Promise<void> {
     for (const [slug, screen] of world.whiteboards) drawWhiteboard(screen, s.branches.find((b) => b.slug === slug), s.projects, accentOf(slug));
     if (world.videoWall.length) drawVideoWall(world.videoWall, s, accentOf);
     if (world.kpiScreen) drawKpiScreen(world.kpiScreen, s);
+    for (const [key, screen] of world.codeBoards) {
+      drawCodeBoard(screen, s.code.projects.find((p) => p.key === key), s.code.sessions.filter((x) => x.projectKey === key && x.state !== "done").length);
+    }
   };
 
   const apply = (s: OfficeSnapshot, first = false) => {

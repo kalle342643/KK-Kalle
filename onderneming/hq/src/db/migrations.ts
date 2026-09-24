@@ -199,4 +199,54 @@ create table agent_profiles (
 );
 `,
   },
+  {
+    id: "004_werkplaats",
+    sql: `
+-- De werkplaats: projecten die je (met Claude Code) bouwt, gevolgd via GitHub en een gezondheidscheck.
+create table code_projects (
+  key text primary key check (key ~ '^[a-z0-9][a-z0-9-]{0,39}$'),
+  name text not null,
+  repo text,
+  url text,
+  health_url text,
+  branch_slug text,
+  backlog_path text not null default 'BACKLOG.md',
+  description text,
+  -- Wat HQ de vorige keer bij GitHub zag (branches, PR's, tests, uitrol, backlog).
+  state jsonb not null default '{}',
+  -- Uitkomst van de gezondheidscheck (bereikbaar, sinds wanneer, hoe snel).
+  health jsonb not null default '{}',
+  archived_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+-- Claude Code-sessies: gezien aan commits (Claude-Session in het bericht, of een claude/-branch) of via hooks.
+create table code_sessions (
+  id text primary key,
+  project_key text references code_projects(key) on delete set null,
+  source text not null check (source in ('cloud', 'local', 'action')),
+  url text,
+  branch text,
+  title text,
+  last_action text,
+  started_at timestamptz not null default now(),
+  last_activity_at timestamptz not null default now(),
+  ended_at timestamptz,
+  commits integer not null default 0,
+  pr jsonb
+);
+create index code_sessions_activity_idx on code_sessions(last_activity_at desc);
+
+-- Elke gezondheidscheck, voor de uptime van de afgelopen dag (HQ ruimt na 14 dagen op).
+create table code_health (
+  project_key text not null references code_projects(key) on delete cascade,
+  at timestamptz not null default now(),
+  ok boolean not null,
+  status integer,
+  ms integer
+);
+create index code_health_idx on code_health(project_key, at desc);
+`,
+  },
 ];

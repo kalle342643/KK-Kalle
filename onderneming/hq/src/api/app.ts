@@ -40,6 +40,11 @@ import {
 import { importRevenueCsv } from "../importers/csv.js";
 import { runJob, type JobDefinition } from "../jobs/scheduler.js";
 import { noteSchema, addNote, searchNotes } from "../knowledge/notes.js";
+import type { GitHubApi } from "../code/github.js";
+import { handleHook, hookSchema, hookTokenOk } from "../code/hooks.js";
+import { codeOverview } from "../code/overview.js";
+import { archiveCodeProject, codeProjectSchema, getCodeProject, requireCodeProject, saveCodeProject } from "../code/projects.js";
+import type { CodeWatcher } from "../code/watch.js";
 import { knowledgeAdvice } from "../knowledge/precheck.js";
 import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
 import { profileSchema, setProfile } from "../office/profiles.js";
@@ -71,6 +76,8 @@ export interface AppDeps {
   factory?: AgentFactory;
   /** Geplande taken die de eigenaar ook met de hand kan starten. */
   jobs?: JobDefinition[];
+  /** De werkplaats: GitHub volgen en sites controleren. */
+  code?: { watcher: CodeWatcher; github: GitHubApi | null };
 }
 
 function safeEqual(a: string, b: string): boolean {
@@ -117,6 +124,19 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
   });
 
   app.get("/health", async (c) => c.json({ ok: true, halted: (await haltState(ctx)).halted }));
+
+  // ---------------------------------------------------------------- Claude Code-hooks (live meldingen)
+  // Los van de rest: alleen dit adres mag eventueel via Tailscale Funnel op internet staan.
+  // Een eigen geheim (HQ_HOOK_TOKEN) dat alleen meldingen kan sturen, niets kan lezen.
+  let hookWindow = { start: Date.now(), count: 0 };
+  app.post("/api/hooks/claude-code", async (c) => {
+    if (!ctx.config.code.hookToken) return c.json({ error: "Hooks staan uit (HQ_HOOK_TOKEN is leeg)." }, 404);
+    if (!hookTokenOk(ctx.config.code.hookToken, c.req.header("authorization"))) return c.json({ error: "Niet toegestaan" }, 401);
+    if (Number(c.req.header("content-length") ?? 0) > 8_192) return c.json({ error: "Te groot" }, 413);
+    if (Date.now() - hookWindow.start > 60_000) hookWindow = { start: Date.now(), count: 0 };
+    if (++hookWindow.count > 600) return c.json({ error: "Te veel meldingen" }, 429);
+    return c.json(await handleHook(ctx, await body(c, hookSchema)));
+  });
 
   // ---------------------------------------------------------------- agents
   const agentApi = new Hono<Env>();
@@ -477,6 +497,49 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     });
     return c.json({ id: updated.id, status: updated.status });
   });
+  // ---- de werkplaats: projecten die je (met Claude Code) bouwt
+  ownerApi.get("/code", async (c) => c.json(await codeOverview(ctx)));
+  ownerApi.post("/code/projects", async (c) => {
+    const saved = await saveCodeProject(ctx, await body(c, codeProjectSchema), "owner");
+    // Meteen een eerste blik: zo staat hij binnen een paar seconden goed in het kantoor.
+    if (deps.code) {
+      void (async () => {
+        const p = await getCodeProject(ctx.db, saved.key);
+        if (!p) return;
+        if (p.repo && deps.code?.github) await deps.code.watcher.pollProject(p);
+        if (p.healthUrl || p.url) await deps.code?.watcher.checkProject((await getCodeProject(ctx.db, saved.key)) ?? p);
+        await ctx.events.emit({ type: "code.backlog", text: `${p.name} staat in de werkplaats`, data: { project: p.key, projectName: p.name, added: [] } });
+      })().catch((err) => ctx.log.warn("werkplaats: eerste blik mislukt", { error: errorMessage(err) }));
+    }
+    return c.json(saved, 201);
+  });
+  ownerApi.delete("/code/projects/:key", async (c) => {
+    await archiveCodeProject(ctx, c.req.param("key"), "owner");
+    return c.json({ ok: true });
+  });
+  ownerApi.post("/code/projects/:key/refresh", async (c) => {
+    const p = await requireCodeProject(ctx.db, c.req.param("key"));
+    if (!deps.code) throw new DomainError("De werkplaats draait niet.", 503);
+    if (p.repo && deps.code.github) await deps.code.watcher.pollProject(p);
+    if (p.healthUrl || p.url) await deps.code.watcher.checkProject((await getCodeProject(ctx.db, p.key)) ?? p);
+    return c.json((await codeOverview(ctx)).projects.find((x) => x.key === p.key) ?? null);
+  });
+  /** Repositories waar het token bij kan, om uit te kiezen bij "project volgen". */
+  ownerApi.get("/code/repos", async (c) => {
+    if (!deps.code?.github) return c.json({ repos: [], error: "Geen GitHub-token (HQ_GITHUB_TOKEN) ingesteld." });
+    try {
+      const repos = await deps.code.github.get<Array<{ full_name: string; private: boolean; homepage: string | null; description: string | null; pushed_at: string | null }>>(
+        "/user/repos?per_page=100&sort=pushed",
+      );
+      return c.json({
+        repos: repos.map((r) => ({ repo: r.full_name, private: r.private, homepage: r.homepage || null, description: r.description, pushedAt: r.pushed_at })),
+        error: null,
+      });
+    } catch (err) {
+      return c.json({ repos: [], error: errorMessage(err) });
+    }
+  });
+
   ownerApi.post("/metrics", async (c) => {
     const input = await body(c, metricSchema.extend({ experimentId: z.number().int().positive(), source: z.string().min(2) }));
     await recordMetric(

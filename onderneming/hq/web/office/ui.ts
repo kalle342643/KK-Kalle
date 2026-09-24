@@ -3,8 +3,8 @@
  * ergens op klikt (een poppetje, het projectenbord, de cijfermuur, het team, de kennisbank,
  * jouw bureau), meldingen en de noodstop.
  */
-import type { OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
-import { COLUMNS, progressOf } from "./boards.js";
+import type { CodeProject, CodeSession, OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
+import { codeStatus, COLUMNS, progressOf } from "./boards.js";
 import { hideTip, lineChart, pairedBars } from "./charts.js";
 import type { DataSource } from "./data.js";
 import type { Director, Liveliness } from "./director.js";
@@ -59,7 +59,28 @@ const PROJECT_STATUS: Record<OfficeProject["status"], string> = {
   rejected: "afgewezen",
 };
 
-export type PanelKind = "agent" | "approvals" | "projects" | "project" | "stats" | "team" | "knowledge" | "ledger" | "room" | "help";
+export type PanelKind =
+  | "agent"
+  | "approvals"
+  | "projects"
+  | "project"
+  | "stats"
+  | "team"
+  | "knowledge"
+  | "ledger"
+  | "room"
+  | "help"
+  | "workshop"
+  | "code"
+  | "session"
+  | "follow";
+
+const SESSION_STATE: Record<CodeSession["state"], { label: string; tone: string }> = {
+  working: { label: "bezig", tone: "good" },
+  idle: { label: "stil", tone: "muted" },
+  done: { label: "klaar", tone: "info" },
+};
+const CI_LABEL: Record<string, string> = { passed: "✔ groen", failed: "✖ rood", running: "◌ loopt" };
 
 export interface UiDeps {
   source: DataSource;
@@ -107,6 +128,7 @@ export class Ui {
         "nav",
         { class: "actions" },
         h("button", { onclick: () => this.open("projects"), title: "Alle projecten", "aria-label": "Projecten" }, "📋", h("span", {}, " Projecten")),
+        h("button", { onclick: () => this.open("workshop"), title: "Werkplaats: je projecten en Claude Code", "aria-label": "Werkplaats" }, "🛠️", h("span", {}, " Werkplaats")),
         h("button", { onclick: () => this.open("stats"), title: "Cijfers en grafieken", "aria-label": "Cijfers" }, "📊", h("span", {}, " Cijfers")),
         h("button", { onclick: () => this.open("team"), title: "Wie werkt er", "aria-label": "Team" }, "👥", h("span", {}, " Team")),
         h("button", { onclick: () => this.open("knowledge"), title: "Kennisbank", "aria-label": "Kennis" }, "🧠", h("span", {}, " Kennis")),
@@ -210,6 +232,7 @@ export class Ui {
 
   label(id: string | null): string {
     if (!id) return "Iemand";
+    if (id.startsWith("cc:")) return this.deps.director.actors.get(id)?.info.label ?? "Claude Code";
     if (id === OWNER_ID) return this.snap?.people.find((p) => p.id === OWNER_ID)?.nickname || "Jij";
     if (id === BOT_ID) return this.snap?.people.find((p) => p.id === BOT_ID)?.nickname || "HQ-bot";
     const a = this.snap?.agents.find((x) => x.id === id);
@@ -237,6 +260,7 @@ export class Ui {
       chip("Team", `${working}/${snap.agents.length}`, "aan het werk", () => this.open("team")),
       chip("Projecten", String(k.runningExperiments), "lopend", () => this.open("projects")),
       chip("Wacht op jou", String(k.pendingApprovals), k.pendingApprovals ? "beslis nu" : "niets", () => this.open("approvals"), k.pendingApprovals > 0),
+      ...[this.workshopChip(snap)].filter((c): c is HTMLElement => c !== null),
     );
     this.el.banner.hidden = !snap.halted;
     if (snap.halted) {
@@ -247,7 +271,21 @@ export class Ui {
     }
     if (snap.paperclipError) this.toastOnce(`paperclip:${snap.paperclipError}`, `⚠️ Paperclip onbereikbaar: ${snap.paperclipError}`, "warn");
     this.renderFeed();
-    if (this.panel && this.panel.kind !== "project" && this.panel.kind !== "knowledge") this.render();
+    const keep: PanelKind[] = ["project", "knowledge", "follow"];
+    if (this.panel && !keep.includes(this.panel.kind)) this.render();
+  }
+
+  /** Werkplaats in de bovenbalk: rood als een site eruit ligt, anders hoeveel Claude-sessies bezig zijn. */
+  private workshopChip(snap: OfficeSnapshot): HTMLElement | null {
+    const code = snap.code;
+    if (!code.projects.length && !code.sessions.length) return null;
+    const down = code.projects.filter((p) => p.health.state === "down");
+    const red = code.projects.filter((p) => p.ci?.state === "failed" || p.deploy?.state === "failure" || p.deploy?.state === "error");
+    const working = code.sessions.filter((s) => s.state === "working").length;
+    if (down.length) return chip("Werkplaats", "🔴", `${down[0]!.name} ligt eruit`, () => this.open("code", down[0]!.key), true);
+    if (red.length) return chip("Werkplaats", "✖", `${red[0]!.name}: rood`, () => this.open("code", red[0]!.key), true);
+    const mine = code.projects.reduce((s, p) => s + (p.backlog?.ownerCount ?? 0), 0);
+    return chip("Werkplaats", String(working), "Claude bezig", () => this.open("workshop"), false, mine ? `${mine} punten wachten op jou` : undefined);
   }
 
   // ---------------------------------------------------------------- logboek
@@ -265,8 +303,9 @@ export class Ui {
       resume: "good",
       "agent.hired": "info",
     };
-    const tone = important[e.type];
+    const tone = important[e.type] ?? codeTone(e);
     if (tone && e.type !== "agent.hired") this.toast(this.describe(e), tone, e.agentId);
+    if (e.type.startsWith("code.") && (this.panel?.kind === "workshop" || this.panel?.kind === "code" || this.panel?.kind === "session")) void this.deps.refresh();
     if (this.panel?.kind === "agent" && (e.agentId === this.panel.arg || e.targetAgentId === this.panel.arg)) this.render();
   }
 
@@ -315,6 +354,19 @@ export class Ui {
         return `📨 ${this.label(BOT_ID)} stuurde je: ${t}`;
       case "agent.profile":
         return `✨ ${who}: ${t}`;
+      case "code.commit":
+        return e.data.summary ? `✍️ ${t}` : `✍️ ${e.agentId ? who : String(e.data.projectName ?? "Project")}: ${t}`;
+      case "code.pr":
+        return `${e.data.action === "merged" ? "🎉" : e.data.action === "closed" ? "🚪" : "🔀"} ${String(e.data.projectName ?? "")}: ${t}`;
+      case "code.ci":
+        return `${e.data.state === "failed" ? "✖" : "✔"} ${t}`;
+      case "code.deploy":
+        return e.data.state === "success" ? `🚀 ${t}` : t;
+      case "code.health":
+      case "code.backlog":
+        return t.startsWith("🔴") || t.startsWith("🟢") ? t : `📋 ${t}`;
+      case "code.session":
+        return e.data.action === "tool" ? `${who} ${t}` : `🤖 ${t}`;
       case "halt":
         return `⛔ Noodstop: ${t}`;
       case "resume":
@@ -378,6 +430,7 @@ export class Ui {
       "red-button": "🛑 Noodstop",
       hologram: "🧠 Kennisgraaf (Graphify)",
       whiteboard: "Afdelingsbord: experimenten",
+      "code-project": "🛠️ Projectbord: live, tests, uitrol en wat op jou wacht",
       desk: "Bureau",
     };
     const text = pick ? (pick.kind === "agent" ? `${this.label(pick.id)} · klik voor details` : labels[pick.kind]) : null;
@@ -391,7 +444,7 @@ export class Ui {
     if (!pick) return;
     switch (pick.kind) {
       case "agent":
-        this.open("agent", pick.id);
+        this.open(pick.id.startsWith("cc:") ? "session" : "agent", pick.id);
         break;
       case "desk": {
         const desk = this.deps.layout().desks.find((d) => d.id === pick.id);
@@ -399,6 +452,9 @@ export class Ui {
         else this.open("room", desk?.roomId);
         break;
       }
+      case "code-project":
+        this.open("code", pick.id);
+        break;
       case "kanban":
         this.open("projects");
         break;
@@ -430,12 +486,13 @@ export class Ui {
     this.panel = { kind, arg };
     this.el.panel.hidden = false;
     this.el.panel.dataset.kind = kind;
-    this.deps.director.select(kind === "agent" ? (arg ?? null) : null);
-    if (kind !== "agent") this.deps.director.follow = null;
+    const person = kind === "agent" || kind === "session";
+    this.deps.director.select(person ? (arg ?? null) : null);
+    if (!person) this.deps.director.follow = null;
     this.render();
     this.syncInsets();
     // Staat het poppetje straks onder het paneel? Schuif dan het beeld een stukje op.
-    const actor = kind === "agent" && arg ? this.deps.director.actors.get(arg) : undefined;
+    const actor = person && arg ? this.deps.director.actors.get(arg) : undefined;
     if (actor) {
       const p = this.deps.world.screenOf(actor.pos.x, 0.8, actor.pos.z);
       const ins = this.deps.world.insets;
@@ -493,6 +550,18 @@ export class Ui {
         break;
       case "help":
         body.replaceChildren(this.helpPanel());
+        break;
+      case "workshop":
+        body.replaceChildren(this.workshopPanel());
+        break;
+      case "code":
+        body.replaceChildren(this.codePanel(p.arg ?? ""));
+        break;
+      case "session":
+        body.replaceChildren(this.sessionPanel(p.arg ?? ""));
+        break;
+      case "follow":
+        body.replaceChildren(this.followPanel(p.arg));
         break;
     }
     body.scrollTop = scroll;
@@ -999,6 +1068,7 @@ export class Ui {
       owner: "Jouw kantoor. Verzoeken van agents komen op je bureau terecht. De rode knop is de noodstop.",
       control: "De controlekamer van de HQ-bot: alle cijfers live op de schermen, en de kluis met het geld.",
       hall: "Receptie. Nieuwe agents wachten hier op de bank tot jij ze aanneemt.",
+      workshop: "De werkplaats: hier werken je Claude Code-sessies aan je projecten. Elk bord laat zien of de site online is, of de tests groen zijn, wat er live staat en wat er op jou wacht.",
     };
     const parts: Child[] = [h("h2", {}, room.kind === "hall" ? "Receptie" : room.name), h("p", { class: "muted" }, text[room.kind] ?? "")];
     if (room.kind === "dept" && room.branch) {
@@ -1017,6 +1087,7 @@ export class Ui {
       meeting: ["📋 Open het projectenbord", "projects"],
       owner: ["📥 Bekijk je verzoeken", "approvals"],
       control: ["📊 Bekijk de cijfers", "stats"],
+      workshop: ["🛠️ Open de werkplaats", "workshop"],
     };
     const sc = shortcuts[room.kind];
     if (sc) parts.push(h("div", { class: "buttons" }, h("button", { onclick: () => this.open(sc[1]) }, sc[0])));
@@ -1039,6 +1110,263 @@ export class Ui {
         h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel de poppetjes 'uit zichzelf' rondlopen (koffie, praatje). Dat is alleen sfeer en kost niets."),
       ),
       h("p", { class: "small muted" }, "3D-poppetjes en meubels: Kenney (www.kenney.nl), CC0."),
+    );
+  }
+
+  // ---- werkplaats
+
+  private sessionsOf(key: string): CodeSession[] {
+    return this.snap!.code.sessions.filter((s) => s.projectKey === key);
+  }
+
+  private codeCard(p: CodeProject): HTMLElement {
+    const lines = codeStatus(p);
+    const active = this.sessionsOf(p.key).filter((s) => s.state !== "done").length;
+    return h(
+      "button",
+      { class: `code-card${p.health.state === "down" ? " down" : ""}`, onclick: () => this.open("code", p.key) },
+      h("b", { class: "pc-title" }, p.name),
+      h("div", { class: "pc-meta small muted" }, [p.repo, p.url ? p.url.replace(/^https?:\/\//, "") : null].filter(Boolean).join(" · ") || "geen repository of site"),
+      h("ul", { class: "status-lines" }, ...lines.slice(0, 4).map((l) => h("li", { class: `tone-${l.tone}` }, h("span", { class: "icon", "aria-hidden": "true" }, l.icon), h("span", {}, l.text)))),
+      h(
+        "div",
+        { class: "pc-line small" },
+        h("span", {}, p.backlog?.ownerCount ? `📋 ${p.backlog.ownerCount} voor jou` : "📋 niets voor jou"),
+        h("span", {}, active ? `🤖 ${active} ${active === 1 ? "sessie" : "sessies"}` : "🤖 niemand bezig"),
+      ),
+    );
+  }
+
+  private sessionItem(s: CodeSession): HTMLElement {
+    const st = SESSION_STATE[s.state];
+    const project = this.snap!.code.projects.find((p) => p.key === s.projectKey)?.name ?? "onbekend project";
+    return h(
+      "li",
+      {},
+      h(
+        "button",
+        {
+          class: "person",
+          onclick: () => {
+            this.focusActor(s.actorId);
+            this.open("session", s.actorId);
+          },
+        },
+        h("span", { class: `dot ${st.tone}` }),
+        h("b", {}, `Claude · ${project}`),
+        h("span", { class: "muted" }, ` ${s.title ?? s.branch ?? "sessie"}`),
+      ),
+      h("div", { class: "small muted indent" }, `${st.label} · ${s.lastAction ?? "–"} · ${ago(s.lastActivityAt)}`),
+    );
+  }
+
+  private workshopPanel(): HTMLElement {
+    const code = this.snap!.code;
+    const sessions = code.sessions.filter((s) => s.state !== "done");
+    const parts: Child[] = [
+      h("h2", {}, "🛠️ Werkplaats"),
+      h("p", { class: "muted" }, "Je projecten en de Claude Code-sessies die eraan werken. Klik op een project voor alles: live, tests, uitrol, pull requests en wat er op jou wacht."),
+    ];
+    if (!code.github && this.deps.source.mode === "live") {
+      parts.push(h("section", { class: "card hint" }, h("b", {}, "Nog geen GitHub-token"), h("p", { class: "small" }, "Zonder HQ_GITHUB_TOKEN ziet de werkplaats alleen of je sites bereikbaar zijn. Met een token (alleen lezen) zie je ook commits, Claude Code-sessies, pull requests, tests, uitrol en je backlog. Zie SETUP.md, stap Werkplaats.")));
+    }
+    parts.push(
+      h("div", { class: "code-grid" }, ...code.projects.map((p) => this.codeCard(p))),
+      code.projects.length ? null : h("p", { class: "muted" }, "Nog geen projecten. Voeg je eerste toe: een repository op GitHub, een website, of allebei."),
+      h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.open("follow") }, "➕ Project volgen")),
+      h("h3", {}, `Claude Code nu (${sessions.length})`),
+      sessions.length
+        ? h("ul", { class: "org sessions" }, ...sessions.map((s) => this.sessionItem(s)))
+        : h("p", { class: "muted small" }, code.github ? "Geen sessies de laatste anderhalve dag. Geef Claude Code een opdracht; zodra het commit, zit het hier aan een bureau." : "Sessies verschijnen hier zodra HQ je repositories kan lezen."),
+    );
+    return h("div", { class: "workshop-panel" }, ...parts);
+  }
+
+  private codePanel(key: string): HTMLElement {
+    const p = this.snap!.code.projects.find((x) => x.key === key);
+    if (!p) return h("div", {}, h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"), h("p", { class: "muted" }, "Dit project volg je niet meer."));
+    const sessions = this.sessionsOf(key);
+    const items = p.backlog?.items ?? [];
+    const mine = items.filter((i) => i.owner);
+    const rest = items.filter((i) => !i.owner);
+    const events = this.events.filter((e) => e.type.startsWith("code.") && e.data.project === key).slice(-12).reverse();
+    const links = h(
+      "div",
+      { class: "buttons links" },
+      p.url ? h("a", { class: "button", href: p.url, target: "_blank", rel: "noopener" }, "🌐 Site") : null,
+      p.repoUrl ? h("a", { class: "button", href: p.repoUrl, target: "_blank", rel: "noopener" }, "🐙 GitHub") : null,
+      p.deploy?.url && p.deploy.url !== p.url ? h("a", { class: "button", href: p.deploy.url, target: "_blank", rel: "noopener" }, "🚀 Laatste uitrol") : null,
+      p.ci?.url ? h("a", { class: "button", href: p.ci.url, target: "_blank", rel: "noopener" }, "🧪 Tests") : null,
+    );
+    const task = h("textarea", { rows: "3", placeholder: "Wat moet Claude Code doen? Bv. 'Zet de KvK-gegevens in de colofon' of 'Maak de cookiescan sneller'", "aria-label": "Opdracht voor Claude Code" }) as HTMLTextAreaElement;
+    return h(
+      "div",
+      { class: "code-panel" },
+      h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"),
+      h("h2", {}, p.health.state === "down" ? `🔴 ${p.name}` : p.name),
+      p.description ? h("p", { class: "muted" }, p.description) : null,
+      h("ul", { class: "status-lines big" }, ...codeStatus(p).map((l) => h("li", { class: `tone-${l.tone}` }, h("span", { class: "icon", "aria-hidden": "true" }, l.icon), h("span", {}, l.text)))),
+      p.health.note ? h("p", { class: "small warn-text" }, `Laatste controle: ${p.health.note}`) : null,
+      links,
+      h("h3", {}, `Jouw beurt (${mine.length})`),
+      mine.length
+        ? h("ul", { class: "backlog mine" }, ...mine.map((i) => h("li", {}, h("b", {}, i.title), i.text ? h("p", { class: "small muted" }, i.text) : null)))
+        : h("p", { class: "muted small" }, p.backlog ? "Niets in de backlog dat op jou wacht. 🎉" : `Geen ${p.repo ? "BACKLOG.md" : "backlog"} gevonden.`),
+      h("h3", {}, `Claude Code (${sessions.filter((s) => s.state !== "done").length} bezig of stil)`),
+      sessions.length ? h("ul", { class: "org sessions" }, ...sessions.map((s) => this.sessionItem(s))) : h("p", { class: "muted small" }, "Geen sessie de laatste anderhalve dag."),
+      h(
+        "section",
+        { class: "card" },
+        h("h3", {}, "🤖 Opdracht voor Claude Code"),
+        h("p", { class: "small muted" }, "Schrijf wat er moet gebeuren. HQ zet er de context bij (repository, backlog, werkwijze), kopieert het, en opent Claude Code: plakken en gaan. Het werk verschijnt daarna vanzelf hier."),
+        task,
+        h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.sendToClaude(p, task.value) }, "📋 Kopieer en open Claude Code")),
+      ),
+      p.openPrs.length ? h("h3", {}, `Pull requests (${p.openPrs.length})`) : null,
+      p.openPrs.length
+        ? h("ul", { class: "prs" }, ...p.openPrs.map((pr) => h("li", {}, h("a", { href: pr.url, target: "_blank", rel: "noopener" }, `#${pr.number} ${pr.title}`), h("span", { class: "small muted" }, ` ${pr.draft ? "concept · " : ""}${pr.ci ? `tests ${CI_LABEL[pr.ci] ?? pr.ci}` : "geen tests"} · ${ago(pr.updatedAt)}`))))
+        : null,
+      p.lastCommit ? h("p", { class: "small muted" }, `Laatste commit ${ago(p.lastCommit.at)} op ${p.lastCommit.branch}: `, p.lastCommit.url ? h("a", { href: p.lastCommit.url, target: "_blank", rel: "noopener" }, p.lastCommit.title) : p.lastCommit.title) : null,
+      events.length ? h("h3", {}, "Recent") : null,
+      events.length ? h("ol", { class: "timeline" }, ...events.map((e) => h("li", {}, h("time", {}, time(e.at)), h("span", {}, this.describe(e))))) : null,
+      rest.length ? h("details", { class: "backlog-rest" }, h("summary", {}, `Rest van de backlog (${rest.length})`), h("ul", { class: "backlog" }, ...rest.map((i) => h("li", {}, h("b", {}, i.title), h("span", { class: "small muted" }, ` · ${i.section}`))))) : null,
+      h(
+        "div",
+        { class: "buttons" },
+        h("button", { onclick: () => void this.act(async () => void (await this.deps.source.refreshCodeProject(p.key)), "🔄 Bijgewerkt") }, "🔄 Nu verversen"),
+        h("button", { onclick: () => this.open("follow", p.key) }, "✏️ Instellingen"),
+        h(
+          "button",
+          {
+            class: "warn",
+            onclick: () => {
+              if (window.confirm(`${p.name} niet meer volgen? De repository en de site blijven gewoon bestaan.`)) {
+                void this.act(() => this.deps.source.removeCodeProject(p.key), `${p.name} staat niet meer in de werkplaats`).then(() => this.open("workshop"));
+              }
+            },
+          },
+          "Niet meer volgen",
+        ),
+      ),
+      p.polledAt ? h("p", { class: "small muted" }, `GitHub bekeken ${ago(p.polledAt)}${p.health.checkedAt ? ` · site gecontroleerd ${ago(p.health.checkedAt)}` : ""}.`) : null,
+    );
+  }
+
+  /** Opdracht met context kopiëren en Claude Code openen. */
+  private sendToClaude(p: CodeProject, text: string): void {
+    const task = text.trim();
+    if (!task) {
+      this.toast("Schrijf eerst wat Claude Code moet doen.", "warn");
+      return;
+    }
+    const prompt = [
+      `Project: ${p.name}${p.repo ? ` (${p.repo}${p.defaultBranch ? `, branch ${p.defaultBranch}` : ""})` : ""}`,
+      `Opdracht: ${task}`,
+      "",
+      `Lees eerst CLAUDE.md${p.backlog ? ` en ${p.backlog.path}` : ""}. Werk in kleine, geteste stappen, commit met duidelijke berichten en open een draft pull request, zodat het kantoor van HQ kan meekijken. Werk ${p.backlog?.path ?? "de backlog"} bij als je iets afrondt of iets nieuws voor mij (Kalle) vindt.`,
+    ].join("\n");
+    const copied = copyText(prompt);
+    window.open("https://claude.ai/code", "_blank", "noopener");
+    this.toast(copied ? "📋 Opdracht gekopieerd: plak hem in Claude Code" : "Kopiëren lukte niet; de opdracht staat hieronder om over te nemen", copied ? "good" : "warn");
+  }
+
+  private sessionPanel(actorId: string): HTMLElement {
+    const s = this.snap!.code.sessions.find((x) => x.actorId === actorId);
+    if (!s) return h("div", {}, h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"), h("p", { class: "muted" }, "Deze sessie is klaar en uit de werkplaats vertrokken."));
+    const st = SESSION_STATE[s.state];
+    const project = this.snap!.code.projects.find((p) => p.key === s.projectKey);
+    const mine = this.events.filter((e) => e.agentId === actorId).slice(-12).reverse();
+    return h(
+      "div",
+      { class: "agent-panel" },
+      h("button", { class: "back", onclick: () => (project ? this.open("code", project.key) : this.open("workshop")) }, `← ${project?.name ?? "Werkplaats"}`),
+      h("h2", {}, `🤖 Claude · ${project?.name ?? "project"}`),
+      h("p", { class: "muted" }, `${s.source === "local" ? "Claude Code op je computer" : "Claude Code in de cloud"}${s.branch ? ` · branch ${s.branch}` : ""}`),
+      h(
+        "section",
+        { class: "card now" },
+        h("div", { class: "row" }, h("span", { class: `pill ${st.tone}` }, st.label), h("span", { class: "muted" }, `sinds ${time(s.startedAt)}`)),
+        h("h3", {}, "Opdracht"),
+        h("p", { class: s.title ? "task" : "muted" }, s.title ?? "Onbekend (HQ ziet de opdracht alleen met de live-koppeling)"),
+        h("h3", {}, "Laatste stap"),
+        h("p", {}, `${s.lastAction ?? "–"} · ${ago(s.lastActivityAt)}`),
+      ),
+      h(
+        "section",
+        { class: "card grid2" },
+        stat("Commits", String(s.commits)),
+        stat("Pull request", s.pr ? `#${s.pr.number} ${s.pr.state === "merged" ? "samengevoegd" : s.pr.state === "closed" ? "gesloten" : "open"}` : "nog niet"),
+        s.pr?.ci ? stat("Tests", CI_LABEL[s.pr.ci] ?? s.pr.ci) : null,
+      ),
+      h(
+        "div",
+        { class: "buttons" },
+        s.url ? h("a", { class: "button good", href: s.url, target: "_blank", rel: "noopener" }, "💬 Open sessie in Claude") : null,
+        s.pr ? h("a", { class: "button", href: s.pr.url, target: "_blank", rel: "noopener" }, `🔀 PR #${s.pr.number}`) : null,
+        h("button", { onclick: () => this.follow(actorId) }, this.deps.director.follow === actorId ? "📍 Volgen uit" : "📍 Volgen"),
+      ),
+      mine.length ? h("h3", {}, "Recent") : null,
+      mine.length ? h("ol", { class: "timeline" }, ...mine.map((e) => h("li", {}, h("time", {}, time(e.at)), h("span", {}, this.describe(e))))) : null,
+    );
+  }
+
+  private followPanel(key?: string): HTMLElement {
+    const snap = this.snap!;
+    const existing = key ? snap.code.projects.find((p) => p.key === key) : undefined;
+    const field = (label: string, input: HTMLElement, help?: string) => h("label", { class: "field" }, h("span", {}, label), input, help ? h("span", { class: "small muted" }, help) : null);
+    const repo = h("input", { type: "text", value: existing?.repo ?? "", placeholder: "eigenaar/repository", list: "hq-repos", autocomplete: "off" }) as HTMLInputElement;
+    const repos = h("datalist", { id: "hq-repos" });
+    const name = h("input", { type: "text", value: existing?.name ?? "", placeholder: "Naam van het project", maxlength: "40" }) as HTMLInputElement;
+    const url = h("input", { type: "url", value: existing?.url ?? "", placeholder: "https://mijnproject.nl" }) as HTMLInputElement;
+    const health = h("input", { type: "url", value: existing?.healthUrl ?? "", placeholder: "https://mijnproject.nl/api/gezondheid" }) as HTMLInputElement;
+    const branch = h(
+      "select",
+      {},
+      h("option", { value: "" }, "(geen)"),
+      ...snap.branches.filter((b) => b.slug !== "holding").map((b) => h("option", { value: b.slug, ...(existing?.branch === b.slug ? { selected: true } : {}) }, b.name)),
+    ) as HTMLSelectElement;
+    const backlog = h("input", { type: "text", value: existing?.backlog?.path ?? "BACKLOG.md" }) as HTMLInputElement;
+    const note = h("p", { class: "small muted" }, "");
+    void this.deps.source
+      .codeRepos()
+      .then(({ repos: list, error }) => {
+        repos.replaceChildren(...list.map((r) => h("option", { value: r.repo }, r.description ?? "")));
+        note.textContent = error ? `Repositories ophalen lukte niet: ${error}` : list.length ? `${list.length} repositories gevonden: begin te typen om te kiezen.` : "";
+        repo.addEventListener("change", () => {
+          const r = list.find((x) => x.repo === repo.value.trim());
+          if (!r) return;
+          if (!name.value) name.value = r.repo.split("/")[1]!.replace(/[-_]/g, " ").replace(/^./, (c) => c.toUpperCase());
+          if (!url.value && r.homepage) url.value = r.homepage;
+        });
+      })
+      .catch(() => undefined);
+    const save = () => {
+      const input = {
+        ...(existing ? { key: existing.key } : {}),
+        name: name.value.trim(),
+        repo: repo.value.trim() || null,
+        url: url.value.trim() || null,
+        healthUrl: health.value.trim() || null,
+        branch: branch.value || null,
+        backlogPath: backlog.value.trim() || "BACKLOG.md",
+      };
+      void this.act(() => this.deps.source.saveCodeProject(input), existing ? "✅ Opgeslagen" : `✅ ${input.name} staat in de werkplaats`).then(() => this.open("workshop"));
+    };
+    return h(
+      "div",
+      { class: "follow-panel" },
+      h("button", { class: "back", onclick: () => (existing ? this.open("code", existing.key) : this.open("workshop")) }, "← Terug"),
+      h("h2", {}, existing ? `✏️ ${existing.name}` : "➕ Project volgen"),
+      h("p", { class: "muted" }, "HQ kijkt dan om de paar minuten op GitHub (commits, Claude Code-sessies, pull requests, tests, uitrol, backlog) en controleert of de site online is. Alleen lezen: HQ verandert niets aan je project."),
+      field("Repository (eigenaar/naam)", repo, "Leeg laten als het project (nog) niet op GitHub staat."),
+      repos,
+      note,
+      field("Naam", name),
+      field("Website", url, "Het adres dat klanten zien."),
+      field("Gezondheidscheck (optioneel)", health, "Een adres dat 200 geeft als alles werkt, en iets anders als de database of de scan eruit ligt."),
+      field("Hoort bij tak", branch),
+      field("Backlog-bestand", backlog, "Punten onder een kopje als 'dit ligt bij Kalle' komen in het kantoor bij jou te staan."),
+      h("div", { class: "buttons" }, h("button", { class: "good", onclick: save }, existing ? "Opslaan" : "Volgen")),
     );
   }
 
@@ -1076,10 +1404,52 @@ export class Ui {
   }
 }
 
-function chip(label: string, value: string, sub: string, onClick?: () => void, alert = false): HTMLElement {
+/** Welke werkplaats-gebeurtenissen verdienen een melding? */
+function codeTone(e: OfficeEvent): "info" | "good" | "warn" | "bad" | undefined {
+  switch (e.type) {
+    case "code.health":
+      return e.data.state === "down" ? "bad" : "good";
+    case "code.deploy":
+      return e.data.state === "success" ? "good" : "bad";
+    case "code.ci":
+      return e.data.state === "failed" ? "warn" : undefined;
+    case "code.pr":
+      return e.data.action === "merged" ? "good" : undefined;
+    case "code.backlog":
+      return Array.isArray(e.data.added) && e.data.added.length ? "info" : undefined;
+    case "code.session":
+      return e.data.action === "task" || e.data.action === "stopped" ? "info" : undefined;
+    default:
+      return undefined;
+  }
+}
+
+/** Tekst naar het klembord. Werkt ook zonder https (dan via een verborgen tekstvak). */
+function copyText(text: string): boolean {
+  try {
+    if (window.isSecureContext && navigator.clipboard) {
+      void navigator.clipboard.writeText(text);
+      return true;
+    }
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.setAttribute("readonly", "");
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    const ok = document.execCommand("copy");
+    area.remove();
+    return ok;
+  } catch {
+    return false;
+  }
+}
+
+function chip(label: string, value: string, sub: string, onClick?: () => void, alert = false, title?: string): HTMLElement {
   return h(
     onClick ? "button" : "div",
-    { class: `chip${alert ? " alert" : ""}`, ...(onClick ? { onclick: onClick } : {}) },
+    { class: `chip${alert ? " alert" : ""}`, ...(onClick ? { onclick: onClick } : {}), ...(title ? { title } : {}) },
     h("span", { class: "chip-label" }, label),
     h("b", {}, value),
     h("span", { class: "chip-sub" }, sub),
