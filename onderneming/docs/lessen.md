@@ -9,8 +9,11 @@ lees het voordat je iets aan het systeem verandert.
   systeem om agents aan te sturen. Les: bij een lang document eerst vaststellen welke fase nu aan de beurt is.
 - **Bouwen tegen de echte API, niet tegen documentatie.** Paperclip lokaal draaien en `/api/openapi.json` ophalen
   leverde veel op. Een paar details stonden niet in de docs (zie hieronder).
-- **Kleine stappen met tests** (79 tests, PGlite als in-memory Postgres, een nep-Paperclip) en daarna end-to-end
+- **Kleine stappen met tests** (PGlite als in-memory Postgres, een nep-Paperclip) en daarna end-to-end
   tegen een echte Paperclip. De e2e-test vond twee fouten die de unit-tests misten: het icoon en de skills-lijst.
+- **CI startte niet.** De eerste PR kreeg geen enkele GitHub Actions-run, ook niet na een nacht. Waarschijnlijk
+  staat Actions uit voor deze repo (aanzetten: Settings → Actions → General). Draai tot die tijd zelf
+  `npm run typecheck && npm test && npm run build` in `hq/` voordat je iets merget.
 
 ## Paperclip (getest met versie 2026.916.1)
 - Met `requireBoardApprovalForNewAgents` weigert Paperclip directe aanmaak (`POST /agents`). Gebruik

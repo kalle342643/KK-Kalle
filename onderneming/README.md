@@ -44,10 +44,13 @@ Volledige installatie: **[docs/SETUP.md](docs/SETUP.md)** (VPS, Tailscale, Paper
 # ontwikkelen/testen op je eigen computer
 cd onderneming/hq
 npm install
-npm test                  # 79 tests, geen database of Paperclip nodig
+npm test                  # geen database of Paperclip nodig
 npm run build
 node dist/main.js help    # alle commando's
 ```
+
+Dezelfde stappen draaien in CI (`.github/workflows/hq.yml`) bij elke PR, als GitHub Actions aan staat voor de
+repo (Settings → Actions → General).
 
 ## Commando's (`node dist/main.js <commando>`)
 | Commando | Wat |
