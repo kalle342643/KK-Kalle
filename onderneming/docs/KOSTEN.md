@@ -10,7 +10,10 @@ AI-gebruik, niet de server. Daarom worden agents alleen op schema of bij een taa
 | of: een computer thuis | €0, plus stroom ±€2–5 |
 | of: Hetzner CX33 (4 vCPU, 8 GB) | ~€7 (prijs na de verhoging van april 2026, volgens je onderzoek) |
 | Tailscale, Telegram, Supabase (gratis laag) | €0 |
-| Het 3D-kantoor | €0: het draait in je browser en gebruikt geen AI |
+| Het 3D-kantoor | €0 en 0 tokens: het draait in je browser en doet zelf geen AI-aanvragen (een "uit"-knop zou dus niets besparen) |
+| De werkplaats (GitHub meelezen, gezondheidscheck) | €0: GitHub-token is gratis, meelezen kost geen tokens |
+| Webtools voor agents (Crawl4AI, last30days, Graphify) | €0: open source, draaien op je eigen server; alleen het lezen van de resultaten kost tokens |
+| Gratis AI-router (LiteLLM) | €0: open source; de aanbieders zelf binnen hun gratis laag |
 | Domeinnaam (alleen als een experiment er een nodig heeft, via een uitgaveverzoek) | ~€1 |
 
 ## AI-gebruik (variabel)
@@ -63,3 +66,10 @@ is in Paperclip een configuratiekwestie; economisch gebeurt het pas als de takke
 - Een lager model voor een rol (`model:` in het sjabloon); `update.sh` zet het door.
 - Claude-abonnement in plaats van API-sleutel via de AI-verbinding in Paperclip. Dan valt het gebruik binnen je
   abonnementslimiet, maar het beleid daarvoor veranderde in 2026 een paar keer: reken er niet op.
+- **Gratis AI** (SETUP.md, *Optioneel*): de kennisgraaf (`GRAPHIFY_BACKEND=gratis`) en eenvoudige rollen zoals
+  verkenners (`HQ_GRATIS_AI_ROLES=verkenner`) via de gratis lagen van Groq, Cerebras en Google. Kost €0 zolang je
+  binnen hun limieten blijft; de router schakelt door naar de volgende als er één vol zit. Minder slim dan Claude,
+  dus niet voor de CEO, de lead of de bouwer. Nooit via gedeelde abonnementen of extra accounts (OmniRoute):
+  dat is tegen de voorwaarden van de aanbieders.
+- **Kennisbank eerst:** agents vragen `hq kennis` voordat ze het web op gaan, en HQ zet bij elk voorstel wat al
+  bekend is. Dat scheelt dubbel onderzoek (en dus tokens).

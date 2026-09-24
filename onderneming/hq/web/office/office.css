@@ -1287,6 +1287,17 @@ a.button.good {
   color: #ffffff;
   border-color: transparent;
 }
+.task-form summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+.task-form[open] summary {
+  margin-bottom: 6px;
+}
+.task-form .row select {
+  width: auto;
+  flex: 1;
+}
 details.backlog-rest summary {
   cursor: pointer;
   font-weight: 650;

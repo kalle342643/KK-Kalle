@@ -15,8 +15,13 @@ flowchart TD
       HQ --> DB[("PostgreSQL<br/>HQ-database")]
       HQ -->|elk uur| V["Kennisbank-map<br/>(Obsidian-notities)"]
       V -->|'s nachts| G["Graphify<br/>kennisgraaf"]
+      CC -->|"hq-web · hq-trends · hq-graaf"| WEB["het web<br/>(openbare pagina's, open API's)"]
+      CC -.->|"rollen op gratis AI"| LL["gratis AI-router<br/>(LiteLLM, 127.0.0.1:4000)"]
     end
     CC -->|model| API["Claude API"]
+    LL -->|"eigen sleutel per aanbieder"| FREE["Groq · Cerebras · Gemini · …"]
+    HQ -->|"alleen lezen"| GH["GitHub<br/>je projecten · Claude Code-commits"]
+    HQ -->|gezondheidscheck| SITE["je sites<br/>(bv. /api/gezondheid)"]
     X["Stripe · CrazyGames-CSV · /omzet"] --> HQ
     HQ -->|meldingen| T["Telegram (en optioneel WhatsApp)"]
 ```
@@ -45,6 +50,10 @@ gebeurt echt. Er wordt niets gesimuleerd behalve wat sfeer als er niets gebeurt 
 | Drie of meer van één afdeling in de vergaderzaal | ze werken tegelijk aan iets | afgeleid uit de runs |
 | De HQ-bot in de controlekamer stuurt iets | een Telegram-bericht aan jou | HQ-meldingen |
 | Rood licht, iedereen terug naar de eigen plek | noodstop | HQ kill switch |
+| Ballon "🔎 zoekt: …" of "🌐 leest: …" boven een agent | de agent gebruikt het web of de kennisgraaf tijdens zijn run | het run-logboek in Paperclip (`heartbeat-runs/:id/log`) |
+| Een Claude-poppetje in de werkplaats typt of zegt "✍️ …" | een Claude Code-sessie werkt aan een van je projecten, of committe iets | GitHub (commits met `Claude-Session`, branches `claude/…`), of live via een hook |
+| Het bord van een project wordt rood, de HQ-bot rent erheen | de site ligt eruit (twee gezondheidschecks op rij mis) | HQ-gezondheidscheck |
+| Confetti bij een projectbord | een pull request is samengevoegd of een nieuwe versie staat live | GitHub (pull requests, deployments) |
 
 Klikbaar: elk poppetje (naam geven, uiterlijk kiezen, waar het aan werkt, kosten, pauzeren), het projectenbord
 (vergaderzaal), de cijfermuur (controlekamer), de kluis (grootboek), het hologram (kennisgraaf), jouw bureau
@@ -70,15 +79,55 @@ flowchart LR
   Poppetjes en meubels zijn van Kenney (CC0, zie `hq/web/assets/CREDITS.md`). Er draait geen extra server.
 - Alleen jij komt erin (dezelfde `HQ_ADMIN_TOKEN` als de eigenaar-API, als cookie). `/demo` toont niets echts.
 
+## De werkplaats (je projecten en Claude Code)
+Naast de holding bouw je zelf aan projecten met Claude Code (bijvoorbeeld een scanner-SaaS of een game). HQ volgt
+die in de werkplaats, zonder er iets aan te veranderen:
+- **GitHub, alleen lezen** (`HQ_GITHUB_TOKEN`), om de twee minuten, met ETags (een ongewijzigde pagina kost geen
+  limiet): de hoofdbranch, branches van Claude Code (`claude/…`) en van open pull requests, hun commits, pull
+  requests, tests (Actions en commit-statussen, zoals Vercel), de laatste uitrol naar productie (deployments) en
+  `BACKLOG.md`.
+- **Claude Code-sessies** zijn te herkennen aan `Claude-Session: https://claude.ai/code/session_…` onder de commits
+  (Claude Code in de cloud zet die er zelf onder) en aan de eigen branch. Eén branch = één sessie. Optioneel meldt
+  een hook (`deploy/claude-code/hq-hook.mjs`) elke stap live aan `POST /api/hooks/claude-code`, met een eigen geheim
+  dat alleen kan schrijven.
+- **Gezondheidscheck** per site (om de vijf minuten): twee keer mis = storing, met bericht; de uptime van de
+  laatste 24 uur staat op het bord.
+- **Jouw beurt:** punten in de backlog onder een kopje dat zegt dat ze bij jou liggen, komen bovenaan in het
+  projectpaneel en tellen mee in de chip in de bovenbalk. Zo zie je in één oogopslag wat er tussen je project en
+  de eerste omzet staat, en wat alleen jij kunt doen (KvK, domein, accounts, betalen).
+
+## Agents op het web
+Elke agent heeft de zoek- en leestools van Claude Code (WebSearch, WebFetch; Paperclip start runs zonder
+toestemmingsvragen), plus drie commando's die setup-vps.sh in `/usr/local/bin` zet: `hq-web` (Crawl4AI, een echte
+browser; weigert interne adressen en respecteert robots.txt zelf), `hq-trends` (last30days, alleen bronnen met een
+open API) en `hq-graaf` (Graphify). De skills `onderzoek` en `kennisgraaf` beschrijven de volgorde (eerst de
+kennisbank, dan het web, dan opschrijven) en de regels. HQ leest in het run-logboek van Paperclip mee welke tools
+een agent gebruikt en laat dat in het kantoor zien; je hoeft daar niets voor te installeren.
+
+Bij elk experimentvoorstel zoekt HQ zelf in de kennisbank naar vergelijkbare experimenten en lessen (de HQ-bot
+loopt naar de kennisruimte). Dat staat bij het voorstel dat jij goedkeurt, en de agent krijgt het terug met advies:
+een eerder afgeschoten idee komt zo niet ongemerkt terug.
+
+## Gratis AI
+Een LiteLLM-router op de server zet de gratis lagen van een paar aanbieders achter één model ("gratis"), in een
+vaste volgorde. Geeft er één een limietfout (429), dan rust dat model een minuut en neemt de volgende het over.
+`hq gratis-ai` vraagt elke aanbieder welke modellen er nu zijn en schrijft de config; sleutels staan er nooit in.
+Rollen uit `HQ_GRATIS_AI_ROLES` draaien Claude Code via de router (Anthropic-formaat, met een kleiner
+contextvenster), en Graphify kan er de kennisgraaf mee bouwen. Wat we bewust niet doen: abonnementen of
+inloggegevens van chat-apps hergebruiken of accounts stapelen om limieten te ontlopen (zoals OmniRoute): dat
+schendt de voorwaarden van die aanbieders, en dan ben jij als eigenaar aansprakelijk.
+
 ## Kennisbank en Graphify
 Agents maken dezelfde fout niet twee keer als ze eerst kijken wat al bekend is. Daarom:
-1. **Eerst vragen:** `GET /api/agent/knowledge?q=...` doorzoekt lessen, notities en de kennisgraaf in één keer
-   (skill `hq-api`). Het poppetje loopt dan naar de kennisbank.
+1. **Eerst vragen:** `hq kennis "…"` (= `GET /api/agent/knowledge?q=...`) doorzoekt lessen, notities en de
+   kennisgraaf in één keer (skills `hq-api` en `kennisgraaf`). Het poppetje loopt dan naar de kennisbank.
+   Verbanden zoeken kan ook direct in de graaf: `hq-graaf uitleg|pad|vraag`. Bouwers gebruiken Graphify op hun
+   eigen code (`graphify update .`, zonder AI).
 2. **Opschrijven:** lessen (na een experiment) en notities (`POST /api/agent/notes`, max 20 per dag per agent).
 3. **De map:** HQ schrijft elk uur een Obsidian-map (`HQ_VAULT_DIR`) met takken, experimenten, lessen, notities
    en agents, met `[[links]]`. Je kunt hem zelf openen in Obsidian.
 4. **De graaf:** 's nachts bouwt [Graphify](https://github.com/Graphify-Labs/graphify) (Apache-2.0, `pipx install graphifyy`) uit die map een kennisgraaf
-   (met Haiku, alleen als `GRAPHIFY_API_KEY` is ingesteld). Zonder sleutel maakt HQ zelf een eenvoudigere graaf uit
+   (met Haiku als `GRAPHIFY_API_KEY` is ingesteld, of gratis via de router met `GRAPHIFY_BACKEND=gratis`). Zonder sleutel maakt HQ zelf een eenvoudigere graaf uit
    de verbanden (tak, experiment, les, tag, agent). Het hologram in de kennisbank toont de graaf; `/kennis` opent
    de interactieve weergave van Graphify zelf.
 
@@ -175,6 +224,9 @@ het besluit uit. Beslis je in de Paperclip-UI, dan neemt HQ dat binnen twee minu
 | `office_events` | alles wat het kantoor laat zien, uniek per bron (30 dagen bewaard) |
 | `notes` | notities van agents voor de kennisbank (full-text doorzoekbaar) |
 | `agent_profiles` | bijnaam en poppetje die jij een agent (of jezelf, of de HQ-bot) gaf |
+| `code_projects` | projecten in de werkplaats: repository, site, gezondheidscheck, en wat HQ de vorige keer zag |
+| `code_sessions` | Claude Code-sessies per project (via commits of hooks): opdracht, laatste stap, pull request |
+| `code_health` | elke gezondheidscheck (14 dagen bewaard), voor de uptime |
 
 ## Uitbreiden
 - **Nieuwe tak-soort:** een YAML in `company/templates/branches/` (agents + routines). Daarna `hq bootstrap`.

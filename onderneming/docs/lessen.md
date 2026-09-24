@@ -87,6 +87,41 @@ bedoeling was. Wat dat opleverde:
   (tekst in `details.bodySnippet`), nieuwe taken `issue.created`, sollicitanten `agent.hire_created`, budgetstops
   `budget.hard_threshold_crossed`. Tokens en kosten van een run staan in `usageJson` van `/heartbeat-runs/{id}`.
 
+## Agents op het web, werkplaats en gratis AI (24 september)
+- **Paperclip start agents met een kaal PATH.** De service (`paperclipai service install`) zet alleen de map van
+  Node en het standaard-PATH van systemd klaar; `~/.local/bin` en `~/.npm-global/bin` ontbreken. Commando's die
+  agents nodig hebben (`hq`, `hq-web`, `hq-trends`, `hq-graaf`, `graphify`, `crwl`, `claude`) zet setup-vps.sh
+  daarom als symlink in `/usr/local/bin`. Les: test een tool altijd zoals de agent hem aanroept, niet in je eigen shell.
+- **Webtools: controleer zelf de regels.** Crawl4AI heeft `check_robots_txt`, maar achter een proxy haalde het
+  robots.txt niet op en las het Reddit gewoon (terwijl Reddit alles verbiedt). `hq-web` controleert robots.txt nu
+  zelf (RFC 9309: 4xx = geen regels, 5xx of geen verbinding = niets lezen) en weigert interne adressen.
+- **last30days is standaard niet netjes genoeg.** Zonder sleutels scrapet het DuckDuckGo en Startpage (met een
+  omweg als DuckDuckGo blokkeert) en leest het Reddit via omwegen, want Reddit blokkeert zijn eigen zoek-API. Dat
+  is blokkades omzeilen. `hq-trends` gebruikt daarom alleen Hacker News (Algolia-API), GitHub en Polymarket
+  (open API's), zet de eigen webzoekfunctie uit (`--web-backend none`) en filtert tips naar scrapers weg. Niet als
+  Claude Code-skill installeren: de SKILL.md stuurt agents naar precies die bronnen.
+- **Wat een agent doet staat in het run-logboek.** Paperclip bewaart per run een JSONL-logboek
+  (`GET /heartbeat-runs/{id}/log?offset=…`, regels `{ts, stream, chunk}`). Bij de ACP-engine (standaard) staan daar
+  regels `{"type":"acpx.tool_call","name":…,"input":{…}}` in, bij de CLI-engine stream-json. Stream-json kan midden in
+  een regel knippen: bewaar het onafgemaakte stuk tot de volgende chunk. Zo ziet het kantoor "🔎 zoekt: …" zonder
+  hooks op de server.
+- **Claude Code in de cloud tekent zijn commits.** Elke commit krijgt `Claude-Session: https://claude.ai/code/session_…`.
+  Daarmee koppelt HQ commits, branch en pull request aan één sessie, zonder iets in die repositories te veranderen.
+  Getest tegen de echte GitHub-API met deze repository: HQ zag deze sessie, 14 commits, PR #2 en groene tests.
+- **GitHub-limiet sparen met ETags.** Een verzoek met `If-None-Match` dat 304 teruggeeft, telt niet mee. Per
+  project volgt HQ alleen de hoofdbranch, `claude/…`-branches en branches van open PR's.
+- **Tekst in meldingen niet te grondig opschonen.** De opschoonfunctie voor Paperclip-reacties haalde alle `#` en
+  `_` weg; daardoor werd "PR #7" "PR 7" en `NORMWACHT_KVK` "NORMWACHTKVK". Nu alleen echte Markdown-opmaak weg.
+- **LiteLLM: `order` + `allowed_fails: 0` + `num_retries` = doorschakelen.** Met een nep-aanbieder die altijd een
+  limietfout geeft (`mock_response: litellm.RateLimitError`) antwoordde de tweede, zowel in OpenAI- als in
+  Anthropic-formaat (`/v1/messages`). Claude Code zelf werkt via de router (`ANTHROPIC_BASE_URL`), maar kent de
+  modelnaam "gratis" niet en rekent dan op 200k context: zet `CLAUDE_CODE_MAX_CONTEXT_TOKENS` lager.
+- **Gratis ≠ vrij van regels.** OmniRoute stapelt abonnementen en accounts; dat schendt de voorwaarden van de
+  aanbieders. Hier: één eigen sleutel per aanbieder. Cohere-proefsleutels zijn niet voor commercieel gebruik (niet
+  opgenomen); Mistral (Experiment) en sommige OpenRouter-modellen kunnen je gegevens gebruiken: dat staat erbij.
+- **`pkill -f` doodt je eigen shell** als het patroon ook in je eigen commando staat (exit 144, twee keer gebeurd).
+  Stop processen op PID.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.
@@ -107,3 +142,12 @@ bedoeling was. Wat dat opleverde:
 - **Graphify met een echte sleutel** (`graphify extract`): alleen de aanroep en het inlezen van de graaf zijn getest.
 - **Een gratis Oracle-server (ARM):** het installatiescript is niet op ARM gedraaid; Node, PostgreSQL, Tailscale en
   Paperclip hebben wel ARM-versies.
+- **Webtools op de server:** `hq-web`, `hq-trends` en `hq-graaf` zijn in de sandbox getest (Crawl4AI 0.9.4 met
+  Playwright-headless-shell, last30days 3.25.0, Graphify 0.9.67), maar nog niet in een echte agent-run op de server.
+- **Het run-logboek in een echte ACP-run:** de lezer is getest met regels zoals de code van Paperclip ze schrijft,
+  niet met een echte run. Kijk bij de eerste runs of "🔎 zoekt" en "🌐 leest" in het kantoor verschijnen.
+- **Gratis AI met echte sleutels:** de router is getest met nep-aanbieders en met een door HQ gemaakte config
+  (LiteLLM 1.102.1 start en toont het model), niet met echte sleutels. Welke modellen de aanbieders nu hebben,
+  bepaalt `hq gratis-ai` bij het draaien.
+- **Hooks vanuit Claude Code in de cloud:** het script en de installatie zijn lokaal getest (geheimen weggepoetst,
+  niets naar stdout, altijd exit 0), de route via Tailscale Funnel en de netwerkinstellingen van een cloud-omgeving niet.

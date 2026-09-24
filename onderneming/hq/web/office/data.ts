@@ -35,6 +35,8 @@ export interface DataSource {
   setProfile(agentId: string, profile: { nickname?: string | null; avatar?: number | null }): Promise<void>;
   project(id: number): Promise<ProjectDetail>;
   graph(): Promise<KnowledgeGraph>;
+  /** Een agent een taak geven (wordt een Paperclip-taak op zijn naam). */
+  giveTask(agentId: string, task: { title: string; description?: string; priority?: "high" | "medium" | "low" }): Promise<void>;
   /** Werkplaats: een project volgen of bijwerken, weghalen, nu verversen, en repositories om uit te kiezen. */
   saveCodeProject(input: CodeProjectInput): Promise<void>;
   removeCodeProject(key: string): Promise<void>;
@@ -129,6 +131,9 @@ export class LiveSource implements DataSource {
   }
   graph(): Promise<KnowledgeGraph> {
     return request("GET", "/api/owner/knowledge/graph?max=400");
+  }
+  async giveTask(agentId: string, task: { title: string; description?: string; priority?: "high" | "medium" | "low" }): Promise<void> {
+    await request("POST", `/api/owner/agents/${encodeURIComponent(agentId)}/task`, task);
   }
   async saveCodeProject(input: CodeProjectInput): Promise<void> {
     await request("POST", "/api/owner/code/projects", input);

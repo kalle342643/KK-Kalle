@@ -95,6 +95,8 @@ export class Ui {
   private snap: OfficeSnapshot | null = null;
   private readonly events: OfficeEvent[] = [];
   private panel: { kind: PanelKind; arg?: string } | null = null;
+  /** Formulieren die je aan het invullen bent, blijven staan als het paneel ververst (dat gebeurt bij elke gebeurtenis). */
+  private readonly drafts = new Map<string, HTMLElement>();
   private readonly el: {
     top: HTMLElement;
     company: HTMLElement;
@@ -597,12 +599,21 @@ export class Ui {
     const look = actor?.info.look ?? 0;
     const thumbs = this.deps.thumbs();
 
-    const input = h("input", { type: "text", value: nickname, placeholder: name, maxlength: "30", "aria-label": "Bijnaam" }) as HTMLInputElement;
-    const save = () =>
-      void this.act(() => this.deps.source.setProfile(id, { nickname: input.value.trim() || null }), input.value.trim() ? `✨ Heet nu ${input.value.trim()}` : "Bijnaam weggehaald");
-    input.addEventListener("keydown", (ev) => {
-      if (ev.key === "Enter") save();
-    });
+    // Hetzelfde invoerveld blijven gebruiken: het paneel ververst bij elke gebeurtenis, en dan mag je getypte naam niet weg.
+    let input = this.drafts.get(`rename:${id}`) as HTMLInputElement | undefined;
+    const save = () => {
+      const value = input!.value.trim();
+      void this.act(() => this.deps.source.setProfile(id, { nickname: value || null }), value ? `✨ Heet nu ${value}` : "Bijnaam weggehaald");
+    };
+    if (!input) {
+      input = h("input", { type: "text", value: nickname, placeholder: name, maxlength: "30", "aria-label": "Bijnaam" }) as HTMLInputElement;
+      input.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter") save();
+      });
+      this.drafts.set(`rename:${id}`, input);
+    } else if (document.activeElement !== input) {
+      input.value = nickname;
+    }
     const looks = h(
       "div",
       { class: "looks", hidden: true },
@@ -672,6 +683,7 @@ export class Ui {
           : h("button", { class: "warn", onclick: () => void this.act(() => this.deps.source.setAgentPaused(id, true), `⏸ ${nickname || name} is gepauzeerd`) }, "⏸ Pauzeren"),
       );
       parts.push(buttons);
+      if (agent.status !== "pending_approval" && agent.status !== "terminated") parts.push(this.taskForm(id, nickname || name));
       const projects = snap.projects.filter((p) => p.leadAgentId === id && ["running", "proposed", "keep", "iterate"].includes(p.status));
       if (projects.length) parts.push(h("h3", {}, "Leidt"), ...projects.map((p) => this.projectCard(p)));
     } else if (id === OWNER_ID) {
@@ -702,6 +714,48 @@ export class Ui {
       parts.push(h("h3", {}, "Recent"), h("ol", { class: "timeline" }, ...mine.map((e) => h("li", {}, h("time", {}, time(e.at)), h("span", {}, this.describe(e))))));
     }
     return h("div", { class: "agent-panel" }, ...parts);
+  }
+
+  /** Een taak geven: wordt een Paperclip-taak op naam van deze agent, en jij loopt er in het kantoor heen. */
+  private taskForm(id: string, name: string): HTMLElement {
+    const cached = this.drafts.get(`task:${id}`);
+    if (cached) return cached;
+    const title = h("input", { type: "text", placeholder: "Wat moet er gebeuren? (kort)", maxlength: "200", "aria-label": "Taak" }) as HTMLInputElement;
+    const details = h("textarea", { rows: "3", placeholder: "Uitleg, links, wanneer het klaar is (mag leeg)", "aria-label": "Uitleg bij de taak" }) as HTMLTextAreaElement;
+    const priority = h(
+      "select",
+      { "aria-label": "Prioriteit" },
+      h("option", { value: "medium" }, "Gewoon"),
+      h("option", { value: "high" }, "Eerst dit"),
+      h("option", { value: "low" }, "Als je tijd hebt"),
+    ) as HTMLSelectElement;
+    const send = () => {
+      const t = title.value.trim();
+      if (t.length < 3) {
+        this.toast("Schrijf in een paar woorden wat er moet gebeuren.", "warn");
+        return;
+      }
+      void this.act(
+        () => this.deps.source.giveTask(id, { title: t, description: details.value.trim() || undefined, priority: priority.value as "high" | "medium" | "low" }),
+        `📝 Taak gegeven aan ${name}`,
+      );
+      title.value = "";
+      details.value = "";
+    };
+    title.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") send();
+    });
+    const form = h(
+      "details",
+      { class: "card task-form" },
+      h("summary", {}, `📝 Taak geven aan ${name}`),
+      h("p", { class: "small muted" }, "Wordt een taak in Paperclip op naam van deze agent; die gaat er meteen mee aan de slag. Geld, publiceren en accounts blijven bij jou."),
+      title,
+      details,
+      h("div", { class: "row" }, priority, h("button", { class: "good", onclick: send }, "Geef taak")),
+    );
+    this.drafts.set(`task:${id}`, form);
+    return form;
   }
 
   private follow(id: string): void {
@@ -1108,7 +1162,11 @@ export class Ui {
         h("li", {}, "Klik op het projectenbord (vergaderzaal), de schermen (controlekamer), de kluis, het hologram (kennisbank) of je bureau."),
         h("li", {}, "Slepen = bewegen, scrollen of knijpen = zoomen, Q/E of ⟲ ⟳ = draaien."),
         h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel de poppetjes 'uit zichzelf' rondlopen (koffie, praatje). Dat is alleen sfeer en kost niets."),
+        h("li", {}, "📝 Klik op een agent om hem een taak te geven. 🛠️ In de werkplaats zie je je projecten (live, tests, uitrol, wat op jou wacht) en je Claude Code-sessies; daar geef je Claude Code ook een opdracht."),
+        h("li", {}, "🌐 Agents op het web: in het logboek zie je wie wat zoekt en leest. 🆓 Bij een agent met 'Gratis AI' draait die op de gratis router."),
       ),
+      h("h3", {}, "Kost het kantoor tokens?"),
+      h("p", { class: "small" }, "Nee. Het kantoor draait helemaal in je browser en doet zelf geen enkele AI-aanvraag: tekenen, lopen en de borden kosten 0 tokens. Een knop om de weergave uit te zetten zou dus niets besparen. Tokens kosten alleen het werk zelf: agents, Graphify en Claude Code. Wil je daarop besparen, kijk dan bij 🆓 Gratis AI in SETUP.md."),
       h("p", { class: "small muted" }, "3D-poppetjes en meubels: Kenney (www.kenney.nl), CC0."),
     );
   }
@@ -1198,7 +1256,10 @@ export class Ui {
       p.deploy?.url && p.deploy.url !== p.url ? h("a", { class: "button", href: p.deploy.url, target: "_blank", rel: "noopener" }, "🚀 Laatste uitrol") : null,
       p.ci?.url ? h("a", { class: "button", href: p.ci.url, target: "_blank", rel: "noopener" }, "🧪 Tests") : null,
     );
-    const task = h("textarea", { rows: "3", placeholder: "Wat moet Claude Code doen? Bv. 'Zet de KvK-gegevens in de colofon' of 'Maak de cookiescan sneller'", "aria-label": "Opdracht voor Claude Code" }) as HTMLTextAreaElement;
+    const task =
+      (this.drafts.get(`claude:${key}`) as HTMLTextAreaElement | undefined) ??
+      (h("textarea", { rows: "3", placeholder: "Wat moet Claude Code doen? Bv. 'Zet de KvK-gegevens in de colofon' of 'Maak de cookiescan sneller'", "aria-label": "Opdracht voor Claude Code" }) as HTMLTextAreaElement);
+    this.drafts.set(`claude:${key}`, task);
     return h(
       "div",
       { class: "code-panel" },
@@ -1220,7 +1281,16 @@ export class Ui {
         h("h3", {}, "🤖 Opdracht voor Claude Code"),
         h("p", { class: "small muted" }, "Schrijf wat er moet gebeuren. HQ zet er de context bij (repository, backlog, werkwijze), kopieert het, en opent Claude Code: plakken en gaan. Het werk verschijnt daarna vanzelf hier."),
         task,
-        h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.sendToClaude(p, task.value) }, "📋 Kopieer en open Claude Code")),
+        h("div", { class: "buttons" }, h(
+          "button",
+          {
+            class: "good",
+            onclick: () => {
+              if (this.sendToClaude(p, task.value)) task.value = "";
+            },
+          },
+          "📋 Kopieer en open Claude Code",
+        )),
       ),
       p.openPrs.length ? h("h3", {}, `Pull requests (${p.openPrs.length})`) : null,
       p.openPrs.length
@@ -1253,11 +1323,11 @@ export class Ui {
   }
 
   /** Opdracht met context kopiëren en Claude Code openen. */
-  private sendToClaude(p: CodeProject, text: string): void {
+  private sendToClaude(p: CodeProject, text: string): boolean {
     const task = text.trim();
     if (!task) {
       this.toast("Schrijf eerst wat Claude Code moet doen.", "warn");
-      return;
+      return false;
     }
     const prompt = [
       `Project: ${p.name}${p.repo ? ` (${p.repo}${p.defaultBranch ? `, branch ${p.defaultBranch}` : ""})` : ""}`,
@@ -1267,7 +1337,8 @@ export class Ui {
     ].join("\n");
     const copied = copyText(prompt);
     window.open("https://claude.ai/code", "_blank", "noopener");
-    this.toast(copied ? "📋 Opdracht gekopieerd: plak hem in Claude Code" : "Kopiëren lukte niet; de opdracht staat hieronder om over te nemen", copied ? "good" : "warn");
+    this.toast(copied ? "📋 Opdracht gekopieerd: plak hem in Claude Code" : "Kopiëren lukte niet; neem de opdracht over uit het tekstvak", copied ? "good" : "warn");
+    return copied;
   }
 
   private sessionPanel(actorId: string): HTMLElement {

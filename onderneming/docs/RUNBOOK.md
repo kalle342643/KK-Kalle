@@ -8,6 +8,10 @@
   op je wacht.
 - **Knoppen:** elk verzoek komt als bericht met ✅/❌. Twijfel je, laat het staan: niets gebeurt zonder jou.
   `/goedkeuringen` stuurt alles wat nog openstaat opnieuw.
+- **De werkplaats** (🛠️ bovenin): per project of de site online is, of de tests groen zijn en wat er live staat.
+  Bovenaan elk projectpaneel staat *Jouw beurt*: wat alleen jij kunt doen (KvK, domein, accounts, betalen). Dat is
+  meestal wat tussen een project en de eerste omzet staat, dus begin daar.
+- **Taak geven:** klik op een agent → *Taak geven*; of in de werkplaats een opdracht voor Claude Code.
 - **Maandag:** het portfolio-voorstel (budget per tak) en het weekplan van CEO Atlas.
 - **Woensdag:** de ideeënraad per tak; daar komen 1 à 2 experimentvoorstellen uit.
 
@@ -52,6 +56,11 @@ voordat je `/hervat` stuurt.
 | Het kantoor blijft op "laden" of is leeg | ververs de pagina; staat WebGL uit in je browser, gebruik dan `/overzicht`. "Niet ingelogd": open `/?token=<HQ_ADMIN_TOKEN>` opnieuw. Geen poppetjes: `hq bootstrap`. |
 | Grijze stip naast de bedrijfsnaam | de live verbinding met HQ is weg; het kantoor verbindt zelf opnieuw en haalt op wat het miste. Blijft hij grijs: `systemctl --user restart hq`. |
 | Hologram in de kennisbank is leeg | er zijn nog geen lessen of notities. Nu opbouwen: `hq kennis`. |
+| 🔴 "… ligt eruit" | open het project in de werkplaats: de laatste controle zegt waarom (503 = vaak de database, bv. een gepauzeerd gratis Supabase-project; geen antwoord = de site zelf). Kijk in het dashboard van je host (Vercel, Supabase). Als het weer werkt krijg je vanzelf 🟢. |
+| Werkplaats toont "geen toegang" of "token ongeldig" | het GitHub-token mist die repository of een recht (zie SETUP.md stap 11), of het is verlopen. Nieuw token in `hq.env`, `systemctl --user restart hq`. |
+| Claude Code-sessie staat niet in de werkplaats | HQ ziet een sessie pas aan zijn eerste commit (of direct met de hook). Nog niets gepusht = nog niets te zien. |
+| Agent zoekt niet op het web | `hq-web https://example.com` als gebruiker ai. "niet geïnstalleerd"? Draai `setup-vps.sh` opnieuw (kan geen kwaad). Een agent op gratis AI heeft geen WebSearch, alleen `hq-web` en `hq-trends`. |
+| Gratis AI werkt niet | `systemctl --user status gratis-ai`; `dist/main.js gratis-ai test`. "Sleutel ongeldig" bij `dist/main.js gratis-ai`: nieuwe sleutel bij die aanbieder, dan `--schrijf` en `systemctl --user restart gratis-ai`. Tijdelijk terug naar Claude: `HQ_GRATIS_AI_ROLES=` leeg en `bootstrap`. |
 
 ## Back-ups
 - HQ-database: elke nacht om 03:30 naar `~/backups/hq-JJJJ-MM-DD.sql.gz` (14 dagen bewaard).
@@ -71,7 +80,8 @@ paperclipai update                        # Paperclip
 Alles wat agents "weten" staat in `onderneming/company/`:
 - `agents/*.md`: CEO en analist
 - `templates/agents/*.md`: rollen in een tak (verkenner, pitcher, criticus, bouwer, ...)
-- `skills/*.md`: spelregels die agents delen (HQ-API, experiment-protocol, geld en regels, ...)
+- `skills/*.md`: spelregels die agents delen (HQ-API, onderzoek op het web, kennisgraaf, experiment-protocol,
+  geld en regels, ...)
 - `templates/branches/*.yaml`: welke agents en routines een nieuwe tak krijgt
 
 Pas aan, commit, en draai `update.sh`. Alleen wat echt veranderde wordt in Paperclip bijgewerkt. Een budget dat jij

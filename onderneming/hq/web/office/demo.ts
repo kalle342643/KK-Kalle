@@ -579,6 +579,21 @@ export class DemoSource implements DataSource {
     };
   }
 
+  async giveTask(agentId: string, task: { title: string; description?: string }): Promise<void> {
+    const a = this.agent(agentId);
+    if (!a) throw new Error("Onbekende agent.");
+    if (this.halted) throw new Error("De noodstop staat aan. Hervat eerst, dan kun je weer taken geven.");
+    this.emit({ type: "talk", agentId: OWNER_ID, targetAgentId: agentId, text: `Nieuwe taak voor jou: ${task.title}`, data: { kind: "delegate", by: "owner" } });
+    // Even later begint de agent eraan (zoals Paperclip hem wakker maakt).
+    window.setTimeout(() => {
+      if (this.runs.has(agentId) || this.halted) return;
+      this.runs.set(agentId, { until: this.clock + 25, task: task.title });
+      a.status = "running";
+      a.currentTask = task.title;
+      this.emit({ type: "run.started", agentId, text: task.title, data: { wakeReason: "issue_assigned" } });
+    }, 6000);
+  }
+
   async saveCodeProject(input: CodeProjectInput): Promise<void> {
     const key = input.key ?? (input.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "project");
     const existing = this.codeProjects.find((p) => p.key === key);

@@ -151,7 +151,77 @@ Wil je niet tot woensdag wachten? Start de routine *Ideeënraad Games-studio* me
 - [ ] `/stop test` → alle agents staan in Paperclip op gepauzeerd; `/hervat` → weer aan
 - [ ] Om 08:00 komt het dagrapport binnen
 
+## 11. De werkplaats: je projecten en Claude Code in het kantoor
+In de kamer *Werkplaats · Claude Code* staat per project een bord (online?, tests, laatste uitrol, wat op jou
+wacht) en zit elke Claude Code-sessie die aan dat project werkt als poppetje aan een bureau. HQ leest daarvoor
+alleen mee op GitHub; het verandert niets aan je repositories.
+
+1. **GitHub-token (alleen lezen).** github.com → *Settings → Developer settings → Personal access tokens →
+   Fine-grained tokens → Generate new token*. Kies *Only select repositories* en vink de repositories aan die
+   je wilt volgen. Onder *Repository permissions* zet je op **Read-only**: *Contents*, *Metadata*, *Pull requests*,
+   *Commit statuses*, *Deployments* en *Actions*. Zet het token als `HQ_GITHUB_TOKEN` in `hq.env` en herstart HQ.
+2. **Project volgen.** In het kantoor: 🛠️ *Werkplaats* → *Project volgen*. Kies de repository (de lijst komt uit
+   je token), geef een naam, het adres van de site en, als je die hebt, een gezondheidscheck (een adres dat 200
+   geeft als alles werkt, bijvoorbeeld `/api/gezondheid`). Een project zonder GitHub (alleen een site) kan ook;
+   een repository zonder site ook.
+3. **Controleren:** `node --env-file=$HOME/.config/hq/hq.env dist/main.js werkplaats` haalt alles één keer op en
+   toont per project de stand. Hetzelfde staat elke ochtend in je dagrapport.
+
+Wat je dan ziet:
+- **Claude Code-sessies** herkent HQ aan de regel `Claude-Session: https://claude.ai/code/session_…` onder de
+  commits en aan de `claude/…`-branch. Klik op het poppetje: opdracht, laatste stap, commits, pull request, en
+  een knop die de sessie in Claude opent.
+- **Jouw beurt:** punten uit `BACKLOG.md` onder een kopje als *"dit ligt bij Kalle"* of *"voor jou"* staan
+  bovenaan het projectpaneel. Andere namen voor jou: `HQ_OWNER_NAMES`.
+- **Storing:** twee mislukte gezondheidschecks op rij = de site ligt eruit. Je krijgt een Telegram-bericht, de
+  werkplaats-chip in de bovenbalk wordt rood en de HQ-bot rent naar het bord. Weer bereikbaar = nog een bericht.
+- **Opdracht voor Claude Code:** in het projectpaneel schrijf je wat er moet gebeuren; HQ zet er de context bij,
+  kopieert het en opent claude.ai/code. Plakken, en het werk verschijnt vanzelf in de werkplaats.
+
+## 12. Agents op het web
+Het installatiescript zette alles klaar: de eigen zoek- en leestools van Claude Code (WebSearch, WebFetch), en
+voor alle agents `hq-web` (pagina's lezen met een echte browser, Crawl4AI), `hq-trends` (waar praten mensen de
+afgelopen 30 dagen over, via last30days) en `hq-graaf` (de kennisgraaf). De skills `onderzoek` en `kennisgraaf`
+leggen uit hoe en binnen welke regels. Proberen als gebruiker ai:
+```bash
+hq-web https://example.com          # moet "Example Domain" tonen
+hq-trends "browser puzzle games"    # recente discussies van Hacker News, GitHub en Polymarket
+```
+`hq-web` leest alleen openbare pagina's en slaat sites over die dat in hun robots.txt verbieden. `hq-trends`
+gebruikt bewust alleen bronnen met een open API: Reddit, X, TikTok en YouTube staan uit (hun voorwaarden).
+In het kantoor zie je het terug: *"Rigel 🔎 zoekt: …"*, *"🌐 leest: crazygames.com/…"*.
+
 ## Optioneel
+**Claude Code live in het kantoor.** Zonder extra's ziet HQ je Claude Code-werk aan de commits (om de paar
+minuten). Wil je elke stap live zien (opdracht, zoeken, bestanden, tests), dan stuurt een kleine hook dat naar HQ.
+De hook stuurt nooit bestandsinhoud of volledige commando's, poetst alles weg wat op een sleutel lijkt, en kan
+Claude Code niet ophouden.
+- *Op je eigen computer:* `bash onderneming/deploy/claude-code/install-hook.sh http://<servernaam>:8080/api/hooks/claude-code <HQ_HOOK_TOKEN>`
+  (je computer zit via Tailscale al in je netwerk).
+- *Claude Code in de cloud (claude.ai/code):* die draait buiten je Tailscale-netwerk, dus HQ moet voor precies
+  dit ene adres bereikbaar zijn. Op de server: `sudo tailscale funnel --bg --set-path /api/hooks http://127.0.0.1:8080/api/hooks`
+  (Tailscale toont een link als Funnel nog aan moet in je tailnet). Controleer met
+  `curl -sS -X POST https://<servernaam>.<tailnet>.ts.net/api/hooks/claude-code -H "Authorization: Bearer <HQ_HOOK_TOKEN>" -H "content-type: application/json" -d '{"event":"ping","sessionId":"test"}'`
+  (antwoord `{"ok":true,…}`). Dan in je cloud-omgeving (menu van de omgeving in de titelbalk van een sessie →
+  *Edit*): zet `HQ_HOOK_URL` (dat https-adres) en `HQ_HOOK_TOKEN` bij de omgevingsvariabelen, voeg
+  `<servernaam>.<tailnet>.ts.net` toe aan de toegestane domeinen onder *Network access*, en zet als setup-script:
+  `curl -fsSL https://raw.githubusercontent.com/kalle342643/KK-Kalle/main/onderneming/deploy/claude-code/install-hook.sh | bash`.
+  Nieuwe sessies melden zich dan live. Alleen `/api/hooks` staat open, en dat adres kan alleen meldingen
+  ontvangen met het geheim; het kantoor zelf blijft alleen via Tailscale bereikbaar.
+
+**Gratis AI (LiteLLM-router).** Laat agents of Graphify op de gratis lagen van een paar aanbieders draaien;
+zit er één aan zijn limiet, dan neemt de volgende het over. Bewust níét OmniRoute: dat hergebruikt abonnementen
+en stapelt accounts, en dat schendt de voorwaarden van die aanbieders. Hier gebruik je per aanbieder één eigen
+sleutel binnen hun gratis laag.
+1. Maak sleutels aan (alleen wat je wilt): Groq, Cerebras, Google AI Studio, eventueel Mistral en OpenRouter.
+   Zet ze in `~/.config/hq/gratis-ai.env` (bij elke regel staat waar je hem haalt en wat er met je gegevens gebeurt).
+2. `node --env-file=$HOME/.config/hq/hq.env dist/main.js gratis-ai` laat zien welke modellen je sleutels geven;
+   klopt het, dan `… gratis-ai --schrijf`.
+3. `systemctl --user enable --now gratis-ai` en `… dist/main.js gratis-ai test` (moet "ok" antwoorden).
+4. Gebruiken: `GRAPHIFY_BACKEND=gratis` in `hq.env` (de kennisgraaf gratis bouwen), en/of `HQ_GRATIS_AI_ROLES=verkenner`
+   om de verkenners erop te laten draaien; daarna `dist/main.js bootstrap`. In het kantoor staat bij die agents
+   "🆓 Gratis AI". Begin klein: gratis modellen zijn minder slim dan Claude en kunnen niet zelf zoeken.
+
 **Kennisbank en Graphify (aanbevolen).** Het script installeerde Graphify al (`pipx install graphifyy`). HQ schrijft
 elk uur alle lessen, notities en experimenten als notities in `~/vault`. Wil je dat Graphify daar 's nachts een
 echte kennisgraaf van maakt (het hologram in de kennisbank), maak dan in de Anthropic Console een **aparte**

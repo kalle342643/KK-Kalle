@@ -46,6 +46,7 @@ import { codeOverview } from "../code/overview.js";
 import { archiveCodeProject, codeProjectSchema, getCodeProject, requireCodeProject, saveCodeProject } from "../code/projects.js";
 import type { CodeWatcher } from "../code/watch.js";
 import { knowledgeAdvice } from "../knowledge/precheck.js";
+import { giveTask, taskSchema } from "../office/tasks.js";
 import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
 import { profileSchema, setProfile } from "../office/profiles.js";
 import { listProjects, officeStats, projectDetail } from "../office/projects.js";
@@ -482,6 +483,8 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
   ownerApi.get("/stats", async (c) => c.json(await officeStats(ctx, Math.min(Math.max(Number(c.req.query("days") ?? 30), 7), 120))));
   // Een agent (of jij, of de HQ-bot) een bijnaam of ander uiterlijk geven.
   ownerApi.put("/agents/:agentId/profile", async (c) => c.json(await setProfile(ctx, c.req.param("agentId"), await body(c, profileSchema))));
+  // Jij geeft een agent een taak (wordt een Paperclip-taak op zijn naam).
+  ownerApi.post("/agents/:agentId/task", async (c) => c.json(await giveTask(ctx, c.req.param("agentId"), await body(c, taskSchema)), 201));
   ownerApi.post("/agents/:agentId/:action{pause|resume}", async (c) => {
     const agentId = c.req.param("agentId");
     const action = c.req.param("action") as "pause" | "resume";

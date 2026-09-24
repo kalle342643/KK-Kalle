@@ -4,6 +4,7 @@ import { formatApproval } from "../src/domain/approvals.js";
 import { proposalSchema, proposeExperiment, recordMetric } from "../src/domain/experiments.js";
 import { recordLedger, recordRevenue } from "../src/domain/ledger.js";
 import { addLesson } from "../src/domain/lessons.js";
+import { halt } from "../src/domain/killswitch.js";
 import { decide } from "../src/domain/workflows.js";
 import { OfficeNotifier } from "../src/office/notifier.js";
 import { buildOfficeSnapshot } from "../src/office/snapshot.js";
@@ -159,5 +160,29 @@ describe("statische bestanden", () => {
     expect(await demo.text()).toContain('data-mode="demo"');
     expect((await app.request("/kantoor")).status).toBe(401);
     expect((await app.request("/api/owner/projects")).status).toBe(401);
+  });
+});
+
+describe("taken geven vanuit het kantoor", () => {
+  const post = (body: unknown) => ({ method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+
+  it("wordt een Paperclip-taak op naam van de agent, en jij loopt er in het kantoor heen", async () => {
+    const app = createApp(env.ctx);
+    const res = await app.request(`/api/owner/agents/${env.scout.id}/task`, post({ title: "Zoek 5 cookie-scanners met prijzen", description: "Alleen NL-markt", priority: "high" }));
+    expect(res.status).toBe(201);
+    const issue = env.paperclip.issues.at(-1)!;
+    expect(issue).toMatchObject({ title: "Zoek 5 cookie-scanners met prijzen", assigneeAgentId: env.scout.id, priority: "high" });
+    expect(issue.description).toContain("Alleen NL-markt");
+    expect(issue.description).toContain("via het kantoor");
+    expect(await last()).toMatchObject({ type: "talk", agentId: "owner", targetAgentId: env.scout.id, text: "Nieuwe taak voor jou: Zoek 5 cookie-scanners met prijzen", data: { kind: "delegate" } });
+  });
+
+  it("niet tijdens de noodstop, niet voor vreemde agents, niet zonder titel", async () => {
+    const app = createApp(env.ctx);
+    expect((await app.request(`/api/owner/agents/${env.scout.id}/task`, post({ title: "x" }))).status).toBe(400);
+    const foreign = env.paperclip.seedAgent("ander-bedrijf", { name: "Vreemd" });
+    expect((await app.request(`/api/owner/agents/${foreign.id}/task`, post({ title: "Doe iets" }))).status).toBe(404);
+    await halt(env.ctx, "test", "owner");
+    expect((await app.request(`/api/owner/agents/${env.scout.id}/task`, post({ title: "Doe iets" }))).status).toBe(423);
   });
 });
