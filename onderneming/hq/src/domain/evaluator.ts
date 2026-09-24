@@ -96,6 +96,12 @@ async function applyVerdict(
   const verdict = d.verdict as Exclude<Verdict, "continue">;
   await endExperiment(ctx, e.id, verdict === "kill" ? "killed" : verdict, d.reason);
   await audit(ctx.db, "job:evaluate", `experiment.${verdict}`, { experimentId: e.id, reason: d.reason });
+  await ctx.events.emit({
+    type: "experiment.verdict",
+    agentId: e.leadAgentId ?? s.branch.leadAgentId,
+    text: `${VERDICT_TEXT[verdict]} ${code} ${e.title}`,
+    data: { experimentId: e.id, verdict, branch: s.branch.slug, reason: d.reason },
+  });
 
   if (e.paperclipProjectId) {
     try {

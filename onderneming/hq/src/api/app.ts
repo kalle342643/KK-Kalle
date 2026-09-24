@@ -1,6 +1,10 @@
 import { timingSafeEqual } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Hono, type Context } from "hono";
 import { getCookie, setCookie } from "hono/cookie";
+import { streamSSE } from "hono/streaming";
 import { z, ZodError } from "zod";
 import type { AgentFactory } from "../company/factory.js";
 import { listApprovals } from "../domain/approvals.js";
@@ -20,7 +24,7 @@ import {
   type ExperimentStatus,
 } from "../domain/experiments.js";
 import { halt, haltState, resume } from "../domain/killswitch.js";
-import { recordLedger, REVENUE_SOURCES } from "../domain/ledger.js";
+import { recordRevenue, REVENUE_SOURCES } from "../domain/ledger.js";
 import { addLesson, lessonSchema, searchLessons } from "../domain/lessons.js";
 import { computePortfolio } from "../domain/portfolio.js";
 import { buildDailyReport, buildStatus } from "../domain/report.js";
@@ -35,10 +39,26 @@ import {
 } from "../domain/workflows.js";
 import { importRevenueCsv } from "../importers/csv.js";
 import { runJob, type JobDefinition } from "../jobs/scheduler.js";
+import { noteSchema, addNote, searchNotes } from "../knowledge/notes.js";
+import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
+import { buildOfficeSnapshot } from "../office/snapshot.js";
+import type { OfficeEvent } from "../office/types.js";
 import { PaperclipError } from "../paperclip/client.js";
 import type { PcAgent } from "../paperclip/types.js";
 import { AgentAuthenticator } from "./agentAuth.js";
 import { renderDashboard } from "./dashboard.js";
+import { renderOfficePage } from "./officePage.js";
+
+/** Gebouwde browserbestanden (npm run build zet ze in dist/public). */
+const PUBLIC_DIR = fileURLToPath(new URL("../public/", import.meta.url));
+const STATIC_TYPES: Record<string, string> = {
+  js: "text/javascript; charset=utf-8",
+  css: "text/css; charset=utf-8",
+  map: "application/json",
+  png: "image/png",
+  svg: "image/svg+xml",
+  woff2: "font/woff2",
+};
 
 type Env = { Variables: { agent: PcAgent; agentToken: string } };
 
@@ -234,14 +254,47 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
   agentApi.get("/lessons", async (c) => {
     const branchSlug = c.req.query("branch");
     const branch = branchSlug ? await requireBranch(ctx.db, branchSlug) : undefined;
-    return c.json(
-      await searchLessons(ctx.db, {
-        text: c.req.query("q"),
-        branchId: branch?.id,
-        tag: c.req.query("tag"),
-        limit: Number(c.req.query("limit") ?? 20),
-      }),
-    );
+    const lessons = await searchLessons(ctx.db, {
+      text: c.req.query("q"),
+      branchId: branch?.id,
+      tag: c.req.query("tag"),
+      limit: Number(c.req.query("limit") ?? 20),
+    });
+    const asked = c.req.query("q") ?? (c.req.query("tag") ? `#${c.req.query("tag")}` : branchSlug ? `lessen van ${branchSlug}` : null);
+    await ctx.events.emit({
+      type: "knowledge.query",
+      agentId: c.get("agent").id,
+      text: asked ?? "recente lessen",
+      data: { lessons: lessons.length, via: "lessons" },
+    });
+    return c.json(lessons);
+  });
+
+  // De kennisbank (Graphify): eerst hier zoeken voordat je iets opnieuw uitzoekt.
+  agentApi.get("/knowledge", async (c) => {
+    const q = (c.req.query("q") ?? "").trim();
+    if (q.length < 3) throw new DomainError("Geef een vraag mee: ?q=… (minstens 3 tekens).");
+    return c.json(await askKnowledge(ctx, q.slice(0, 300), c.get("agent").id));
+  });
+
+  agentApi.get("/notes", async (c) => {
+    const notes = await searchNotes(ctx.db, { text: c.req.query("q"), tag: c.req.query("tag"), limit: Number(c.req.query("limit") ?? 10) });
+    await ctx.events.emit({
+      type: "knowledge.query",
+      agentId: c.get("agent").id,
+      text: c.req.query("q") ?? (c.req.query("tag") ? `#${c.req.query("tag")}` : "recente notities"),
+      data: { notes: notes.length, via: "notes" },
+    });
+    return c.json(notes);
+  });
+
+  agentApi.post("/notes", async (c) => {
+    const input = await body(c, noteSchema);
+    const actor = actorOf(c);
+    if ((await countRecent(ctx.db, actor, ["note.add"], 24)) >= 20) {
+      throw new DomainError("Maximaal 20 notities per dag. Bundel wat je weet in minder, betere notities.", 429);
+    }
+    return c.json(await addNote(ctx, input, actor, c.get("agent").name), 201);
   });
 
   agentApi.post("/lessons", async (c) => {
@@ -278,6 +331,7 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     const agent = c.get("agent");
     await ctx.notifier.send({ text: `💬 ${agent.name}: ${input.text}`, silent: true });
     await audit(ctx.db, actor, "agent.notify", { length: input.text.length });
+    await ctx.events.emit({ type: "notify", agentId: agent.id, text: input.text });
     return c.json({ ok: true }, 201);
   });
 
@@ -331,8 +385,7 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     );
     const branch = await requireBranch(ctx.db, input.branch);
     if (input.experimentId) await requireExperiment(ctx.db, input.experimentId);
-    await recordLedger(ctx.db, {
-      kind: "revenue",
+    await recordRevenue(ctx, {
       amountEur: input.amountEur,
       source: input.source,
       externalId: input.externalId ?? `owner:${Date.now()}`,
@@ -356,6 +409,58 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     if (!job) throw new DomainError(`Onbekende taak '${c.req.param("name")}'.`, 404);
     return c.json(await runJob(ctx, job));
   });
+  ownerApi.get("/office", async (c) => c.json(await buildOfficeSnapshot(ctx)));
+  ownerApi.get("/office/stream", (c) =>
+    streamSSE(c, async (stream) => {
+      let open = true;
+      let wake: (() => void) | undefined;
+      const queue: OfficeEvent[] = [];
+      const unsubscribe = ctx.events.subscribe((e) => {
+        queue.push(e);
+        wake?.();
+      });
+      stream.onAbort(() => {
+        open = false;
+        unsubscribe();
+        wake?.();
+      });
+      // Na een onderbroken verbinding: stuur wat er intussen gebeurde.
+      let lastSent = Number(c.req.header("last-event-id") ?? c.req.query("after") ?? 0) || 0;
+      if (lastSent > 0) queue.unshift(...(await ctx.events.after(lastSent)));
+      try {
+        while (open) {
+          queue.sort((a, b) => a.id - b.id);
+          while (queue.length) {
+            const e = queue.shift()!;
+            if (e.id <= lastSent) continue;
+            await stream.writeSSE({ id: String(e.id), event: "office", data: JSON.stringify(e) });
+            lastSent = e.id;
+          }
+          await Promise.race([new Promise<void>((resolve) => (wake = resolve)), stream.sleep(20_000)]);
+          wake = undefined;
+          if (open && !queue.length) await stream.writeSSE({ event: "ping", data: String(Date.now()) });
+        }
+      } finally {
+        unsubscribe();
+      }
+    }),
+  );
+  ownerApi.get("/knowledge/graph", async (c) => c.json(await knowledgeGraph(ctx, Math.min(Number(c.req.query("max") ?? 400), 2000))));
+  ownerApi.post("/agents/:agentId/:action{pause|resume}", async (c) => {
+    const agentId = c.req.param("agentId");
+    const action = c.req.param("action") as "pause" | "resume";
+    const agent = await ctx.paperclip.getAgent(agentId);
+    if (agent.companyId !== ctx.companyId) throw new DomainError("Onbekende agent.", 404);
+    const updated = action === "pause" ? await ctx.paperclip.pauseAgent(agentId) : await ctx.paperclip.resumeAgent(agentId);
+    await audit(ctx.db, "owner", `agent.${action}`, { agentId, name: agent.name });
+    await ctx.events.emit({
+      type: "agent.status",
+      agentId,
+      text: `${agent.name} is ${action === "pause" ? "gepauzeerd" : "weer aan het werk"} (door jou)`,
+      data: { from: agent.status, to: updated.status, by: "owner" },
+    });
+    return c.json({ id: updated.id, status: updated.status });
+  });
   ownerApi.post("/metrics", async (c) => {
     const input = await body(c, metricSchema.extend({ experimentId: z.number().int().positive(), source: z.string().min(2) }));
     await recordMetric(
@@ -368,12 +473,13 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
   });
   app.route("/api/owner", ownerApi);
 
-  // ---------------------------------------------------------------- dashboard
-  app.get("/", async (c) => {
+  // ---------------------------------------------------------------- pagina's
+  /** Inloggen met ?token=… zet een cookie; daarna is de pagina 30 dagen bereikbaar. Geeft een antwoord terug als het niet mag. */
+  const pageLogin = (c: Context<Env>): Response | null => {
     const token = c.req.query("token");
     if (token && ctx.config.adminToken && safeEqual(token, ctx.config.adminToken)) {
       setCookie(c, "hq_token", token, { httpOnly: true, sameSite: "Strict", path: "/", maxAge: 60 * 60 * 24 * 30 });
-      return c.redirect("/");
+      return c.redirect(c.req.path);
     }
     if (ctx.config.adminToken) {
       const cookie = getCookie(c, "hq_token") ?? "";
@@ -381,7 +487,33 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
         return c.html("<p>Log in via <code>/?token=…</code> (HQ_ADMIN_TOKEN).</p>", 401);
       }
     }
-    return c.html(await renderDashboard(ctx));
+    return null;
+  };
+
+  // Het kantoor: je agents als poppetjes die rondlopen, praten en dingen opzoeken.
+  app.get("/", (c) => pageLogin(c) ?? c.html(renderOfficePage({ demo: false })));
+  app.get("/kantoor", (c) => pageLogin(c) ?? c.html(renderOfficePage({ demo: false })));
+  // Het oude overzicht met alle cijfers op één pagina.
+  app.get("/overzicht", async (c) => pageLogin(c) ?? c.html(await renderDashboard(ctx)));
+  // Een demo-kantoor met verzonnen agents; laat niets van jouw bedrijf zien.
+  app.get("/demo", (c) => c.html(renderOfficePage({ demo: true })));
+  // De interactieve graaf die Graphify zelf maakt (als die er is).
+  app.get("/kennis", (c) => {
+    const denied = pageLogin(c);
+    if (denied) return denied;
+    const vault = ctx.config.knowledge.vaultDir;
+    const file = vault ? join(vault, "graphify-out", "graph.html") : null;
+    if (!file || !existsSync(file)) {
+      return c.html("<p>Nog geen Graphify-graaf. Zie docs/SETUP.md (Graphify) of bekijk de kennisbank in het kantoor.</p>", 404);
+    }
+    return c.html(readFileSync(file, "utf8"));
+  });
+  app.get("/static/:file{[a-z0-9._-]+}", (c) => {
+    const name = c.req.param("file");
+    const type = STATIC_TYPES[name.split(".").pop() ?? ""];
+    const path = join(PUBLIC_DIR, name);
+    if (!type || !existsSync(path)) return c.text("niet gevonden", 404);
+    return c.body(readFileSync(path), 200, { "content-type": type, "cache-control": "no-cache" });
   });
 
   return app;

@@ -95,6 +95,7 @@ export async function halt(ctx: AppContext, reason: string, actor: Actor): Promi
     pausedAgentIds: [...pausedIds],
   } satisfies HaltState);
   await audit(ctx.db, actor, "halt", { reason, ...result });
+  await ctx.events.emit({ type: "halt", text: reason, data: { by: actor, ...result } });
   ctx.log.warn("kill switch geactiveerd", { reason, ...result });
   return result;
 }
@@ -120,6 +121,7 @@ export async function resume(ctx: AppContext, actor: Actor): Promise<{ resumedAg
   }
   await setSetting(ctx.db, KEY, { ...EMPTY, pausedAgentIds: stillPaused } satisfies HaltState);
   await audit(ctx.db, actor, "resume", { resumedAgents, errors });
+  await ctx.events.emit({ type: "resume", data: { by: actor, resumedAgents } });
   ctx.log.info("kill switch opgeheven", { resumedAgents, errors });
   return { resumedAgents, errors };
 }

@@ -18,11 +18,14 @@ import { defaultJobs, runJob, Scheduler } from "./jobs/scheduler.js";
 import { ConsoleNotifier, MultiNotifier, type Notifier } from "./notify/notifier.js";
 import { TelegramApi, TelegramNotifier } from "./notify/telegram.js";
 import { WhatsAppNotifier } from "./notify/whatsapp.js";
+import { rebuildKnowledge } from "./knowledge/service.js";
+import { OfficeEvents } from "./office/events.js";
+import { PaperclipWatcher } from "./office/watcher.js";
 import { HttpPaperclipClient } from "./paperclip/client.js";
 
 const USAGE = `hq <commando>
 
-  serve                     API, dashboard, Telegram-bot en planner starten (dit draait 24/7)
+  serve                     API, kantoor, Telegram-bot en planner starten (dit draait 24/7)
   migrate                   databaseschema bijwerken
   bootstrap                 company/ (holding, skills, CEO, analist, routines) in Paperclip zetten
   branch <sjabloon> <slug> "<Naam>" [budget]
@@ -31,6 +34,7 @@ const USAGE = `hq <commando>
   status | report           status of dagrapport in de terminal
   halt [reden] | resume     noodstop aan/uit
   import-csv <bestand>      omzet importeren (kolommen: date, amount_eur, branch, source, ...)
+  kennis                    kennisbank-map bijwerken en (met GRAPHIFY_API_KEY) de Graphify-graaf opbouwen
 `;
 
 function die(msg: string): never {
@@ -66,7 +70,16 @@ async function makeContext(config: Config): Promise<{ ctx: AppContext; telegram?
   const companyId = await resolveCompanyId({ db, config });
   if (!companyId) die("Nog geen holding in Paperclip. Draai eerst: hq bootstrap");
   const { notifier, telegram } = makeNotifier(config);
-  const ctx: AppContext = { db, config, paperclip, notifier, companyId, now: () => new Date(), log: consoleLogger };
+  const ctx: AppContext = {
+    db,
+    config,
+    paperclip,
+    notifier,
+    companyId,
+    events: new OfficeEvents(db, consoleLogger),
+    now: () => new Date(),
+    log: consoleLogger,
+  };
   return { ctx, telegram };
 }
 
@@ -89,6 +102,9 @@ async function serveCommand(config: Config): Promise<void> {
 
   const scheduler = new Scheduler(ctx);
   scheduler.start();
+  // Het kantoor: kijk mee in Paperclip wie er werkt en wie met wie praat.
+  const watcher = new PaperclipWatcher(ctx);
+  watcher.start();
   // Direct één keer synchroniseren, zodat openstaande verzoeken meteen in Telegram staan.
   for (const job of defaultJobs(ctx).filter((j) => j.name === "approvals-sync" || j.name === "cost-sync")) {
     await runJob(ctx, job);
@@ -111,6 +127,7 @@ async function serveCommand(config: Config): Promise<void> {
     ctx.log.info("HQ stopt", { signal });
     controller.abort();
     scheduler.stop();
+    watcher.stop();
     server.close();
     await ctx.db.close();
     process.exit(0);
@@ -223,6 +240,12 @@ async function main(argv: string[]): Promise<void> {
       const { ctx } = await makeContext(config);
       const res = command === "halt" ? await halt(ctx, args.join(" ") || "via CLI", "owner") : await resume(ctx, "owner");
       console.log(JSON.stringify(res, null, 2));
+      await ctx.db.close();
+      return;
+    }
+    case "kennis": {
+      const { ctx } = await makeContext(config);
+      console.log(await rebuildKnowledge(ctx));
       await ctx.db.close();
       return;
     }

@@ -1,7 +1,7 @@
 import { getBranchBySlug, holdingBranch } from "../domain/branches.js";
 import type { AppContext } from "../domain/context.js";
 import { getExperiment } from "../domain/experiments.js";
-import { recordLedger } from "../domain/ledger.js";
+import { recordRevenue } from "../domain/ledger.js";
 
 type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
 
@@ -52,8 +52,7 @@ export async function importStripe(
       const branch = (ch.metadata.branch ? await getBranchBySlug(ctx.db, ch.metadata.branch) : undefined) ?? fallback;
       const expId = Number(ch.metadata.experiment_id ?? NaN);
       const experiment = Number.isInteger(expId) ? await getExperiment(ctx.db, expId) : undefined;
-      await recordLedger(ctx.db, {
-        kind: "revenue",
+      await recordRevenue(ctx, {
         amountEur: Math.max(0, ch.amount_captured - ch.amount_refunded) / 100,
         source: "stripe",
         externalId: ch.id,

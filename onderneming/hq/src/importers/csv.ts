@@ -3,7 +3,7 @@ import { requireBranch } from "../domain/branches.js";
 import type { Actor, AppContext } from "../domain/context.js";
 import { audit } from "../domain/audit.js";
 import { requireExperiment } from "../domain/experiments.js";
-import { recordLedger, REVENUE_SOURCES } from "../domain/ledger.js";
+import { recordRevenue, REVENUE_SOURCES } from "../domain/ledger.js";
 
 /** Minimale CSV-parser (komma of puntkomma, aanhalingstekens, lege regels overslaan). */
 export function parseCsv(text: string): Array<Record<string, string>> {
@@ -87,8 +87,7 @@ export async function importRevenueCsv(ctx: AppContext, text: string, actor: Act
       const branch = await requireBranch(ctx.db, r.branch);
       const experimentId = r.experiment_id ? Number(r.experiment_id.replace(/^EXP-/i, "")) : null;
       if (experimentId) await requireExperiment(ctx.db, experimentId);
-      await recordLedger(ctx.db, {
-        kind: "revenue",
+      await recordRevenue(ctx, {
         amountEur: r.amount_eur,
         source,
         externalId: r.external_id || `${r.date.slice(0, 10)}:${branch.slug}:${experimentId ?? "-"}:${r.amount_eur}`,

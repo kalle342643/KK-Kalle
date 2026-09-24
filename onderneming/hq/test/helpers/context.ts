@@ -3,6 +3,7 @@ import type { Db } from "../../src/db/index.js";
 import { createBranch, type Branch } from "../../src/domain/branches.js";
 import { silentLogger, type AppContext } from "../../src/domain/context.js";
 import { RecordingNotifier } from "../../src/notify/notifier.js";
+import { OfficeEvents } from "../../src/office/events.js";
 import { createTestDb } from "./db.js";
 import { FakePaperclip } from "./fakePaperclip.js";
 
@@ -33,6 +34,7 @@ export async function createTestEnv(overrides: Partial<Config> = {}): Promise<Te
     paperclip,
     notifier,
     companyId: company.id,
+    events: new OfficeEvents(db, silentLogger),
     now: () => clock.now,
     log: silentLogger,
   };

@@ -161,8 +161,11 @@ describe("eigenaar-API en dashboard", () => {
     expect((await totals(env.db, { branchId: env.games.id })).revenue).toBe(15.6);
   });
 
-  it("toont het dashboard en vraagt om inloggen als er een token is", async () => {
-    const open = await app.request("/");
+  it("toont het kantoor en het overzicht, en vraagt om inloggen als er een token is", async () => {
+    const office = await app.request("/");
+    expect(office.status).toBe(200);
+    expect(await office.text()).toContain("/static/office.js");
+    const open = await app.request("/overzicht");
     expect(open.status).toBe(200);
     const html = await open.text();
     expect(html).toContain("Wacht op jou");
@@ -170,11 +173,17 @@ describe("eigenaar-API en dashboard", () => {
 
     env.ctx.config.adminToken = "geheim";
     expect((await app.request("/")).status).toBe(401);
+    expect((await app.request("/overzicht")).status).toBe(401);
+    expect((await app.request("/api/owner/office")).status).toBe(401);
+    // Het demo-kantoor laat niets van het bedrijf zien en mag zonder inloggen.
+    expect((await app.request("/demo")).status).toBe(200);
     const login = await app.request("/?token=geheim");
     expect(login.status).toBe(302);
     const cookie = login.headers.get("set-cookie")!;
     expect(cookie).toContain("HttpOnly");
     const withCookie = await app.request("/", { headers: { cookie: cookie.split(";")[0]! } });
     expect(withCookie.status).toBe(200);
+    const overzicht = await app.request("/overzicht", { headers: { cookie: cookie.split(";")[0]! } });
+    expect(overzicht.status).toBe(200);
   });
 });

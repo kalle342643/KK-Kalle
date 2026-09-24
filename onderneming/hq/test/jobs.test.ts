@@ -20,6 +20,8 @@ describe("planner", () => {
       "evaluate",
       "daily-report",
       "weekly-portfolio",
+      "vault-sync",
+      "knowledge-graph",
     ]);
     env.ctx.config.stripe = { apiKey: "rk_test", defaultBranch: "games" };
     expect(defaultJobs(env.ctx).map((j) => j.name)).toContain("stripe-import");

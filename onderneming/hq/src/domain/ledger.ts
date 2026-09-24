@@ -1,4 +1,5 @@
 import { num, type Db } from "../db/index.js";
+import type { AppContext } from "./context.js";
 import { round2 } from "./money.js";
 
 export type LedgerKind = "token_cost" | "spend" | "revenue";
@@ -20,13 +21,14 @@ export interface LedgerInput {
 /**
  * Boekt of werkt een grootboekregel bij (idempotent op source + externalId).
  * Omzet mag alleen uit vertrouwde bronnen komen; agents kunnen hier nooit bij.
+ * Geeft terug of de regel nieuw was.
  */
-export async function recordLedger(db: Db, e: LedgerInput): Promise<void> {
+export async function recordLedger(db: Db, e: LedgerInput): Promise<{ inserted: boolean }> {
   if (e.kind === "revenue" && !REVENUE_SOURCES.has(e.source)) {
     throw new Error(`Omzet uit bron '${e.source}' is niet toegestaan.`);
   }
   if (!(e.amountEur >= 0)) throw new Error("Bedrag moet 0 of hoger zijn.");
-  await db.query(
+  const rows = await db.query<{ inserted: boolean }>(
     `insert into ledger (branch_id, experiment_id, kind, amount_eur, source, external_id, description, occurred_at)
      values ($1, $2, $3, $4, $5, $6, $7, $8)
      on conflict (source, external_id) do update set
@@ -34,7 +36,8 @@ export async function recordLedger(db: Db, e: LedgerInput): Promise<void> {
        branch_id = excluded.branch_id,
        experiment_id = excluded.experiment_id,
        description = excluded.description,
-       occurred_at = excluded.occurred_at`,
+       occurred_at = excluded.occurred_at
+     returning (xmax = 0) as inserted`,
     [
       e.branchId ?? null,
       e.experimentId ?? null,
@@ -46,6 +49,24 @@ export async function recordLedger(db: Db, e: LedgerInput): Promise<void> {
       e.occurredAt.toISOString(),
     ],
   );
+  return { inserted: rows[0]?.inserted === true };
+}
+
+/** Boekt omzet en laat hem in het kantoor zien als hij nieuw is (de kassa rinkelt). */
+export async function recordRevenue(ctx: AppContext, e: Omit<LedgerInput, "kind">): Promise<{ inserted: boolean }> {
+  const res = await recordLedger(ctx.db, { ...e, kind: "revenue" });
+  if (res.inserted && e.amountEur > 0) {
+    const branch = e.branchId
+      ? (await ctx.db.query<{ slug: string }>("select slug from branches where id = $1", [e.branchId]))[0]?.slug ?? null
+      : null;
+    await ctx.events.emit({
+      type: "revenue",
+      text: e.description ?? null,
+      data: { amountEur: round2(e.amountEur), branch, experimentId: e.experimentId ?? null, source: e.source },
+      sourceKey: `revenue:${e.source}:${e.externalId}`,
+    });
+  }
+  return res;
 }
 
 export async function ledgerExists(db: Db, source: string, externalId: string): Promise<boolean> {

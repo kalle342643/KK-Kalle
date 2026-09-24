@@ -4,7 +4,7 @@ import { DomainError, requireBranch } from "../domain/branches.js";
 import { errorMessage, type AppContext } from "../domain/context.js";
 import { experimentCode, listExperiments, recordMetric, snapshot } from "../domain/experiments.js";
 import { halt, haltState, resume } from "../domain/killswitch.js";
-import { recordLedger } from "../domain/ledger.js";
+import { recordRevenue } from "../domain/ledger.js";
 import { formatEur, formatPct, usdCentsToEur } from "../domain/money.js";
 import { computePortfolio, formatPortfolio } from "../domain/portfolio.js";
 import { buildDailyReport, buildStatus } from "../domain/report.js";
@@ -174,8 +174,7 @@ export class HqBot {
           return this.reply(chatId, "Gebruik: /omzet 12,50 games [omschrijving]");
         }
         const branch = await requireBranch(ctx.db, branchSlug);
-        await recordLedger(ctx.db, {
-          kind: "revenue",
+        await recordRevenue(ctx, {
           amountEur: amount,
           source: "owner",
           externalId: `telegram:${Date.now()}`,

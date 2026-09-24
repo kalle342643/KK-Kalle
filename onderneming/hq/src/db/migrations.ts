@@ -154,4 +154,36 @@ insert into branches (slug, name, description, status, monthly_budget_eur)
 values ('holding', 'Holding', 'Overhead: CEO, analist en alles wat niet bij een tak hoort.', 'active', 0);
 `,
   },
+  {
+    id: "002_office",
+    sql: `
+-- Wat er in het kantoor gebeurt: agents die werken, praten, iets opzoeken of iets vragen.
+create table office_events (
+  id bigint generated always as identity primary key,
+  at timestamptz not null default now(),
+  type text not null,
+  agent_id text,
+  target_agent_id text,
+  text text,
+  data jsonb not null default '{}',
+  -- Voorkomt dubbele gebeurtenissen als dezelfde Paperclip-activiteit twee keer langskomt.
+  source_key text unique
+);
+create index office_events_at_idx on office_events(at);
+
+-- Notities van agents: het gedeelde geheugen (ook als Markdown in de kennisbank-map).
+create table notes (
+  id integer generated always as identity primary key,
+  agent_id text,
+  author text not null,
+  title text not null,
+  body text not null,
+  tags text[] not null default '{}',
+  branch_id integer references branches(id),
+  experiment_id integer references experiments(id),
+  created_at timestamptz not null default now()
+);
+create index notes_fts_idx on notes using gin (to_tsvector('simple', title || ' ' || body));
+`,
+  },
 ];

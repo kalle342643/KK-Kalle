@@ -7,6 +7,7 @@ import { buildDailyReport } from "../domain/report.js";
 import { markNotified } from "../domain/settings.js";
 import { syncApprovals } from "../domain/workflows.js";
 import { importStripe } from "../importers/stripe.js";
+import { rebuildKnowledge, runVaultSync } from "../knowledge/service.js";
 
 export interface JobDefinition {
   name: string;
@@ -26,6 +27,15 @@ export function defaultJobs(ctx: AppContext): JobDefinition[] {
       run: async (x) => x.notifier.send({ text: await buildDailyReport(x) }),
     },
     { name: "weekly-portfolio", cron: c.weeklyPortfolio, run: (x) => proposePortfolio(x, "job:weekly-portfolio") },
+    { name: "vault-sync", cron: c.vaultSync, run: runVaultSync },
+    {
+      name: "knowledge-graph",
+      cron: c.knowledge,
+      run: async (x) => {
+        await x.events.prune(30);
+        return rebuildKnowledge(x);
+      },
+    },
   ];
   const stripe = ctx.config.stripe;
   if (stripe) jobs.push({ name: "stripe-import", cron: c.revenueImport, run: (x) => importStripe(x, stripe) });

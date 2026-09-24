@@ -150,11 +150,37 @@ export interface PcRun {
   startedAt: string | null;
 }
 
+/** Eén heartbeat-run met context (waarom de agent wakker werd en aan welke taak hij werkt). */
+export interface PcRunDetail extends PcRun {
+  finishedAt?: string | null;
+  error?: string | null;
+  contextSnapshot?: { issueId?: string; wakeReason?: string; [key: string]: unknown } | null;
+}
+
 export interface PcIssue {
   id: string;
   identifier: string;
   title: string;
   status: string;
+  assigneeAgentId?: string | null;
+  createdByAgentId?: string | null;
+  createdByUserId?: string | null;
+  projectId?: string | null;
+}
+
+/** Regel uit het activiteitenlogboek van een bedrijf (`GET /companies/{id}/activity`, nieuwste eerst). */
+export interface PcActivity {
+  id: string;
+  companyId: string;
+  actorType: "user" | "agent" | "system" | (string & {});
+  actorId: string | null;
+  action: string;
+  entityType: string | null;
+  entityId: string | null;
+  agentId: string | null;
+  runId: string | null;
+  details: Record<string, unknown> | null;
+  createdAt: string;
 }
 
 export interface PcRoutineTrigger {

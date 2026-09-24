@@ -166,6 +166,13 @@ export async function requestApproval(ctx: AppContext, req: ApprovalRequest, act
   );
   const record = toRecord(rows[0]!);
   await audit(ctx.db, actor, "approval.request", { approvalId: record.id, kind: req.kind, amountEur: req.amountEur });
+  await ctx.events.emit({
+    type: "approval.requested",
+    agentId: record.requestedByAgentId,
+    text: record.title,
+    data: { approvalId: record.id, kind: record.kind, amountEur: record.amountEur },
+    sourceKey: `approval:${pc.id}:requested`,
+  });
   await notifyApproval(ctx, record);
   return record;
 }
@@ -275,7 +282,17 @@ export async function mirrorApproval(ctx: AppContext, pc: PcApproval): Promise<{
     const again = await getApprovalByPaperclipId(ctx.db, pc.id);
     return { record: again!, isNew: false };
   }
-  return { record: toRecord(rows[0]), isNew: true };
+  const record = toRecord(rows[0]);
+  if (record.status === "pending") {
+    await ctx.events.emit({
+      type: "approval.requested",
+      agentId: record.requestedByAgentId,
+      text: record.title,
+      data: { approvalId: record.id, kind: record.kind, amountEur: record.amountEur },
+      sourceKey: `approval:${pc.id}:requested`,
+    });
+  }
+  return { record, isNew: true };
 }
 
 const KIND_ICON: Record<ApprovalKind, string> = {
@@ -382,7 +399,21 @@ export async function recordDecision(
     [id, status, note ?? final.decisionNote, final.decidedAt],
   );
   await audit(ctx.db, actor, "approval.decide", { approvalId: id, decision, status });
-  return toRecord(rows[0]!);
+  const decided = toRecord(rows[0]!);
+  await announceDecision(ctx, decided);
+  return decided;
+}
+
+/** Laat in het kantoor zien dat jij over een verzoek beslist hebt (één keer per verzoek). */
+export async function announceDecision(ctx: AppContext, record: ApprovalRecord): Promise<void> {
+  if (record.status !== "approved" && record.status !== "rejected") return;
+  await ctx.events.emit({
+    type: "approval.decided",
+    agentId: record.requestedByAgentId,
+    text: record.title,
+    data: { approvalId: record.id, kind: record.kind, status: record.status },
+    sourceKey: `approval:${record.paperclipApprovalId}:decided`,
+  });
 }
 
 /** Budgetincidenten los je in Paperclip op via het incident zelf; de gekoppelde approval volgt dan. */

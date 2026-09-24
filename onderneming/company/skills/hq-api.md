@@ -1,6 +1,6 @@
 ---
 name: hq-api
-description: Hoe je met HQ praat (experimenten, metingen, geldverzoeken, lessen, aannames). Gebruik dit voor alles wat met geld of experimenten te maken heeft.
+description: Hoe je met HQ praat (kennisbank, experimenten, metingen, geldverzoeken, lessen, aannames). Gebruik dit voor alles wat met kennis, geld of experimenten te maken heeft.
 tagline: De HQ-API van de holding
 ---
 
@@ -18,9 +18,24 @@ hq() { curl -sS -X "$1" "$HQ_URL/api/agent$2" -H "Authorization: Bearer $PAPERCL
 hq GET /overview
 ```
 
+## Eerst: de kennisbank
+Wil je iets weten? Vraag het **eerst** aan de kennisbank, voordat je het opnieuw uitzoekt. Daar staat alles wat
+collega's al leerden: lessen, notities, experimenten en de verbanden ertussen (een Graphify-kennisgraaf).
+```bash
+hq GET "/knowledge?q=retentie+van+puzzelgames+op+mobiel"
+```
+Je krijgt `lessons`, `notes` en `graph` (knopen en verbanden rond je vraag). Zoek je iets uit wat anderen ook
+kunnen gebruiken? Schrijf het op als notitie (kort, feitelijk, met bron):
+```bash
+hq POST /notes '{"title": "Concurrent X op CrazyGames", "body": "40 levels, daily challenge, 1,2M plays. Bron: https://...", "tags": ["concurrentie", "puzzel"], "branch": "games"}'
+```
+Maximaal 20 notities per dag; liever één goede notitie dan vijf halve.
+
 ## Lezen
 | Wat | Aanroep |
 |---|---|
+| Kennisbank doorzoeken (lessen, notities, kennisgraaf) | `GET /knowledge?q=...` |
+| Notities zoeken | `GET /notes?q=...&tag=...` |
 | Overzicht: takken, vrij budget, lopende experimenten, recente lessen, regels | `GET /overview` |
 | Geld per tak (30 dagen), ROI, voorstel budgetverdeling | `GET /portfolio` |
 | Experimenten (filter `status=running`, `branch=games`) | `GET /experiments?status=running` |

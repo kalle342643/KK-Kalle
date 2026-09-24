@@ -9,6 +9,7 @@ import type { PcAgent, PcRoutine } from "../paperclip/types.js";
 import { AgentFactory } from "./factory.js";
 import { render, type CompanyDefinition } from "./loader.js";
 import { RecordingNotifier } from "../notify/notifier.js";
+import { OfficeEvents } from "../office/events.js";
 
 export interface BootstrapDeps {
   db: Db;
@@ -95,6 +96,7 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
     paperclip,
     notifier: new RecordingNotifier(),
     companyId,
+    events: new OfficeEvents(deps.db, deps.log),
     now: () => new Date(),
     log: deps.log,
   };

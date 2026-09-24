@@ -371,6 +371,12 @@ export async function startExperiment(ctx: AppContext, id: number): Promise<Expe
   }
   exp = await setStatus(ctx.db, id, "running", { started_at: now, deadline_at: deadline });
   await audit(ctx.db, "system", "experiment.start", { experimentId: id, projectId });
+  await ctx.events.emit({
+    type: "experiment.started",
+    agentId: lead,
+    text: `${experimentCode(id)} ${exp.title}`,
+    data: { experimentId: id, branch: branch.slug, budgetEur: exp.budgetEur },
+  });
   await ctx.notifier.send({
     text: `▶️ ${experimentCode(id)} gestart: ${exp.title}\nBudget ${formatEur(exp.budgetEur)}, deadline ${deadline.toISOString().slice(0, 10)}.`,
     silent: true,
@@ -452,6 +458,12 @@ export async function recordMetric(
     [experimentId, input.name, input.value, input.source, input.trusted, input.note ?? null, input.externalId ?? null, actor],
   );
   await audit(ctx.db, actor, "metric.record", { experimentId, name: input.name, value: input.value, trusted: input.trusted });
+  await ctx.events.emit({
+    type: "metric",
+    agentId: actor.startsWith("agent:") ? actor.slice(6) : null,
+    text: `${experimentCode(experimentId)} ${input.name}: ${input.value}`,
+    data: { experimentId, name: input.name, value: input.value, trusted: input.trusted },
+  });
 }
 
 export interface ExperimentSnapshot {

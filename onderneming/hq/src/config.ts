@@ -50,12 +50,23 @@ const envSchema = z.object({
   HQ_MAX_REQUESTS_PER_AGENT_PER_DAY: z.coerce.number().int().positive().default(5),
   HQ_MAX_ITERATIONS: z.coerce.number().int().nonnegative().default(2),
 
+  /** Map met de kennisbank (Markdown-notities voor Graphify en Obsidian). Standaard ~/vault. */
+  HQ_VAULT_DIR: z.string().optional(),
+  /** Het graphify-programma (pip install graphifyy). */
+  GRAPHIFY_BIN: z.string().default("graphify"),
+  /** Sleutel waarmee Graphify 's nachts de kennisgraaf opbouwt. Zonder sleutel gebruikt HQ zijn eigen graaf. */
+  GRAPHIFY_API_KEY: z.string().optional(),
+  GRAPHIFY_BACKEND: z.string().default("claude"),
+  GRAPHIFY_MODEL: z.string().default("claude-haiku-4-5"),
+
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
   HQ_SYNC_CRON: z.string().default("*/2 * * * *"),
   HQ_COST_SYNC_CRON: z.string().default("*/15 * * * *"),
   HQ_REVENUE_IMPORT_CRON: z.string().default("0 * * * *"),
   HQ_EVALUATE_CRON: z.string().default("0 7 * * *"),
+  HQ_VAULT_SYNC_CRON: z.string().default("20 * * * *"),
+  HQ_KNOWLEDGE_CRON: z.string().default("30 3 * * *"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -98,6 +109,13 @@ export interface Config {
     maxRequestsPerAgentPerDay: number;
     maxIterations: number;
   };
+  knowledge: {
+    vaultDir: string | undefined;
+    graphifyBin: string;
+    graphifyApiKey: string | undefined;
+    graphifyBackend: string;
+    graphifyModel: string;
+  };
   cron: {
     dailyReport: string;
     weeklyPortfolio: string;
@@ -105,6 +123,8 @@ export interface Config {
     costSync: string;
     revenueImport: string;
     evaluate: string;
+    vaultSync: string;
+    knowledge: string;
   };
 }
 
@@ -157,6 +177,13 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       maxRequestsPerAgentPerDay: e.HQ_MAX_REQUESTS_PER_AGENT_PER_DAY,
       maxIterations: e.HQ_MAX_ITERATIONS,
     },
+    knowledge: {
+      vaultDir: e.HQ_VAULT_DIR ?? (cleaned.HOME ? `${cleaned.HOME}/vault` : undefined),
+      graphifyBin: e.GRAPHIFY_BIN,
+      graphifyApiKey: e.GRAPHIFY_API_KEY,
+      graphifyBackend: e.GRAPHIFY_BACKEND,
+      graphifyModel: e.GRAPHIFY_MODEL,
+    },
     cron: {
       dailyReport: e.HQ_DAILY_REPORT_CRON,
       weeklyPortfolio: e.HQ_WEEKLY_PORTFOLIO_CRON,
@@ -164,6 +191,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       costSync: e.HQ_COST_SYNC_CRON,
       revenueImport: e.HQ_REVENUE_IMPORT_CRON,
       evaluate: e.HQ_EVALUATE_CRON,
+      vaultSync: e.HQ_VAULT_SYNC_CRON,
+      knowledge: e.HQ_KNOWLEDGE_CRON,
     },
   };
 }
@@ -171,5 +200,10 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
 /** Config met veilige standaardwaarden voor tests. */
 export function testConfig(overrides: Partial<Config> = {}): Config {
   const base = loadConfig({});
-  return { ...base, ...overrides, money: { ...base.money, ...(overrides.money ?? {}) } };
+  return {
+    ...base,
+    ...overrides,
+    money: { ...base.money, ...(overrides.money ?? {}) },
+    knowledge: { ...base.knowledge, ...(overrides.knowledge ?? {}) },
+  };
 }
