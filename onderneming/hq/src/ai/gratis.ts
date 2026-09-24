@@ -1,46 +1,48 @@
-import { stringify } from "yaml";
-
 /**
- * Gratis AI: een LiteLLM-router op de server (127.0.0.1:4000) die de gratis lagen van een paar aanbieders
- * achter één adres zet. Loopt er één tegen zijn limiet aan, dan neemt de volgende het over.
+ * Gratis AI via OmniRoute (MIT, github.com/diegosouzapw/OmniRoute) op de server (127.0.0.1:20128).
+ * OmniRoute zet veel aanbieders achter één adres. In de combo "gratis" zet HQ de beste gratis modellen in een
+ * vaste volgorde: zit er één aan zijn limiet, dan neemt de volgende het over.
  *
- * Bewust alleen de nette manier: per aanbieder één eigen API-sleutel binnen hun gratis laag, zoals hun
- * voorwaarden het toestaan. Geen inloggegevens of abonnementen van chat-apps hergebruiken, geen stapels
- * accounts om limieten te omzeilen (dat doet OmniRoute wel, en dat schendt de voorwaarden van die aanbieders).
+ * Bewust alleen de nette manier: per aanbieder één eigen API-sleutel binnen hun gratis laag. OmniRoute kan ook
+ * abonnementen koppelen (Claude, ChatGPT, Copilot), cookies van webchats gebruiken en accounts stapelen. Dat
+ * gebruikt HQ niet: het schendt de voorwaarden van die aanbieders, en je account (ook dat van Claude Code) kan er
+ * geblokkeerd door raken. Verbindingen buiten de lijst hieronder komen daarom nooit in de combo.
  *
- * De modellen verschuiven vaak. Daarom kiest `dist/main.js gratis-ai` ze niet uit een vaste lijst, maar vraagt het elke
- * aanbieder welke modellen er nu zijn, en pakt het de beste volgens een voorkeurslijst.
+ * De modellen verschuiven vaak. Daarom vraagt `dist/main.js gratis-ai` OmniRoute welke modellen een aanbieder
+ * nu heeft, en pakt het de beste volgens een voorkeurslijst.
  */
 
-export type ProviderId = "groq" | "cerebras" | "gemini" | "mistral" | "openrouter";
+export type ProviderId = "groq" | "cerebras" | "sambanova" | "gemini" | "huggingface" | "mistral" | "openrouter";
 
 export interface FreeProvider {
+  /** Id van de aanbieder in OmniRoute. */
   id: ProviderId;
   name: string;
-  /** Omgevingsvariabele met de sleutel (zo heet hij ook in de LiteLLM-config). */
+  /** Omgevingsvariabele met jouw sleutel (in ~/.config/hq/gratis-ai.env). */
   envKey: string;
-  /** Voorvoegsel voor LiteLLM (groq/, gemini/, ...). */
-  prefix: string;
-  modelsUrl: string;
+  /** Waar je de sleutel maakt. */
+  keyUrl: string;
   /** Voorkeur, beste eerst. Het eerste patroon dat een bestaand model raakt, wint. */
   prefer: RegExp[];
-  /** Alleen deze modellen komen in aanmerking (bv. OpenRouter: alleen :free). */
+  /** Alleen deze modellen komen in aanmerking (geen spraak, embeddings of beveiligingsfilters). */
   allow?: (id: string) => boolean;
   /** Wat je moet weten: limieten en wat er met je gegevens gebeurt. */
   note: string;
-  /** Gebruikt de aanbieder je prompts (mogelijk) om te trainen? */
+  /** Gebruikt de aanbieder je prompts (mogelijk) om te trainen? Die staan achteraan in de rij. */
   mayTrain: boolean;
 }
 
+const chatOnly = (id: string) => !/whisper|tts|embed|guard|safeguard|rerank|ocr|image|vision-exp|moderation/i.test(id);
+
+/** In deze volgorde komen ze in de combo: snel en privacy-vriendelijk eerst. */
 export const PROVIDERS: FreeProvider[] = [
   {
     id: "groq",
     name: "Groq",
     envKey: "GROQ_API_KEY",
-    prefix: "groq/",
-    modelsUrl: "https://api.groq.com/openai/v1/models",
-    prefer: [/^openai\/gpt-oss-120b$/, /^moonshotai\/kimi-k2/, /^qwen\/qwen3-32b$/, /^llama-3\.3-70b-versatile$/, /^meta-llama\/llama-4-maverick/, /^openai\/gpt-oss-20b$/],
-    allow: (id) => !/whisper|tts|guard|playai|orpheus|prompt-guard|compound/i.test(id),
+    keyUrl: "https://console.groq.com/keys",
+    prefer: [/^openai\/gpt-oss-120b$/, /^qwen\/qwen3\.\d+-\d+b$/, /^llama-3\.3-70b-versatile$/, /^qwen\/qwen3-32b$/, /^meta-llama\/llama-4/, /^openai\/gpt-oss-20b$/],
+    allow: chatOnly,
     note: "Gratis laag met limieten per minuut en per dag, per model. Traint niet op je gegevens.",
     mayTrain: false,
   },
@@ -48,29 +50,49 @@ export const PROVIDERS: FreeProvider[] = [
     id: "cerebras",
     name: "Cerebras",
     envKey: "CEREBRAS_API_KEY",
-    prefix: "cerebras/",
-    modelsUrl: "https://api.cerebras.ai/v1/models",
-    prefer: [/^gpt-oss-120b$/, /^qwen-3-235b/, /^zai-glm/, /^llama-3\.3-70b$/, /^qwen-3-32b$/],
+    keyUrl: "https://cloud.cerebras.ai",
+    prefer: [/^gpt-oss-120b$/, /^zai-glm/, /^qwen-3/, /^gemma-4/, /^llama/],
+    allow: chatOnly,
     note: "Gratis laag met een dagelijks tokenlimiet; het aanbod aan modellen wisselt vaak.",
+    mayTrain: false,
+  },
+  {
+    id: "sambanova",
+    name: "SambaNova",
+    envKey: "SAMBANOVA_API_KEY",
+    keyUrl: "https://cloud.sambanova.ai/apis",
+    prefer: [/^DeepSeek-V3\.\d+$/, /^gpt-oss-120b$/, /^MiniMax-M\d/, /^Meta-Llama-3\.3-70B/, /^gemma-4/],
+    allow: chatOnly,
+    note: "Gratis laag met limieten per minuut en per dag.",
     mayTrain: false,
   },
   {
     id: "gemini",
     name: "Google AI Studio (Gemini)",
     envKey: "GEMINI_API_KEY",
-    prefix: "gemini/",
-    modelsUrl: "https://generativelanguage.googleapis.com/v1beta/openai/models",
-    prefer: [/gemini-2\.5-flash$/, /gemini-flash-latest$/, /gemini-2\.0-flash$/, /gemini-[\d.]+-flash$/],
+    keyUrl: "https://aistudio.google.com/apikey",
+    prefer: [/^gemini-\d+(\.\d+)?-flash$/, /^gemini-\d+(\.\d+)?-flash-preview$/, /^gemini-\d+(\.\d+)?-flash-lite$/],
+    allow: chatOnly,
     note: "Gratis laag met limieten per minuut en per dag. In de EU/EER gelden de regels van de betaalde laag: Google gebruikt je gegevens dan niet om te trainen.",
+    mayTrain: false,
+  },
+  {
+    id: "huggingface",
+    name: "Hugging Face",
+    envKey: "HF_TOKEN",
+    keyUrl: "https://huggingface.co/settings/tokens",
+    prefer: [/^openai\/gpt-oss-120b$/, /^deepseek-ai\/DeepSeek-V\d+(\.\d+)?-Flash$/, /^Qwen\/Qwen3\.\d+-27B$/, /^zai-org\/GLM-\d+(\.\d+)?-Flash$/, /^meta-llama\/Llama-3\.3-70B/],
+    allow: chatOnly,
+    note: "Een klein gratis tegoed per maand; daarna stopt het tot de volgende maand.",
     mayTrain: false,
   },
   {
     id: "mistral",
     name: "Mistral",
     envKey: "MISTRAL_API_KEY",
-    prefix: "mistral/",
-    modelsUrl: "https://api.mistral.ai/v1/models",
-    prefer: [/^mistral-small-latest$/, /^mistral-medium-latest$/, /^open-mistral-nemo/],
+    keyUrl: "https://console.mistral.ai/api-keys",
+    prefer: [/^mistral-small-latest$/, /^mistral-medium/, /^devstral-latest$/, /^mistral-large-latest$/],
+    allow: chatOnly,
     note: "Gratis Experiment-plan (telefoonverificatie). Mistral mag die gegevens voor training gebruiken, tenzij je dat in de console uitzet.",
     mayTrain: true,
   },
@@ -78,107 +100,261 @@ export const PROVIDERS: FreeProvider[] = [
     id: "openrouter",
     name: "OpenRouter (gratis modellen)",
     envKey: "OPENROUTER_API_KEY",
-    prefix: "openrouter/",
-    modelsUrl: "https://openrouter.ai/api/v1/models",
-    prefer: [/^openai\/gpt-oss-120b:free$/, /^deepseek\/deepseek-(chat|v3).*:free$/, /^qwen\/qwen3-(235b|coder).*:free$/, /^meta-llama\/llama-3\.3-70b.*:free$/, /^deepseek\/deepseek-r1.*:free$/],
-    allow: (id) => id.endsWith(":free"),
+    keyUrl: "https://openrouter.ai/keys",
+    prefer: [/^openai\/gpt-oss-120b:free$/, /^deepseek\/.*:free$/, /^qwen\/.*:free$/, /^meta-llama\/.*:free$/, /:free$/],
+    allow: (id) => id.endsWith(":free") && chatOnly(id),
     note: "Ongeveer 50 verzoeken per dag zonder tegoed. Sommige gratis modellen bewaren of gebruiken je prompts: daarom als laatste in de rij.",
     mayTrain: true,
   },
 ];
 
-/** De modelnaam waarmee agents en Graphify de router aanspreken. */
+/** De modelnaam (de combo in OmniRoute) waarmee agents en Graphify de router aanspreken. */
 export const GRATIS_MODEL = "gratis";
+/** Naam van de sleutel waarmee HQ en de agents OmniRoute gebruiken. */
+export const HQ_KEY_NAME = "hq-agents";
 
-/** Kies het beste model van een aanbieder uit wat er nu is. */
-export function pickModels(provider: FreeProvider, available: string[], max = 2): string[] {
-  const ids = available.map((id) => id.replace(/^models\//, "")).filter((id) => !provider.allow || provider.allow(id));
+/** Kies de beste modellen van een aanbieder uit wat er nu is. Meer modellen = langer doorwerken (limieten gelden vaak per model). */
+export function pickModels(provider: FreeProvider, available: string[], max = 3): string[] {
+  const ids = available.filter((id) => !provider.allow || provider.allow(id));
   const picked: string[] = [];
   for (const pattern of provider.prefer) {
-    const hit = ids.find((id) => pattern.test(id) && !picked.includes(id));
-    if (hit) picked.push(hit);
-    if (picked.length >= max) break;
+    for (const id of ids) {
+      if (picked.length >= max) return picked;
+      if (pattern.test(id) && !picked.includes(id)) picked.push(id);
+    }
   }
   return picked;
 }
 
-export interface Selection {
-  provider: FreeProvider;
-  models: string[];
-  error?: string;
+// ---------------------------------------------------------------------------------------------- OmniRoute
+
+export interface Connection {
+  id: string;
+  provider: string;
+  name: string;
+  isActive: boolean;
+  /** apikey, oauth, cookie, ... */
+  authType?: string;
 }
 
-/** Vraagt elke aanbieder met een sleutel welke modellen er zijn. */
-export async function discover(
-  keys: Record<string, string | undefined>,
-  fetchImpl: (input: string, init?: RequestInit) => Promise<Response> = fetch,
-): Promise<Selection[]> {
-  const out: Selection[] = [];
+/** Wat HQ van OmniRoute nodig heeft (zo kunnen de tests een nep-OmniRoute gebruiken). */
+export interface OmniApi {
+  login(): Promise<void>;
+  connections(): Promise<Connection[]>;
+  addConnection(provider: string, name: string, apiKey: string): Promise<void>;
+  updateConnection(id: string, apiKey: string): Promise<void>;
+  models(connectionId: string): Promise<string[]>;
+  combos(): Promise<Array<{ id: string; name: string }>>;
+  saveCombo(id: string | null, name: string, models: string[]): Promise<void>;
+  keys(): Promise<Array<{ id: string; name: string }>>;
+  createKey(name: string): Promise<{ id: string; key: string }>;
+  updateKey(id: string, patch: Record<string, unknown>): Promise<void>;
+  /** Werkt deze sleutel voor de agents (het /v1-deel)? */
+  keyWorks(key: string): Promise<boolean>;
+}
+
+export class OmniRouteError extends Error {}
+
+const unreachable = (baseUrl: string, err: unknown) =>
+  new OmniRouteError(`OmniRoute niet bereikbaar op ${baseUrl} (${err instanceof Error ? err.message : String(err)}). Draait gratis-ai? (systemctl --user status gratis-ai)`);
+
+/** Beheer van OmniRoute via zijn API, ingelogd met het wachtwoord van het dashboard. */
+export class OmniRouteClient implements OmniApi {
+  private cookie = "";
+
+  constructor(
+    private readonly baseUrl: string,
+    private readonly password: string,
+    private readonly fetchImpl: typeof fetch = fetch,
+  ) {}
+
+  private async call<T>(method: string, path: string, body?: unknown): Promise<T> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+        method,
+        headers: { "content-type": "application/json", ...(this.cookie ? { cookie: this.cookie } : {}) },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      throw unreachable(this.baseUrl, err);
+    }
+    const text = await res.text();
+    if (!res.ok) throw new OmniRouteError(`OmniRoute gaf ${res.status} op ${method} ${path}: ${text.slice(0, 200)}`);
+    return (text ? JSON.parse(text) : {}) as T;
+  }
+
+  async login(): Promise<void> {
+    let res: Response;
+    try {
+      res = await this.fetchImpl(`${this.baseUrl}/api/auth/login`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: this.password }),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      throw unreachable(this.baseUrl, err);
+    }
+    if (res.status === 401 || res.status === 403) {
+      throw new OmniRouteError("Inloggen bij OmniRoute lukte niet: klopt OMNIROUTE_PASSWORD in gratis-ai.env nog met het wachtwoord van het dashboard?");
+    }
+    if (!res.ok) throw new OmniRouteError(`Inloggen bij OmniRoute gaf ${res.status}.`);
+    const cookies = typeof res.headers.getSetCookie === "function" ? res.headers.getSetCookie() : [res.headers.get("set-cookie") ?? ""];
+    this.cookie = cookies
+      .map((c) => c.split(";")[0]!.trim())
+      .filter(Boolean)
+      .join("; ");
+    if (!this.cookie) throw new OmniRouteError("OmniRoute gaf na het inloggen geen sessie terug.");
+  }
+
+  async connections(): Promise<Connection[]> {
+    const r = await this.call<{ connections?: Connection[] }>("GET", "/api/providers");
+    return r.connections ?? [];
+  }
+
+  async addConnection(provider: string, name: string, apiKey: string): Promise<void> {
+    await this.call("POST", "/api/providers", { provider, name, apiKey, isActive: true });
+  }
+
+  async updateConnection(id: string, apiKey: string): Promise<void> {
+    await this.call("PATCH", `/api/providers/${encodeURIComponent(id)}`, { apiKey, isActive: true });
+  }
+
+  async models(connectionId: string): Promise<string[]> {
+    const r = await this.call<{ models?: Array<{ id: string }> }>("GET", `/api/providers/${encodeURIComponent(connectionId)}/models`);
+    return (r.models ?? []).map((m) => m.id);
+  }
+
+  async combos(): Promise<Array<{ id: string; name: string }>> {
+    const r = await this.call<{ combos?: Array<{ id: string; name: string }> }>("GET", "/api/combos");
+    return r.combos ?? [];
+  }
+
+  async saveCombo(id: string | null, name: string, models: string[]): Promise<void> {
+    const body = { name, strategy: "priority", models };
+    if (id) await this.call("PUT", `/api/combos/${encodeURIComponent(id)}`, body);
+    else await this.call("POST", "/api/combos", body);
+  }
+
+  async keys(): Promise<Array<{ id: string; name: string }>> {
+    const r = await this.call<{ keys?: Array<{ id: string; name: string }> } | Array<{ id: string; name: string }>>("GET", "/api/keys");
+    return Array.isArray(r) ? r : (r.keys ?? []);
+  }
+
+  async createKey(name: string): Promise<{ id: string; key: string }> {
+    return this.call<{ id: string; key: string }>("POST", "/api/keys", { name });
+  }
+
+  async updateKey(id: string, patch: Record<string, unknown>): Promise<void> {
+    await this.call("PATCH", `/api/keys/${encodeURIComponent(id)}`, patch);
+  }
+
+  async keyWorks(key: string): Promise<boolean> {
+    try {
+      const res = await this.fetchImpl(`${this.baseUrl}/v1/models`, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15_000) });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+}
+
+export interface GratisPlan {
+  /** De combo "gratis": provider/model, in volgorde. */
+  combo: string[];
+  used: Array<{ provider: FreeProvider; connection: string; models: string[] }>;
+  /** Verbindingen in OmniRoute die HQ bewust niet gebruikt, met de reden. */
+  skipped: Array<{ name: string; reason: string }>;
+}
+
+const isApiKey = (c: Connection) => !c.authType || c.authType === "apikey";
+
+/** Welke verbindingen komen in de combo, en welke niet (en waarom). */
+export async function planGratis(api: OmniApi, connections: Connection[], perProvider = 3): Promise<GratisPlan> {
+  const plan: GratisPlan = { combo: [], used: [], skipped: [] };
+  for (const c of connections) {
+    if (!isApiKey(c)) {
+      plan.skipped.push({ name: c.name, reason: "gekoppeld via een login of abonnement: dat verbieden de meeste aanbieders, en je account kan geblokkeerd raken" });
+    } else if (!PROVIDERS.some((p) => p.id === c.provider)) {
+      plan.skipped.push({ name: c.name, reason: "staat niet op de lijst van bekende aanbieders met een officiële gratis laag" });
+    } else if (!c.isActive) {
+      plan.skipped.push({ name: c.name, reason: "staat uit in OmniRoute" });
+    }
+  }
+  for (const provider of PROVIDERS) {
+    const c = connections.find((x) => x.provider === provider.id && x.isActive && isApiKey(x));
+    if (!c) continue;
+    const models = pickModels(provider, await api.models(c.id), provider.id === "openrouter" ? Math.min(2, perProvider) : perProvider);
+    if (!models.length) {
+      plan.skipped.push({ name: c.name, reason: "geen bruikbaar gratis model gevonden" });
+      continue;
+    }
+    plan.used.push({ provider, connection: c.name, models });
+    plan.combo.push(...models.map((m) => `${provider.id}/${m}`));
+  }
+  return plan;
+}
+
+export interface SyncResult {
+  plan: GratisPlan;
+  added: string[];
+  updated: string[];
+  /** Nieuwe sleutel voor HQ (komt als HQ_GRATIS_AI_KEY in hq.env), of null als de oude nog werkt. */
+  newKey: string | null;
+}
+
+/**
+ * Zet jouw sleutels in OmniRoute, maakt de combo "gratis" en zorgt dat HQ een eigen sleutel heeft.
+ * Die sleutel slaat geen prompts op en laat de tekst ongemoeid (OmniRoute kan prompts "comprimeren";
+ * dat verandert wat de agent leest).
+ */
+export async function syncGratis(api: OmniApi, keys: Record<string, string | undefined>, opts: { hqKey?: string; perProvider?: number } = {}): Promise<SyncResult> {
+  await api.login();
+  const result: SyncResult = { plan: { combo: [], used: [], skipped: [] }, added: [], updated: [], newKey: null };
+  let connections = await api.connections();
   for (const provider of PROVIDERS) {
     const key = keys[provider.envKey];
     if (!key) continue;
-    try {
-      const res = await fetchImpl(provider.modelsUrl, { headers: { authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15_000) });
-      if (!res.ok) {
-        out.push({ provider, models: [], error: res.status === 401 || res.status === 403 ? "sleutel ongeldig" : `gaf ${res.status}` });
-        continue;
-      }
-      const body = (await res.json()) as { data?: Array<{ id: string }> };
-      const models = pickModels(provider, (body.data ?? []).map((m) => m.id));
-      out.push({ provider, models, ...(models.length ? {} : { error: "geen bruikbaar gratis model gevonden" }) });
-    } catch (err) {
-      out.push({ provider, models: [], error: err instanceof Error ? err.message : String(err) });
+    const existing = connections.find((c) => c.provider === provider.id && isApiKey(c));
+    if (existing) {
+      await api.updateConnection(existing.id, key);
+      result.updated.push(provider.name);
+    } else {
+      await api.addConnection(provider.id, provider.name, key);
+      result.added.push(provider.name);
     }
   }
-  return out;
-}
-
-/** De LiteLLM-config: alle gekozen modellen onder één naam, in volgorde van voorkeur. */
-export function buildConfig(selections: Selection[], opts: { generatedAt?: Date } = {}): string {
-  const modelList: Array<{ model_name: string; litellm_params: Record<string, unknown> }> = [];
-  let order = 1;
-  for (const s of selections) {
-    for (const model of s.models) {
-      modelList.push({
-        model_name: GRATIS_MODEL,
-        litellm_params: { model: `${s.provider.prefix}${model}`, api_key: `os.environ/${s.provider.envKey}`, order: order++ },
-      });
-    }
+  connections = await api.connections();
+  result.plan = await planGratis(api, connections, opts.perProvider);
+  if (result.plan.combo.length) {
+    const existing = (await api.combos()).find((c) => c.name === GRATIS_MODEL);
+    await api.saveCombo(existing?.id ?? null, GRATIS_MODEL, result.plan.combo);
   }
-  const config = {
-    model_list: modelList,
-    router_settings: {
-      // Na één fout (bv. 429: limiet op) een minuut rust voor dat model; de volgende in de rij neemt het over.
-      num_retries: Math.max(1, Math.min(4, modelList.length - 1)),
-      allowed_fails: 0,
-      cooldown_time: 60,
-    },
-    litellm_settings: { drop_params: true, request_timeout: 180, telemetry: false },
-    general_settings: { master_key: "os.environ/LITELLM_MASTER_KEY" },
-  };
-  const header = [
-    `# Gratis AI-router (LiteLLM). Gemaakt door \`dist/main.js gratis-ai --schrijf\`${opts.generatedAt ? ` op ${opts.generatedAt.toISOString().slice(0, 10)}` : ""}.`,
-    "# Niet met de hand aanpassen: zet sleutels in ~/.config/hq/gratis-ai.env en draai het commando opnieuw.",
-    "",
-  ].join("\n");
-  return header + stringify(config, { lineWidth: 0 });
+  let hqKey = (await api.keys()).find((k) => k.name === HQ_KEY_NAME);
+  if (!hqKey || !opts.hqKey || !(await api.keyWorks(opts.hqKey))) {
+    const created = await api.createKey(HQ_KEY_NAME);
+    hqKey = { id: created.id, name: HQ_KEY_NAME };
+    result.newKey = created.key;
+  }
+  await api.updateKey(hqKey.id, { compressionEnabled: false, noLog: true });
+  return result;
 }
 
 /** Een leesbare samenvatting voor in de terminal. */
-export function describeSelections(selections: Selection[]): string {
-  if (!selections.length) {
-    return "Nog geen sleutels. Zet er minstens één in ~/.config/hq/gratis-ai.env (GROQ_API_KEY, CEREBRAS_API_KEY, GEMINI_API_KEY, MISTRAL_API_KEY of OPENROUTER_API_KEY).";
+export function describePlan(plan: GratisPlan): string {
+  if (!plan.used.length && !plan.skipped.length) {
+    return "Nog geen aanbieders. Zet minstens één sleutel in ~/.config/hq/gratis-ai.env (bv. GROQ_API_KEY) en draai dit met --schrijf.";
   }
   const lines: string[] = [];
   let order = 1;
-  for (const s of selections) {
-    if (s.error && !s.models.length) {
-      lines.push(`✖ ${s.provider.name}: ${s.error}`);
-      continue;
-    }
-    lines.push(`✔ ${s.provider.name}: ${s.models.map((m) => `${order++}. ${m}`).join(", ")}${s.provider.mayTrain ? "  (⚠️ kan je gegevens gebruiken voor training)" : ""}`);
-    lines.push(`   ${s.provider.note}`);
+  for (const u of plan.used) {
+    lines.push(`✔ ${u.provider.name}: ${u.models.map((m) => `${order++}. ${m}`).join(", ")}${u.provider.mayTrain ? "  (⚠️ kan je gegevens gebruiken voor training)" : ""}`);
+    lines.push(`   ${u.provider.note}`);
   }
+  for (const s of plan.skipped) lines.push(`✖ ${s.name}: ${s.reason}`);
+  if (plan.combo.length) lines.push("", `Combo "${GRATIS_MODEL}": ${plan.combo.length} modellen, in deze volgorde.`);
   return lines.join("\n");
 }
 
@@ -198,9 +374,17 @@ export function parseEnvFile(text: string): Record<string, string> {
   return out;
 }
 
+/** Zet (of vervangt) één regel KEY=waarde in een env-bestand, en laat de rest staan. */
+export function setEnvLine(text: string, key: string, value: string): string {
+  const line = `${key}=${value}`;
+  const re = new RegExp(`^${key}=.*$`, "m");
+  if (re.test(text)) return text.replace(re, line);
+  return `${text.replace(/\n*$/, "\n")}${line}\n`;
+}
+
 /**
- * Omgeving voor een agent die op de gratis router draait (Claude Code praat dan met LiteLLM in plaats van
- * met Anthropic). Het contextvenster is kleiner dan bij Claude, dus Claude Code moet eerder samenvatten.
+ * Omgeving voor een agent die op de gratis router draait (Claude Code praat dan via OmniRoute in plaats van
+ * rechtstreeks met Anthropic). Het contextvenster is kleiner dan bij Claude, dus Claude Code moet eerder samenvatten.
  */
 export function gratisAgentEnv(cfg: { url: string; key: string; contextTokens: number }): Record<string, string> {
   return {

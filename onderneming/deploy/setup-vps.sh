@@ -92,9 +92,9 @@ fi
 if [[ ! -d ~/tools/last30days/.git ]]; then
   git clone --quiet --depth 1 --branch v3.25.0 https://github.com/mvanhorn/last30days-skill ~/tools/last30days
 fi
-# LiteLLM: de gratis AI-router (vaste versie; bijwerken alleen na nakijken van de release).
-if ! command -v litellm >/dev/null; then
-  pipx install "litellm[proxy]==1.102.1"
+# OmniRoute: de gratis AI-router (vaste versie; bijwerken alleen na nakijken van de release). Groot (±2 GB).
+if [[ "$(omniroute --version 2>/dev/null | tail -1)" != *3.8.50* ]]; then
+  npm install -g omniroute@3.8.50
 fi
 AS_AI
 
@@ -124,16 +124,20 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
   sed -i "s|^HQ_ADMIN_TOKEN=.*|HQ_ADMIN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
   sed -i "s|^HQ_HOOK_TOKEN=.*|HQ_HOOK_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
 fi
-# Gratis AI-router: één wachtwoord, in beide bestanden hetzelfde.
+# Gratis AI-router (OmniRoute): geheimen en het wachtwoord van het dashboard, één keer willekeurig gemaakt.
+# STORAGE_ENCRYPTION_KEY versleutelt de sleutels in de database: nooit veranderen, anders is alles weg.
 if [[ ! -f ~/.config/hq/gratis-ai.env ]]; then
   cp ../deploy/gratis-ai.env.example ~/.config/hq/gratis-ai.env
   chmod 600 ~/.config/hq/gratis-ai.env
-  router_key="sk-$(openssl rand -hex 24)"
-  sed -i "s|^LITELLM_MASTER_KEY=.*|LITELLM_MASTER_KEY=$router_key|" ~/.config/hq/gratis-ai.env
-  # Een hq.env van een eerdere installatie kent de regel nog niet.
-  grep -q '^HQ_GRATIS_AI_KEY=' ~/.config/hq/hq.env || echo 'HQ_GRATIS_AI_KEY=' >> ~/.config/hq/hq.env
-  sed -i "s|^HQ_GRATIS_AI_KEY=.*|HQ_GRATIS_AI_KEY=$router_key|" ~/.config/hq/hq.env
+  omni_password="$(openssl rand -hex 12)"
+  sed -i "s|^JWT_SECRET=.*|JWT_SECRET=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^API_KEY_SECRET=.*|API_KEY_SECRET=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^STORAGE_ENCRYPTION_KEY=.*|STORAGE_ENCRYPTION_KEY=$(openssl rand -hex 32)|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^INITIAL_PASSWORD=.*|INITIAL_PASSWORD=$omni_password|" ~/.config/hq/gratis-ai.env
+  sed -i "s|^OMNIROUTE_PASSWORD=.*|OMNIROUTE_PASSWORD=$omni_password|" ~/.config/hq/gratis-ai.env
 fi
+# Een hq.env van een eerdere installatie wijst nog naar de oude router (LiteLLM, poort 4000).
+sed -i "s|^HQ_GRATIS_AI_URL=http://127.0.0.1:4000$|HQ_GRATIS_AI_URL=http://127.0.0.1:20128|" ~/.config/hq/hq.env
 cp ../deploy/hq.service ~/.config/systemd/user/hq.service
 cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ../deploy/gratis-ai.service ~/.config/systemd/user/
 chmod +x ../deploy/backup.sh ../deploy/update.sh ../deploy/tools/*

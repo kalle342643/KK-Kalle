@@ -215,18 +215,25 @@ Claude Code niet ophouden.
   (Dat adres wijst naar `main`: het werkt zodra deze code daar staat.) Nieuwe sessies melden zich dan live. Alleen `/api/hooks` staat open, en dat adres kan alleen meldingen
   ontvangen met het geheim; het kantoor zelf blijft alleen via Tailscale bereikbaar.
 
-**Gratis AI (LiteLLM-router).** Laat agents of Graphify op de gratis lagen van een paar aanbieders draaien;
-zit er één aan zijn limiet, dan neemt de volgende het over. Bewust níét OmniRoute: dat hergebruikt abonnementen
-en stapelt accounts, en dat schendt de voorwaarden van die aanbieders. Hier gebruik je per aanbieder één eigen
-sleutel binnen hun gratis laag.
-1. Maak sleutels aan (alleen wat je wilt): Groq, Cerebras, Google AI Studio, eventueel Mistral en OpenRouter.
-   Zet ze in `~/.config/hq/gratis-ai.env` (bij elke regel staat waar je hem haalt en wat er met je gegevens gebeurt).
-2. `node --env-file=$HOME/.config/hq/hq.env dist/main.js gratis-ai` laat zien welke modellen je sleutels geven;
-   klopt het, dan `… gratis-ai --schrijf`.
-3. `systemctl --user enable --now gratis-ai` en `… dist/main.js gratis-ai test` (moet "ok" antwoorden).
+**Gratis AI (OmniRoute).** Laat agents of Graphify op de gratis lagen van zeven aanbieders draaien (samen ±20
+modellen). Zit er één aan zijn limiet, dan neemt de volgende het over. [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
+(MIT) staat al op de server. HQ gebruikt alleen de nette kant: per aanbieder één eigen sleutel binnen hun gratis laag.
+Abonnementen koppelen (Claude, ChatGPT, Copilot), webchat-cookies of meerdere accounts per aanbieder kan OmniRoute
+ook, maar dat schendt hun voorwaarden en kan je accounts kosten (ook dat van Claude Code); HQ zet zulke
+verbindingen nooit in de combo.
+1. Start de router: `systemctl --user enable --now gratis-ai`.
+2. Maak sleutels aan (alleen wat je wilt): Groq, Cerebras, SambaNova, Google AI Studio, Hugging Face, Mistral,
+   OpenRouter. Zet ze in `~/.config/hq/gratis-ai.env`; bij elke regel staat waar je hem haalt en wat er met je
+   gegevens gebeurt.
+3. `node --env-file=$HOME/.config/hq/hq.env dist/main.js gratis-ai --schrijf`: zet je sleutels in OmniRoute, maakt de
+   combo "gratis" (de beste modellen, per aanbieder de beste drie) en een eigen sleutel voor de agents (in `hq.env`).
+   Daarna `dist/main.js bootstrap && systemctl --user restart hq`, en `… gratis-ai test` (moet "ok" antwoorden).
 4. Gebruiken: `GRAPHIFY_BACKEND=gratis` in `hq.env` (de kennisgraaf gratis bouwen), en/of `HQ_GRATIS_AI_ROLES=verkenner`
    om de verkenners erop te laten draaien; daarna `dist/main.js bootstrap`. In het kantoor staat bij die agents
    "🆓 Gratis AI". Begin klein: gratis modellen zijn minder slim dan Claude en kunnen niet zelf zoeken.
+5. Het dashboard van OmniRoute (wat is er nog over van elke gratis laag?): `tailscale serve --bg --https=8443
+   http://127.0.0.1:20128`, dan `https://<servernaam>.<tailnet>.ts.net:8443`, alleen binnen je Tailscale-netwerk.
+   Het wachtwoord staat als `OMNIROUTE_PASSWORD` in `gratis-ai.env`.
 
 **Kennisbank en Graphify (aanbevolen).** Het script installeerde Graphify al (`pipx install graphifyy`). HQ schrijft
 elk uur alle lessen, notities en experimenten als notities in `~/vault`. Wil je dat Graphify daar 's nachts een

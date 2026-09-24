@@ -116,7 +116,8 @@ bedoeling was. Wat dat opleverde:
   limietfout geeft (`mock_response: litellm.RateLimitError`) antwoordde de tweede, zowel in OpenAI- als in
   Anthropic-formaat (`/v1/messages`). Claude Code zelf werkt via de router (`ANTHROPIC_BASE_URL`), maar kent de
   modelnaam "gratis" niet en rekent dan op 200k context: zet `CLAUDE_CODE_MAX_CONTEXT_TOKENS` lager.
-- **Gratis ≠ vrij van regels.** OmniRoute stapelt abonnementen en accounts; dat schendt de voorwaarden van de
+  (Later vervangen door OmniRoute, zie hieronder; de les over de context blijft gelden.)
+- **Gratis ≠ vrij van regels.** OmniRoute kan abonnementen en accounts stapelen; dat schendt de voorwaarden van de
   aanbieders. Hier: één eigen sleutel per aanbieder. Cohere-proefsleutels zijn niet voor commercieel gebruik (niet
   opgenomen); Mistral (Experiment) en sommige OpenRouter-modellen kunnen je gegevens gebruiken: dat staat erbij.
 - **`pkill -f` doodt je eigen shell** als het patroon ook in je eigen commando staat (exit 144, drie keer gebeurd,
@@ -149,6 +150,24 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
 - **Een openbare repo, ook in tests.** In de testbestanden stonden de naam van een privé-repository, een branch en
   een adres van een eigen project. Nu neutrale voorbeeldnamen. Zoek vóór elke commit ook in `test/` op privénamen.
 
+## OmniRoute als gratis router (24 september, avond)
+- **Beheer via REST, niet via de CLI.** Na `POST /api/auth/login {password}` (zet een cookie) gaat alles via
+  `/api/providers` (sleutels), `/api/combos` (de volgorde van doorschakelen) en `/api/keys` (veld `name`, niet
+  `label`). De CLI-opdracht `setup` las de `.env` uit het npm-pakket en zette een ander wachtwoord; daarna lukte
+  inloggen niet meer. Nu: `INITIAL_PASSWORD` bij de eerste start en verder alleen REST (`hq gratis-ai --schrijf`).
+- **De catalogus kent soorten aanbieders:** api-key (233), oauth (25, abonnementen), web-cookie (35, chatsites met je
+  inlog) en noauth (13). HQ zet alleen api-key-aanbieders van een vaste lijst in de combo en noemt bij de rest waarom
+  niet. Zo kan niemand per ongeluk een abonnement of een ingelogde chatsite laten meedraaien.
+- **`STORAGE_ENCRYPTION_KEY` nooit veranderen.** OmniRoute versleutelt de opgeslagen sleutels ermee; een nieuwe
+  waarde maakt ze onleesbaar. setup-vps.sh maakt hem één keer en laat hem daarna staan.
+- **HQ krijgt een eigen sleutel zonder compressie en zonder log.** OmniRoute kan prompts "comprimeren"; dat verandert
+  wat een agent leest. En prompts hoeven niet in de router bewaard te worden.
+- **Test een lokale router met `env -i`.** In deze sandbox stonden eigen `CLAUDE_*`-variabelen; Claude Code kreeg
+  daardoor 401 van de router terwijl de sleutel goed was.
+- **Het pakket is groot (±2 GB, een complete Next.js-build).** Op een kleine server eerst de schijf controleren.
+- Getest met de echte OmniRoute 3.8.50: doorschakelen van A (429) naar B in OpenAI- en Anthropic-formaat, ook
+  streaming, en `gratis-ai --schrijf`: 20 modellen in de combo, en bij een tweede run blijft de sleutel dezelfde.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.
@@ -173,9 +192,9 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
   Playwright-headless-shell, last30days 3.25.0, Graphify 0.9.67), maar nog niet in een echte agent-run op de server.
 - **Het run-logboek in een echte ACP-run:** de lezer is getest met regels zoals de code van Paperclip ze schrijft,
   niet met een echte run. Kijk bij de eerste runs of "🔎 zoekt" en "🌐 leest" in het kantoor verschijnen.
-- **Gratis AI met echte sleutels:** de router is getest met nep-aanbieders en met een door HQ gemaakte config
-  (LiteLLM 1.102.1 start en toont het model), niet met echte sleutels. Welke modellen de aanbieders nu hebben,
-  bepaalt `dist/main.js gratis-ai` bij het draaien.
+- **Gratis AI met echte sleutels:** OmniRoute is getest met nep-aanbieders (doorschakelen, sleutels, combo), niet
+  met echte sleutels van Groq, Gemini en de rest. Welke modellen de aanbieders nu hebben, bepaalt
+  `dist/main.js gratis-ai --schrijf` bij het draaien.
 - **Hooks vanuit Claude Code in de cloud:** het script en de installatie zijn lokaal getest (geheimen weggepoetst,
   niets naar stdout, altijd exit 0), ook met de echte Claude Code CLI en een helper. De route via Tailscale Funnel
   en de netwerkinstellingen van een cloud-omgeving zijn niet getest.

@@ -13,7 +13,7 @@ AI-gebruik, niet de server. Daarom worden agents alleen op schema of bij een taa
 | Het 3D-kantoor | €0 en 0 tokens: het draait in je browser en doet zelf geen AI-aanvragen (een "uit"-knop zou dus niets besparen) |
 | De werkplaats (GitHub meelezen, gezondheidscheck) | €0: GitHub-token is gratis, meelezen kost geen tokens |
 | Webtools voor agents (Crawl4AI, last30days, Graphify) | €0: open source, draaien op je eigen server; alleen het lezen van de resultaten kost tokens |
-| Gratis AI-router (LiteLLM) | €0: open source; de aanbieders zelf binnen hun gratis laag |
+| Gratis AI-router (OmniRoute) | €0: open source; de aanbieders zelf binnen hun gratis laag |
 | Domeinnaam (alleen als een experiment er een nodig heeft, via een uitgaveverzoek) | ~€1 |
 
 ## AI-gebruik (variabel)
@@ -74,9 +74,9 @@ er al 2 experimenten lopen of wachten, en geen Graphify-extractie onder 100 less
 - Claude-abonnement in plaats van API-sleutel via de AI-verbinding in Paperclip. Dan valt het gebruik binnen je
   abonnementslimiet, maar het beleid daarvoor veranderde in 2026 een paar keer: reken er niet op.
 - **Gratis AI** (SETUP.md, *Optioneel*): de kennisgraaf (`GRAPHIFY_BACKEND=gratis`) en eenvoudige rollen zoals
-  verkenners (`HQ_GRATIS_AI_ROLES=verkenner`) via de gratis lagen van Groq, Cerebras en Google. Kost €0 zolang je
-  binnen hun limieten blijft; de router schakelt door naar de volgende als er één vol zit. Minder slim dan Claude,
-  dus niet voor de CEO, de lead of de bouwer. Nooit via gedeelde abonnementen of extra accounts (OmniRoute):
-  dat is tegen de voorwaarden van de aanbieders.
+  verkenners (`HQ_GRATIS_AI_ROLES=verkenner`) via OmniRoute, over de gratis lagen van zeven aanbieders (±20
+  modellen). Kost €0 zolang je binnen hun limieten blijft; OmniRoute schakelt door naar de volgende als er één vol
+  zit. Minder slim dan Claude, dus niet voor de CEO, de lead of de bouwer. Nooit via abonnementen, webchat-cookies
+  of extra accounts: dat kan OmniRoute wel, maar het is tegen de voorwaarden van de aanbieders.
 - **Kennisbank eerst:** agents vragen `hq kennis` voordat ze het web op gaan, en HQ zet bij elk voorstel wat al
   bekend is. Dat scheelt dubbel onderzoek (en dus tokens).

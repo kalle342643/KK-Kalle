@@ -71,17 +71,19 @@ const envSchema = z.object({
   /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
   HQ_OWNER_NAMES: z.string().default("Kalle"),
 
-  /** Gratis AI: de LiteLLM-router op deze server (zie `dist/main.js gratis-ai`). */
-  HQ_GRATIS_AI_URL: z.string().default("http://127.0.0.1:4000"),
-  /** De master key van de router (LITELLM_MASTER_KEY). Leeg = gratis AI staat uit. */
+  /** Gratis AI: OmniRoute op deze server (zie `dist/main.js gratis-ai`). */
+  HQ_GRATIS_AI_URL: z.string().default("http://127.0.0.1:20128"),
+  /** De sleutel waarmee HQ en de agents OmniRoute gebruiken; `gratis-ai --schrijf` zet hem. Leeg = gratis AI staat uit. */
   HQ_GRATIS_AI_KEY: z.string().optional(),
   /** Welke agents op gratis AI draaien (sjabloonnamen, komma-gescheiden), bv. "verkenner". Leeg = geen. */
   HQ_GRATIS_AI_ROLES: z.string().default(""),
   /** Contextvenster waarop Claude Code moet rekenen bij gratis modellen (die zijn kleiner dan Claude). */
   HQ_GRATIS_AI_CONTEXT: z.coerce.number().int().min(8000).default(64000),
-  /** Waar de sleutels van de aanbieders staan en waar de routerconfig komt. */
+  /** Hoeveel modellen per aanbieder in de combo "gratis" (limieten gelden vaak per model). */
+  HQ_GRATIS_AI_PER_PROVIDER: z.coerce.number().int().min(1).max(10).default(3),
+  /** Waar de sleutels van de aanbieders en het OmniRoute-wachtwoord staan, en waar hq.env staat. */
   HQ_GRATIS_AI_ENV: z.string().optional(),
-  HQ_GRATIS_AI_CONFIG: z.string().optional(),
+  HQ_ENV_FILE: z.string().optional(),
 
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
@@ -147,8 +149,10 @@ export interface Config {
     key: string | undefined;
     roles: string[];
     contextTokens: number;
+    perProvider: number;
     envFile: string;
-    configFile: string;
+    /** Het env-bestand van HQ zelf: `gratis-ai --schrijf` zet daar de sleutel in. */
+    hqEnvFile: string;
   };
   code: {
     githubToken: string | undefined;
@@ -231,8 +235,9 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       key: e.HQ_GRATIS_AI_KEY,
       roles: e.HQ_GRATIS_AI_ROLES.split(",").map((r) => r.trim()).filter(Boolean),
       contextTokens: e.HQ_GRATIS_AI_CONTEXT,
+      perProvider: e.HQ_GRATIS_AI_PER_PROVIDER,
       envFile: e.HQ_GRATIS_AI_ENV ?? `${cleaned.HOME ?? "."}/.config/hq/gratis-ai.env`,
-      configFile: e.HQ_GRATIS_AI_CONFIG ?? `${cleaned.HOME ?? "."}/.config/hq/gratis-ai.yaml`,
+      hqEnvFile: e.HQ_ENV_FILE ?? `${cleaned.HOME ?? "."}/.config/hq/hq.env`,
     },
     code: {
       githubToken: e.HQ_GITHUB_TOKEN,

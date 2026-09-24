@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { parse } from "yaml";
-import { buildConfig, describeSelections, discover, parseEnvFile, pickModels, PROVIDERS } from "../src/ai/gratis.js";
+import {
+  describePlan,
+  OmniRouteClient,
+  pickModels,
+  planGratis,
+  PROVIDERS,
+  setEnvLine,
+  syncGratis,
+  parseEnvFile,
+  type Connection,
+  type OmniApi,
+} from "../src/ai/gratis.js";
 import { AgentFactory } from "../src/company/factory.js";
 import { loadCompany } from "../src/company/loader.js";
 import { testConfig } from "../src/config.js";
@@ -9,93 +19,187 @@ import { graphifyRuntime, semanticExtractionEnabled } from "../src/knowledge/gra
 
 const provider = (id: string) => PROVIDERS.find((p) => p.id === id)!;
 
+/** Modellen zoals OmniRoute 3.8 ze per aanbieder in zijn catalogus heeft. */
+const CATALOG: Record<string, string[]> = {
+  groq: ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b", "qwen/qwen3.6-27b", "openai/gpt-oss-safeguard-20b", "whisper-large-v3"],
+  cerebras: ["zai-glm-4.7", "gemma-4-31b", "gpt-oss-120b"],
+  gemini: ["gemini-3.7-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-3.1-flash-tts-preview", "gemini-embedding-2"],
+  openrouter: ["openai/gpt-6-luna", "nex-agi/nex-n2.5-mini:free", "deepseek/deepseek-v4.1-flash:free", "anthropic/claude-opus-5.5", "qwen/qwen3.8-coder:free"],
+};
+
+/** Nep-OmniRoute: onthoudt wat HQ erin zet. */
+class FakeOmni implements OmniApi {
+  loggedIn = false;
+  conns: Connection[] = [];
+  combosList: Array<{ id: string; name: string; models: string[] }> = [];
+  keysList: Array<{ id: string; name: string; key: string; patch?: Record<string, unknown> }> = [];
+  apiKeys = new Map<string, string>();
+  async login() {
+    this.loggedIn = true;
+  }
+  async connections() {
+    return this.conns.map((c) => ({ ...c }));
+  }
+  async addConnection(provider: string, name: string, apiKey: string) {
+    const id = `c-${provider}`;
+    this.conns.push({ id, provider, name, isActive: true, authType: "apikey" });
+    this.apiKeys.set(id, apiKey);
+  }
+  async updateConnection(id: string, apiKey: string) {
+    this.apiKeys.set(id, apiKey);
+  }
+  async models(connectionId: string) {
+    return CATALOG[this.conns.find((c) => c.id === connectionId)!.provider] ?? [];
+  }
+  async combos() {
+    return this.combosList;
+  }
+  async saveCombo(id: string | null, name: string, models: string[]) {
+    if (id) this.combosList = this.combosList.map((c) => (c.id === id ? { id, name, models } : c));
+    else this.combosList.push({ id: `combo-${this.combosList.length + 1}`, name, models });
+  }
+  async keys() {
+    return this.keysList;
+  }
+  async createKey(name: string) {
+    const k = { id: `k${this.keysList.length + 1}`, name, key: `sk-omni-${this.keysList.length + 1}` };
+    this.keysList.push(k);
+    return { id: k.id, key: k.key };
+  }
+  async updateKey(id: string, patch: Record<string, unknown>) {
+    this.keysList.find((k) => k.id === id)!.patch = patch;
+  }
+  async keyWorks(key: string) {
+    return this.keysList.some((k) => k.key === key);
+  }
+}
+
 describe("gratis AI: modellen kiezen", () => {
-  it("pakt het beste model dat er nu is, en slaat spraak en beveiligingsmodellen over", () => {
-    expect(pickModels(provider("groq"), ["whisper-large-v3", "llama-3.1-8b-instant", "llama-3.3-70b-versatile", "openai/gpt-oss-120b", "meta-llama/llama-guard-4-12b"])).toEqual([
-      "openai/gpt-oss-120b",
-      "llama-3.3-70b-versatile",
-    ]);
-    expect(pickModels(provider("gemini"), ["models/gemini-2.0-flash", "models/gemini-2.5-flash", "models/gemini-2.5-pro"])).toEqual(["gemini-2.5-flash", "gemini-2.0-flash"]);
+  it("pakt de beste modellen die er nu zijn, en slaat spraak, embeddings en filters over", () => {
+    expect(pickModels(provider("groq"), CATALOG.groq!)).toEqual(["openai/gpt-oss-120b", "qwen/qwen3.6-27b", "llama-3.3-70b-versatile"]);
+    expect(pickModels(provider("gemini"), CATALOG.gemini!)).toEqual(["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite"]);
+    expect(pickModels(provider("cerebras"), CATALOG.cerebras!, 2)).toEqual(["gpt-oss-120b", "zai-glm-4.7"]);
   });
 
   it("bij OpenRouter alleen de gratis modellen", () => {
-    expect(pickModels(provider("openrouter"), ["openai/gpt-oss-120b", "deepseek/deepseek-chat-v3.1:free", "anthropic/claude-sonnet-5"])).toEqual(["deepseek/deepseek-chat-v3.1:free"]);
-  });
-
-  it("vraagt alleen aanbieders met een sleutel, en zegt het als een sleutel niet werkt", async () => {
-    const asked: string[] = [];
-    const fetchImpl = async (url: string, init?: RequestInit) => {
-      asked.push(url);
-      expect((init?.headers as Record<string, string>).authorization).toMatch(/^Bearer /);
-      if (url.includes("googleapis")) return new Response("{}", { status: 401 });
-      if (url.includes("groq")) return Response.json({ data: [{ id: "llama-3.3-70b-versatile" }, { id: "openai/gpt-oss-120b" }] });
-      return Response.json({ data: [{ id: "qwen/qwen3-235b-a22b:free" }] });
-    };
-    const found = await discover({ GROQ_API_KEY: "gsk_x", GEMINI_API_KEY: "fout", OPENROUTER_API_KEY: "sk-or-x" }, fetchImpl as typeof fetch);
-    expect(asked).toHaveLength(3);
-    expect(found.map((s) => [s.provider.id, s.models, s.error ?? null])).toEqual([
-      ["groq", ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"], null],
-      ["gemini", [], "sleutel ongeldig"],
-      ["openrouter", ["qwen/qwen3-235b-a22b:free"], null],
-    ]);
-    const text = describeSelections(found);
-    expect(text).toContain("1. openai/gpt-oss-120b, 2. llama-3.3-70b-versatile");
-    expect(text).toContain("✖ Google AI Studio (Gemini): sleutel ongeldig");
-    expect(text).toContain("kan je gegevens gebruiken voor training");
+    expect(pickModels(provider("openrouter"), CATALOG.openrouter!)).toEqual(["deepseek/deepseek-v4.1-flash:free", "qwen/qwen3.8-coder:free", "nex-agi/nex-n2.5-mini:free"]);
   });
 });
 
-describe("gratis AI: de routerconfig", () => {
-  it("alle modellen onder één naam, in volgorde, en nooit een sleutel in het bestand", () => {
-    const yaml = buildConfig([
-      { provider: provider("groq"), models: ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"] },
-      { provider: provider("cerebras"), models: ["gpt-oss-120b"] },
-      { provider: provider("gemini"), models: [], error: "sleutel ongeldig" },
+describe("gratis AI: OmniRoute inrichten", () => {
+  it("zet jouw sleutels erin, maakt de combo in vaste volgorde en een eigen sleutel voor de agents", async () => {
+    const omni = new FakeOmni();
+    const res = await syncGratis(omni, { GROQ_API_KEY: "gsk_1", GEMINI_API_KEY: "g_2", OPENROUTER_API_KEY: "sk-or-3", ONBEKEND_API_KEY: "x" });
+    expect(omni.loggedIn).toBe(true);
+    expect(res.added).toEqual(["Groq", "Google AI Studio (Gemini)", "OpenRouter (gratis modellen)"]);
+    expect(omni.apiKeys.get("c-groq")).toBe("gsk_1");
+    expect(omni.combosList).toEqual([
+      {
+        id: "combo-1",
+        name: "gratis",
+        models: [
+          "groq/openai/gpt-oss-120b",
+          "groq/qwen/qwen3.6-27b",
+          "groq/llama-3.3-70b-versatile",
+          "gemini/gemini-3.7-flash",
+          "gemini/gemini-2.5-flash",
+          "gemini/gemini-3.1-flash-lite",
+          // OpenRouter achteraan en met hooguit twee: de limiet geldt daar per account, niet per model.
+          "openrouter/deepseek/deepseek-v4.1-flash:free",
+          "openrouter/qwen/qwen3.8-coder:free",
+        ],
+      },
     ]);
-    const cfg = parse(yaml) as { model_list: Array<{ model_name: string; litellm_params: Record<string, unknown> }>; router_settings: Record<string, number>; general_settings: Record<string, string> };
-    expect(cfg.model_list.map((m) => [m.model_name, m.litellm_params.model, m.litellm_params.order, m.litellm_params.api_key])).toEqual([
-      ["gratis", "groq/openai/gpt-oss-120b", 1, "os.environ/GROQ_API_KEY"],
-      ["gratis", "groq/llama-3.3-70b-versatile", 2, "os.environ/GROQ_API_KEY"],
-      ["gratis", "cerebras/gpt-oss-120b", 3, "os.environ/CEREBRAS_API_KEY"],
-    ]);
-    expect(cfg.router_settings).toMatchObject({ allowed_fails: 0, cooldown_time: 60, num_retries: 2 });
-    expect(cfg.general_settings.master_key).toBe("os.environ/LITELLM_MASTER_KEY");
-    expect(yaml).not.toMatch(/gsk_|sk-or-|sk-[a-z0-9]{10}/i);
+    // Een eigen sleutel: geen prompts bewaren, en niets aan de tekst veranderen.
+    expect(res.newKey).toBe("sk-omni-1");
+    expect(omni.keysList[0]).toMatchObject({ name: "hq-agents", patch: { compressionEnabled: false, noLog: true } });
+    expect(describePlan(res.plan)).toContain('Combo "gratis": 8 modellen');
   });
 
-  it("leest het sleutelbestand zoals systemd dat doet", () => {
-    expect(parseEnvFile("# gratis AI\nGROQ_API_KEY=gsk_1\n\nGEMINI_API_KEY=\"g2\"\nLEEG=\n  CEREBRAS_API_KEY = c3 \n")).toEqual({ GROQ_API_KEY: "gsk_1", GEMINI_API_KEY: "g2", CEREBRAS_API_KEY: "c3" });
+  it("tweede keer: sleutels bijwerken, combo vervangen, en de werkende sleutel houden", async () => {
+    const omni = new FakeOmni();
+    const first = await syncGratis(omni, { GROQ_API_KEY: "gsk_1" });
+    const second = await syncGratis(omni, { GROQ_API_KEY: "gsk_nieuw", CEREBRAS_API_KEY: "c_1" }, { hqKey: first.newKey! });
+    expect(second).toMatchObject({ added: ["Cerebras"], updated: ["Groq"], newKey: null });
+    expect(omni.apiKeys.get("c-groq")).toBe("gsk_nieuw");
+    expect(omni.combosList).toHaveLength(1);
+    expect(omni.combosList[0]!.models.slice(3)).toEqual(["cerebras/gpt-oss-120b", "cerebras/zai-glm-4.7", "cerebras/gemma-4-31b"]);
+    // Klopt de sleutel in hq.env niet meer, dan komt er een nieuwe.
+    expect((await syncGratis(omni, {}, { hqKey: "sk-weg" })).newKey).toBe("sk-omni-2");
+  });
+
+  it("abonnementen, webchats en onbekende aanbieders komen nooit in de combo", async () => {
+    const omni = new FakeOmni();
+    omni.conns = [
+      { id: "a", provider: "claude", name: "Claude (abonnement)", isActive: true, authType: "oauth" },
+      { id: "b", provider: "chatgpt-web", name: "ChatGPT web", isActive: true, authType: "cookie" },
+      { id: "c", provider: "free-ai", name: "Free AI", isActive: true, authType: "apikey" },
+      { id: "d", provider: "groq", name: "Groq", isActive: true, authType: "apikey" },
+    ];
+    const plan = await planGratis(omni, omni.conns);
+    expect(plan.combo.every((m) => m.startsWith("groq/"))).toBe(true);
+    expect(plan.skipped.map((s) => [s.name, s.reason.split(":")[0]])).toEqual([
+      ["Claude (abonnement)", "gekoppeld via een login of abonnement"],
+      ["ChatGPT web", "gekoppeld via een login of abonnement"],
+      ["Free AI", "staat niet op de lijst van bekende aanbieders met een officiële gratis laag"],
+    ]);
+  });
+});
+
+describe("gratis AI: de OmniRoute-client", () => {
+  it("logt in met het wachtwoord en stuurt daarna de sessie mee", async () => {
+    const seen: Array<{ url: string; cookie: string | null }> = [];
+    const fetchImpl = (async (url: string, init?: RequestInit) => {
+      const headers = new Headers(init?.headers);
+      seen.push({ url, cookie: headers.get("cookie") });
+      if (url.endsWith("/api/auth/login")) {
+        if (JSON.parse(String(init?.body)).password !== "goed") return new Response('{"error":"Invalid password"}', { status: 401 });
+        return new Response('{"success":true}', { status: 200, headers: { "set-cookie": "auth_token=abc; Path=/; HttpOnly" } });
+      }
+      return Response.json({ connections: [{ id: "1", provider: "groq", name: "Groq", isActive: true, authType: "apikey" }] });
+    }) as typeof fetch;
+    await expect(new OmniRouteClient("http://omni", "fout", fetchImpl).login()).rejects.toThrow(/OMNIROUTE_PASSWORD/);
+    const api = new OmniRouteClient("http://omni", "goed", fetchImpl);
+    await api.login();
+    expect(await api.connections()).toHaveLength(1);
+    expect(seen.at(-1)).toEqual({ url: "http://omni/api/providers", cookie: "auth_token=abc" });
+  });
+
+  it("zet de sleutel in hq.env zonder de rest aan te raken", () => {
+    expect(setEnvLine("A=1\nHQ_GRATIS_AI_KEY=oud\nB=2\n", "HQ_GRATIS_AI_KEY", "nieuw")).toBe("A=1\nHQ_GRATIS_AI_KEY=nieuw\nB=2\n");
+    expect(setEnvLine("A=1", "HQ_GRATIS_AI_KEY", "nieuw")).toBe("A=1\nHQ_GRATIS_AI_KEY=nieuw\n");
+    expect(parseEnvFile("# gratis AI\nGROQ_API_KEY=gsk_1\n\nGEMINI_API_KEY=\"g2\"\nLEEG=\n  HF_TOKEN = h3 \n")).toEqual({ GROQ_API_KEY: "gsk_1", GEMINI_API_KEY: "g2", HF_TOKEN: "h3" });
   });
 });
 
 describe("gratis AI voor agents en Graphify", () => {
   const withGratis = testConfig({
-    gratisAi: { url: "http://127.0.0.1:4000", key: "sk-router", roles: ["verkenner"], contextTokens: 64000, envFile: "/x", configFile: "/y" },
+    gratisAi: { url: "http://127.0.0.1:20128", key: "sk-router", roles: ["verkenner"], contextTokens: 64000, perProvider: 3, envFile: "/x", hqEnvFile: "/y" },
   });
   const ctx = { config: withGratis } as AppContext;
   const factory = new AgentFactory(loadCompany(), "http://127.0.0.1:8080");
 
-  it("een verkenner draait op de router, een bouwer gewoon op Claude", () => {
+  it("een verkenner draait via OmniRoute, een bouwer gewoon op Claude", () => {
     const scout = factory.buildHire(ctx, factory.agentTemplate("verkenner"), { name: "Rigel", branch: null, reportsTo: null });
     expect(scout.adapterConfig).toMatchObject({
       model: "gratis",
-      env: { HQ_URL: "http://127.0.0.1:8080", ANTHROPIC_BASE_URL: "http://127.0.0.1:4000", ANTHROPIC_AUTH_TOKEN: "sk-router", ANTHROPIC_DEFAULT_HAIKU_MODEL: "gratis", CLAUDE_CODE_MAX_CONTEXT_TOKENS: "64000" },
+      env: { HQ_URL: "http://127.0.0.1:8080", ANTHROPIC_BASE_URL: "http://127.0.0.1:20128", ANTHROPIC_AUTH_TOKEN: "sk-router", ANTHROPIC_DEFAULT_HAIKU_MODEL: "gratis", CLAUDE_CODE_MAX_CONTEXT_TOKENS: "64000" },
     });
     const builder = factory.buildHire(ctx, factory.agentTemplate("bouwer"), { name: "Pollux", branch: null, reportsTo: null });
     expect(builder.adapterConfig).toMatchObject({ model: "claude-sonnet-5" });
     expect((builder.adapterConfig as { env: Record<string, string> }).env.ANTHROPIC_BASE_URL).toBeUndefined();
   });
 
-  it("zonder routersleutel draait niemand op gratis AI", () => {
+  it("zonder sleutel draait niemand op gratis AI", () => {
     const off = { config: testConfig({ gratisAi: { ...withGratis.gratisAi, key: undefined } }) } as AppContext;
     const scout = factory.buildHire(off, factory.agentTemplate("verkenner"), { name: "Rigel", branch: null, reportsTo: null });
     expect(scout.adapterConfig).toMatchObject({ model: "claude-haiku-4-5" });
   });
 
-  it("Graphify bouwt de kennisgraaf via de router met GRAPHIFY_BACKEND=gratis", () => {
+  it("Graphify bouwt de kennisgraaf via OmniRoute met GRAPHIFY_BACKEND=gratis", () => {
     const cfg = testConfig({ gratisAi: withGratis.gratisAi, knowledge: { ...withGratis.knowledge, vaultDir: "/v", graphifyBackend: "gratis", graphifyApiKey: undefined } });
     expect(semanticExtractionEnabled(cfg)).toBe(true);
-    expect(graphifyRuntime(cfg)).toMatchObject({ backend: "openai", model: "gratis", env: { OPENAI_BASE_URL: "http://127.0.0.1:4000/v1", OPENAI_API_KEY: "sk-router", OPENAI_MODEL: "gratis" } });
+    expect(graphifyRuntime(cfg)).toMatchObject({ backend: "openai", model: "gratis", env: { OPENAI_BASE_URL: "http://127.0.0.1:20128/v1", OPENAI_API_KEY: "sk-router", OPENAI_MODEL: "gratis" } });
     const none = testConfig({ knowledge: { ...cfg.knowledge, graphifyBackend: "claude" } });
     expect(semanticExtractionEnabled(none)).toBe(false);
     expect(graphifyRuntime(none)).toBeNull();

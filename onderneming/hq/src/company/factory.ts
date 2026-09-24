@@ -84,7 +84,7 @@ export class AgentFactory {
       BRANCH: opts.branch?.slug ?? "holding",
       BRANCH_NAME: opts.branch?.name ?? "Holding",
     };
-    // Draait deze rol op de gratis AI-router? Dan praat Claude Code met LiteLLM in plaats van met Anthropic.
+    // Draait deze rol op de gratis AI-router? Dan praat Claude Code met OmniRoute in plaats van met Anthropic.
     const gratis = ctx.config.gratisAi;
     const onGratis = Boolean(gratis.key) && gratis.roles.includes(spec.key);
     const hire: HireAgentInput = {

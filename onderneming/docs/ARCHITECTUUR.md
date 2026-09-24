@@ -16,7 +16,7 @@ flowchart TD
       HQ -->|elk uur| V["Kennisbank-map<br/>(Obsidian-notities)"]
       V -->|'s nachts| G["Graphify<br/>kennisgraaf"]
       CC -->|"hq-web · hq-trends · hq-graaf"| WEB["het web<br/>(openbare pagina's, open API's)"]
-      CC -.->|"rollen op gratis AI"| LL["gratis AI-router<br/>(LiteLLM, 127.0.0.1:4000)"]
+      CC -.->|"rollen op gratis AI"| LL["gratis AI-router<br/>(OmniRoute, 127.0.0.1:20128)"]
     end
     CC -->|model| API["Claude API"]
     LL -->|"eigen sleutel per aanbieder"| FREE["Groq · Cerebras · Gemini · …"]
@@ -113,13 +113,15 @@ loopt naar de kennisruimte). Dat staat bij het voorstel dat jij goedkeurt, en de
 een eerder afgeschoten idee komt zo niet ongemerkt terug.
 
 ## Gratis AI
-Een LiteLLM-router op de server zet de gratis lagen van een paar aanbieders achter één model ("gratis"), in een
-vaste volgorde. Geeft er één een limietfout (429), dan rust dat model een minuut en neemt de volgende het over.
-`dist/main.js gratis-ai` vraagt elke aanbieder welke modellen er nu zijn en schrijft de config; sleutels staan er nooit in.
-Rollen uit `HQ_GRATIS_AI_ROLES` draaien Claude Code via de router (Anthropic-formaat, met een kleiner
-contextvenster), en Graphify kan er de kennisgraaf mee bouwen. Wat we bewust niet doen: abonnementen of
-inloggegevens van chat-apps hergebruiken of accounts stapelen om limieten te ontlopen (zoals OmniRoute): dat
-schendt de voorwaarden van die aanbieders, en dan ben jij als eigenaar aansprakelijk.
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT) draait op de server en zet de gratis lagen van zeven
+aanbieders achter één model: de combo "gratis", met ±20 modellen in een vaste volgorde. Geeft er één een limietfout
+(429), dan neemt de volgende het over. `dist/main.js gratis-ai --schrijf` beheert OmniRoute via zijn API: het zet je
+sleutels erin, vraagt welke modellen er nu zijn, kiest de beste en maakt een eigen sleutel voor HQ (die geen
+prompts bewaart en niets aan de tekst verandert). Rollen uit `HQ_GRATIS_AI_ROLES` draaien Claude Code via
+OmniRoute (Anthropic-formaat, met een kleiner contextvenster), en Graphify kan er de kennisgraaf mee bouwen.
+Wat we bewust niet doen, al kan OmniRoute het: abonnementen koppelen, webchat-cookies gebruiken of accounts
+stapelen om limieten te ontlopen. Dat schendt de voorwaarden van die aanbieders, en dan ben jij als eigenaar
+aansprakelijk. Zulke verbindingen komen nooit in de combo, ook niet als iemand ze in het dashboard toevoegt.
 
 ## Kennisbank en Graphify
 Agents maken dezelfde fout niet twee keer als ze eerst kijken wat al bekend is. Daarom:

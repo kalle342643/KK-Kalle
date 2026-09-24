@@ -61,7 +61,7 @@ voordat je `/hervat` stuurt.
 | Werkplaats toont "geen toegang" of "token ongeldig" | het GitHub-token mist die repository of een recht (zie SETUP.md stap 11), of het is verlopen. Nieuw token in `hq.env`, `systemctl --user restart hq`. |
 | Claude Code-sessie staat niet in de werkplaats | HQ ziet een sessie pas aan zijn eerste commit (of direct met de hook). Nog niets gepusht = nog niets te zien. |
 | Agent zoekt niet op het web | `hq-web https://example.com` als gebruiker ai. "niet geïnstalleerd"? Draai `setup-vps.sh` opnieuw (kan geen kwaad). Een agent op gratis AI heeft geen WebSearch, alleen `hq-web` en `hq-trends`. |
-| Gratis AI werkt niet | `systemctl --user status gratis-ai`; `dist/main.js gratis-ai test`. "Sleutel ongeldig" bij `dist/main.js gratis-ai`: nieuwe sleutel bij die aanbieder, dan `--schrijf` en `systemctl --user restart gratis-ai`. Tijdelijk terug naar Claude: `HQ_GRATIS_AI_ROLES=` leeg en `bootstrap`. |
+| Gratis AI werkt niet | `systemctl --user status gratis-ai`; `dist/main.js gratis-ai test`. In het dashboard van OmniRoute (SETUP.md, *Gratis AI*) zie je per aanbieder of de sleutel werkt en wat er van de gratis laag over is. Nieuwe sleutel? In `gratis-ai.env` zetten en `dist/main.js gratis-ai --schrijf`. "Inloggen lukte niet": `OMNIROUTE_PASSWORD` in `gratis-ai.env` klopt niet meer met het dashboard. Tijdelijk terug naar Claude: `HQ_GRATIS_AI_ROLES=` leeg en `bootstrap`. |
 
 ## Back-ups
 - HQ-database: elke nacht om 03:30 naar `~/backups/hq-JJJJ-MM-DD.sql.gz` (14 dagen bewaard).
