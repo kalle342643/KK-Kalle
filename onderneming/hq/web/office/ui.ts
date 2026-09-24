@@ -38,7 +38,7 @@ function ago(iso: string | null): string {
   return `${Math.round(s / 86400)} dagen geleden`;
 }
 const modelName = (m: string | null) =>
-  !m ? "–" : m.replace(/^claude-/, "").replace(/-(\d)(-(\d))?$/, " $1.$3").replace(/\.$/, "").replace(/^./, (c) => c.toUpperCase()).replace(/\.undefined/, "");
+  !m ? "–" : m === "gratis" ? "🆓 Gratis AI" : m.replace(/^claude-/, "").replace(/-(\d)(-(\d))?$/, " $1.$3").replace(/\.$/, "").replace(/^./, (c) => c.toUpperCase()).replace(/\.undefined/, "");
 
 const STATUS: Record<string, { label: string; tone: string }> = {
   running: { label: "aan het werk", tone: "good" },

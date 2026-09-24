@@ -69,6 +69,18 @@ const envSchema = z.object({
   /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
   HQ_OWNER_NAMES: z.string().default("Kalle"),
 
+  /** Gratis AI: de LiteLLM-router op deze server (zie `hq gratis-ai`). */
+  HQ_GRATIS_AI_URL: z.string().default("http://127.0.0.1:4000"),
+  /** De master key van de router (LITELLM_MASTER_KEY). Leeg = gratis AI staat uit. */
+  HQ_GRATIS_AI_KEY: z.string().optional(),
+  /** Welke agents op gratis AI draaien (sjabloonnamen, komma-gescheiden), bv. "verkenner". Leeg = geen. */
+  HQ_GRATIS_AI_ROLES: z.string().default(""),
+  /** Contextvenster waarop Claude Code moet rekenen bij gratis modellen (die zijn kleiner dan Claude). */
+  HQ_GRATIS_AI_CONTEXT: z.coerce.number().int().min(8000).default(64000),
+  /** Waar de sleutels van de aanbieders staan en waar de routerconfig komt. */
+  HQ_GRATIS_AI_ENV: z.string().optional(),
+  HQ_GRATIS_AI_CONFIG: z.string().optional(),
+
   HQ_DAILY_REPORT_CRON: z.string().default("0 8 * * *"),
   HQ_WEEKLY_PORTFOLIO_CRON: z.string().default("30 7 * * 1"),
   HQ_SYNC_CRON: z.string().default("*/2 * * * *"),
@@ -125,6 +137,14 @@ export interface Config {
     graphifyApiKey: string | undefined;
     graphifyBackend: string;
     graphifyModel: string;
+  };
+  gratisAi: {
+    url: string;
+    key: string | undefined;
+    roles: string[];
+    contextTokens: number;
+    envFile: string;
+    configFile: string;
   };
   code: {
     githubToken: string | undefined;
@@ -201,6 +221,14 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       graphifyBackend: e.GRAPHIFY_BACKEND,
       graphifyModel: e.GRAPHIFY_MODEL,
     },
+    gratisAi: {
+      url: e.HQ_GRATIS_AI_URL.replace(/\/+$/, ""),
+      key: e.HQ_GRATIS_AI_KEY,
+      roles: e.HQ_GRATIS_AI_ROLES.split(",").map((r) => r.trim()).filter(Boolean),
+      contextTokens: e.HQ_GRATIS_AI_CONTEXT,
+      envFile: e.HQ_GRATIS_AI_ENV ?? `${cleaned.HOME ?? "."}/.config/hq/gratis-ai.env`,
+      configFile: e.HQ_GRATIS_AI_CONFIG ?? `${cleaned.HOME ?? "."}/.config/hq/gratis-ai.yaml`,
+    },
     code: {
       githubToken: e.HQ_GITHUB_TOKEN,
       pollMs: e.HQ_GITHUB_POLL_SECONDS * 1000,
@@ -230,5 +258,6 @@ export function testConfig(overrides: Partial<Config> = {}): Config {
     money: { ...base.money, ...(overrides.money ?? {}) },
     knowledge: { ...base.knowledge, ...(overrides.knowledge ?? {}) },
     code: { ...base.code, ...(overrides.code ?? {}) },
+    gratisAi: { ...base.gratisAi, ...(overrides.gratisAi ?? {}) },
   };
 }

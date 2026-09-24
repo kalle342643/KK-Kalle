@@ -92,6 +92,10 @@ fi
 if [[ ! -d ~/tools/last30days/.git ]]; then
   git clone --quiet --depth 1 --branch v3.25.0 https://github.com/mvanhorn/last30days-skill ~/tools/last30days
 fi
+# LiteLLM: de gratis AI-router (vaste versie; bijwerken alleen na nakijken van de release).
+if ! command -v litellm >/dev/null; then
+  pipx install "litellm[proxy]==1.102.1"
+fi
 AS_AI
 
 log "Browser voor Crawl4AI"
@@ -120,8 +124,18 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
   sed -i "s|^HQ_ADMIN_TOKEN=.*|HQ_ADMIN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
   sed -i "s|^HQ_HOOK_TOKEN=.*|HQ_HOOK_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
 fi
+# Gratis AI-router: één wachtwoord, in beide bestanden hetzelfde.
+if [[ ! -f ~/.config/hq/gratis-ai.env ]]; then
+  cp ../deploy/gratis-ai.env.example ~/.config/hq/gratis-ai.env
+  chmod 600 ~/.config/hq/gratis-ai.env
+  router_key="sk-$(openssl rand -hex 24)"
+  sed -i "s|^LITELLM_MASTER_KEY=.*|LITELLM_MASTER_KEY=$router_key|" ~/.config/hq/gratis-ai.env
+  # Een hq.env van een eerdere installatie kent de regel nog niet.
+  grep -q '^HQ_GRATIS_AI_KEY=' ~/.config/hq/hq.env || echo 'HQ_GRATIS_AI_KEY=' >> ~/.config/hq/hq.env
+  sed -i "s|^HQ_GRATIS_AI_KEY=.*|HQ_GRATIS_AI_KEY=$router_key|" ~/.config/hq/hq.env
+fi
 cp ../deploy/hq.service ~/.config/systemd/user/hq.service
-cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ~/.config/systemd/user/
+cp ../deploy/hq-backup.service ../deploy/hq-backup.timer ../deploy/gratis-ai.service ~/.config/systemd/user/
 chmod +x ../deploy/backup.sh ../deploy/update.sh ../deploy/tools/*
 AS_AI
 

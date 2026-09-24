@@ -41,7 +41,29 @@ export async function graphifyQuery(config: Config, question: string, budgetToke
 }
 
 export function semanticExtractionEnabled(config: Config): boolean {
-  return Boolean(config.knowledge.vaultDir && config.knowledge.graphifyApiKey);
+  const k = config.knowledge;
+  const viaRouter = k.graphifyBackend === "gratis" && Boolean(config.gratisAi.key);
+  return Boolean(k.vaultDir && (k.graphifyApiKey || viaRouter));
+}
+
+/**
+ * Hoe Graphify zijn AI aanspreekt. Met GRAPHIFY_BACKEND=gratis via de gratis router (OpenAI-formaat),
+ * anders rechtstreeks bij de aanbieder met GRAPHIFY_API_KEY.
+ */
+export function graphifyRuntime(config: Config): { backend: string; model: string; env: NodeJS.ProcessEnv } | null {
+  const k = config.knowledge;
+  const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: process.env.HOME, LANG: process.env.LANG };
+  if (k.graphifyBackend === "gratis") {
+    if (!config.gratisAi.key) return null;
+    env.OPENAI_API_KEY = config.gratisAi.key;
+    env.OPENAI_BASE_URL = `${config.gratisAi.url}/v1`;
+    env.OPENAI_MODEL = "gratis";
+    return { backend: "openai", model: "gratis", env };
+  }
+  if (!k.graphifyApiKey) return null;
+  if (k.graphifyBackend === "claude") env.ANTHROPIC_API_KEY = k.graphifyApiKey;
+  else env[`${k.graphifyBackend.toUpperCase()}_API_KEY`] = k.graphifyApiKey;
+  return { backend: k.graphifyBackend, model: k.graphifyModel, env };
 }
 
 /**
@@ -51,14 +73,17 @@ export function semanticExtractionEnabled(config: Config): boolean {
 export async function graphifyExtract(config: Config): Promise<{ ok: boolean; message: string }> {
   const k = config.knowledge;
   if (!k.vaultDir) return { ok: false, message: "HQ_VAULT_DIR is niet ingesteld" };
-  if (!k.graphifyApiKey) return { ok: false, message: "GRAPHIFY_API_KEY is niet ingesteld (alleen de HQ-graaf wordt gebruikt)" };
-  const env: NodeJS.ProcessEnv = { PATH: process.env.PATH, HOME: process.env.HOME, LANG: process.env.LANG };
-  if (k.graphifyBackend === "claude") env.ANTHROPIC_API_KEY = k.graphifyApiKey;
-  else env[`${k.graphifyBackend.toUpperCase()}_API_KEY`] = k.graphifyApiKey;
+  const runtime = graphifyRuntime(config);
+  if (!runtime) {
+    return {
+      ok: false,
+      message: k.graphifyBackend === "gratis" ? "HQ_GRATIS_AI_KEY is niet ingesteld (gratis router)" : "GRAPHIFY_API_KEY is niet ingesteld (alleen de HQ-graaf wordt gebruikt)",
+    };
+  }
   const res = await run(
     k.graphifyBin,
-    ["extract", k.vaultDir, "--backend", k.graphifyBackend, "--model", k.graphifyModel, "--max-concurrency", "2"],
-    { timeoutMs: 30 * 60_000, env, cwd: k.vaultDir },
+    ["extract", k.vaultDir, "--backend", runtime.backend, "--model", runtime.model, "--max-concurrency", runtime.backend === "openai" ? "1" : "2"],
+    { timeoutMs: 30 * 60_000, env: runtime.env, cwd: k.vaultDir },
   );
   const tail = (res.stdout + res.stderr).trim().split("\n").slice(-3).join(" | ");
   if (!res.ok) return { ok: false, message: `graphify extract mislukte: ${tail.slice(0, 500)}` };

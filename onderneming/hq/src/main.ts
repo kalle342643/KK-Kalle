@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { serve } from "@hono/node-server";
 import { createApp } from "./api/app.js";
 import { HqBot, COMMANDS, runPolling } from "./bot/bot.js";
@@ -23,6 +24,7 @@ import { OfficeEvents } from "./office/events.js";
 import { OfficeNotifier } from "./office/notifier.js";
 import { PaperclipWatcher } from "./office/watcher.js";
 import { HttpPaperclipClient } from "./paperclip/client.js";
+import { buildConfig, describeSelections, discover, GRATIS_MODEL, parseEnvFile } from "./ai/gratis.js";
 import { GitHubClient } from "./code/github.js";
 import { codeReportLines } from "./code/overview.js";
 import { listCodeProjects } from "./code/projects.js";
@@ -41,6 +43,9 @@ const USAGE = `hq <commando>
   import-csv <bestand>      omzet importeren (kolommen: date, amount_eur, branch, source, ...)
   kennis                    kennisbank-map bijwerken en (met GRAPHIFY_API_KEY) de Graphify-graaf opbouwen
   werkplaats                projecten één keer bij GitHub bijwerken, sites controleren en de stand tonen
+  gratis-ai [--schrijf|test]
+                            gratis AI-router: kijk welke gratis modellen je sleutels geven, schrijf de
+                            LiteLLM-config (--schrijf), of stuur een proefvraag door de router (test)
 `;
 
 function die(msg: string): never {
@@ -261,6 +266,36 @@ async function main(argv: string[]): Promise<void> {
       const { ctx } = await makeContext(config);
       console.log(await rebuildKnowledge(ctx));
       await ctx.db.close();
+      return;
+    }
+    case "gratis-ai": {
+      const g = config.gratisAi;
+      if (args[0] === "test") {
+        if (!g.key) die("HQ_GRATIS_AI_KEY ontbreekt in hq.env (dezelfde waarde als LITELLM_MASTER_KEY).");
+        const started = Date.now();
+        const res = await fetch(`${g.url}/v1/chat/completions`, {
+          method: "POST",
+          headers: { authorization: `Bearer ${g.key}`, "content-type": "application/json" },
+          body: JSON.stringify({ model: GRATIS_MODEL, max_tokens: 8, messages: [{ role: "user", content: "Antwoord met alleen het woord: ok" }] }),
+        }).catch((err: unknown) => die(`Router niet bereikbaar op ${g.url}: ${errorMessage(err)}. Draait gratis-ai? (systemctl --user status gratis-ai)`));
+        const body = (await res.json().catch(() => ({}))) as { choices?: Array<{ message?: { content?: string } }>; error?: { message?: string } };
+        if (!res.ok) die(`Router gaf ${res.status}: ${body.error?.message ?? "onbekende fout"}`);
+        const via = res.headers.get("x-litellm-model-api-base") ?? res.headers.get("x-litellm-model-id") ?? "?";
+        console.log(`✔ Antwoord in ${Date.now() - started} ms: "${body.choices?.[0]?.message?.content?.trim() ?? ""}" (via ${via})`);
+        return;
+      }
+      const keys = existsSync(g.envFile) ? parseEnvFile(readFileSync(g.envFile, "utf8")) : {};
+      const selections = await discover(keys);
+      console.log(describeSelections(selections));
+      if (!selections.some((s) => s.models.length)) return;
+      const yaml = buildConfig(selections, { generatedAt: new Date() });
+      if (args[0] === "--schrijf") {
+        mkdirSync(dirname(g.configFile), { recursive: true });
+        writeFileSync(g.configFile, yaml, { mode: 0o600 });
+        console.log(`\nOpgeslagen in ${g.configFile}. Herstart de router: systemctl --user restart gratis-ai`);
+      } else {
+        console.log(`\n${yaml}\n(Nog niet opgeslagen. Klopt het? Draai dan: hq gratis-ai --schrijf)`);
+      }
       return;
     }
     case "werkplaats": {

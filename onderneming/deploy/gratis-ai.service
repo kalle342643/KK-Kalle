@@ -1,0 +1,20 @@
+# Gratis AI-router (LiteLLM) voor HQ, alleen bereikbaar op deze server (127.0.0.1:4000).
+# Staat in ~/.config/systemd/user/gratis-ai.service van de gebruiker 'ai'.
+# Eerst sleutels in ~/.config/hq/gratis-ai.env, dan `hq gratis-ai --schrijf` (zie docs/SETUP.md), dan:
+#   systemctl --user enable --now gratis-ai
+# Logs: journalctl --user -u gratis-ai -f
+[Unit]
+Description=Gratis AI-router (LiteLLM) voor HQ
+After=network-online.target
+ConditionPathExists=%h/.config/hq/gratis-ai.yaml
+
+[Service]
+Type=simple
+EnvironmentFile=%h/.config/hq/gratis-ai.env
+Environment=LITELLM_LOG=ERROR
+ExecStart=%h/.local/bin/litellm --config %h/.config/hq/gratis-ai.yaml --host 127.0.0.1 --port 4000
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=default.target
