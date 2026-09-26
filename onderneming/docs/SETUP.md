@@ -198,8 +198,7 @@ In het kantoor zie je het terug: *"Rigel 🔎 zoekt: …"*, *"🌐 leest: crazyg
 ## 13. Wat nu, wat later
 Alles wat je vroeg, wat al af is en wat nog moet, staat op één plek: [STAPPENPLAN.md](STAPPENPLAN.md). Daar staan ook
 de modellen en tools voor later (Kimi, Claude Managed Agents, gratis en open modellen, Jev, everything-claude-code,
-`claude-code-setup`) met
-wanneer ze wél zin krijgen.
+`claude-code-setup`), met wanneer ze wél zin krijgen.
 
 ## Optioneel
 **Claude Code live in het kantoor.** Zonder extra's ziet HQ je Claude Code-werk aan de commits (om de paar
