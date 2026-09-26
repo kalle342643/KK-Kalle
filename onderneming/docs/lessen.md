@@ -227,6 +227,16 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   - Handig voor veel kleine keuzes, zoals sorteren, routeren of controleren. Niet voor tekst, rekenen of datums.
   - Aanmelden stond in september dicht. Pas nuttig als we massawerk hebben.
 
+## Eén stappenplan (26 september)
+- **Alles wat Kalle stuurt, komt in [STAPPENPLAN.md](STAPPENPLAN.md).** Na vier dagen stonden zijn verzoeken verspreid
+  over rapporten, docs en losse lijstjes. Nu is er één plek met per bericht: wat ermee gebeurde en de volgende stap.
+  `CLAUDE.md` zegt het elke sessie opnieuw.
+- **Berichten die tijdens het werk binnenkomen, staan niet als gewone berichten in het logboek.** Wie alle verzoeken
+  terug wil vinden, moet ook die tussendoor-berichten en de meegestuurde foto's meenemen. Anders mis je er een paar,
+  zoals het bericht over Jev of de uitleg van je eigen project.
+- **Een repo zonder `CLAUDE.md` laat elke nieuwe sessie de regels opnieuw raden.** De analyse van `claude-code-setup`
+  vond dat meteen. Houd hem kort, met alleen wat elke sessie nodig heeft.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.

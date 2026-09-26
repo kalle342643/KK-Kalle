@@ -195,20 +195,10 @@ hq-trends "browser puzzle games"    # recente discussies van Hacker News, GitHub
 gebruikt bewust alleen bronnen met een open API: Reddit, X, TikTok en YouTube staan uit (hun voorwaarden).
 In het kantoor zie je het terug: *"Rigel 🔎 zoekt: …"*, *"🌐 leest: crazygames.com/…"*.
 
-## 13. Andere AI-modellen en skills: wat nu, wat later
-Je hoeft hier nu niets voor te doen. Elke rol draait al op het model en de denkstand die bij zijn werk passen, en de
-gratis AI hieronder dekt de goedkope rollen. Dit is wat we uitzochten, en wanneer het wél zin krijgt (uitleg en bronnen:
-[ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-ideale-opzet-september-2026)):
-
-| Wat | Nu? | Wanneer wel |
-|---|---|---|
-| **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot) |
-| **Elk model een eigen agent** | Nee. Meer agents kosten meer en praten langs elkaar heen | Een ander model als tegenstem bij grote beslissingen; eventueel de criticus als proef op een ander model |
-| **Gratis modellen** | Ja, al ingericht (zes aanbieders, zie *Gratis AI* hieronder) | Draai `gratis-ai --schrijf` af en toe opnieuw: het aanbod wisselt vaak |
-| **Open modellen op je eigen server** | Nee. Te traag voor agents zonder videokaart | Voor nachtwerk (Graphify) als de kennisbank groot is |
-| **Jev (TypeSafe AI)** | Nee. Aanmelden staat dicht en er is geen massawerk | Als een tak duizenden reviews, reacties of mails moet sorteren |
-| **TypeScript** | Ja, staat aan: bouwers schrijven TypeScript met `strict` | — |
-| **everything-claude-code** | Niet installeren (honderden skills kosten in elke sessie tokens). De drie beste ideeën zitten al in de holding | Voor je eigen projecten: kopieer hooguit één losse skill, zoals `loop-design-check`, naar `~/.claude/skills` |
+## 13. Wat nu, wat later
+Alles wat je vroeg, wat al af is en wat nog moet, staat op één plek: [STAPPENPLAN.md](STAPPENPLAN.md). Daar staan ook
+de modellen en tools voor later (Kimi, gratis en open modellen, Jev, everything-claude-code, `claude-code-setup`) met
+wanneer ze wél zin krijgen.
 
 ## Optioneel
 **Claude Code live in het kantoor.** Zonder extra's ziet HQ je Claude Code-werk aan de commits (om de paar

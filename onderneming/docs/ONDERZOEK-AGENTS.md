@@ -361,6 +361,22 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
   die je bij programmeren niet gebruikt. Wil je iets uit ECC, kopieer dan één losse skill (bijvoorbeeld
   `loop-design-check` of `verification-loop`) naar `~/.claude/skills`, niet het hele pakket.
 
+### 10. De plugin `claude-code-setup` (van Anthropic)
+- **Wat:** één skill (*claude-automation-recommender*) uit Anthropics officiële plugin-lijst. Die bekijkt een project
+  en raadt per soort 1–2 automatiseringen aan: MCP-servers, skills, hooks, helpers en plugins. Hij verandert zelf niets.
+  Klein, dus goedkoop om aan te laten staan.
+- **Wat hij voor KK-Kalle vond:**
+  - een TypeScript-project (Hono, zod, three.js) met Vitest en GitHub Actions, zonder `CLAUDE.md` en zonder `.claude/`;
+  - belangrijkste aanbeveling, en gedaan: een korte `CLAUDE.md` met Kalles regels, de commando's en wanneer iets klaar
+    is.
+- **Optioneel voor je eigen codeersessies:**
+  - context7, zodat Claude de actuele documentatie van libraries leest;
+  - Playwright als MCP, om zelf door een site of game te klikken.
+- **Bewust niet gedaan:**
+  - een hook die na elke bewerking de types controleert (±20 s per keer; CI doet het al);
+  - extra helpers (de onderzoeker en reviewer bestaan al).
+- **Voor je eigen projecten:** installeer hem en vraag één keer per project "recommend automations for this project".
+
 ### Wat er daarom veranderd is (deel 2)
 - **Sjablonen:**
   - Elke rol heeft een vaste denkstand (tabel hierboven). Argus draait op Sonnet.
@@ -425,3 +441,4 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
 - Gratis lagen: [overzicht van 17 aanbieders (september 2026)](https://klymentiev.com/blog/free-llm-api), [Gemini API-voorwaarden](https://ai.google.dev/gemini-api/terms), [NVIDIA API Trial Terms](https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf), [Cerebras-rate-limits](https://inference-docs.cerebras.ai/support/rate-limits), [Cloudflare Workers AI-prijzen](https://developers.cloudflare.com/workers-ai/platform/pricing/)
 - Jev: [TypeSafe-documentatie](https://docs.typesafe.ai/introduction), [The Register](https://www.theregister.com/ai-and-ml/2026/09/16/typesafe-ai-debuts-model-for-machines-that-plays-doom/5296711), [The Decoder](https://the-decoder.com/former-openai-researcher-builds-an-ai-model-that-judges-options-instead-of-writing-text/), [TechCrunch](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/), [Flavio Copes](https://flaviocopes.com/jev/)
 - [everything-claude-code / ECC](https://github.com/affaan-m/everything-claude-code): de skills `loop-design-check`, `gan-style-harness`, `context-budget`, `council-multi-model`, `seo` en *the-shortform-guide*
+- Anthropic, [claude-code-setup (plugin)](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup)

@@ -95,11 +95,13 @@ met `npm run demo` (één HTML-bestand in `dist/demo/kantoor-demo.html`, werkt o
 `/omzet 12,50 games` · `/meting EXP-3 plays 740` · **`/stop`** · `/hervat`
 
 ## Documentatie
+- [docs/STAPPENPLAN.md](docs/STAPPENPLAN.md): alles wat je vroeg, wat af is en wat nog moet (begin hier)
 - [docs/SETUP.md](docs/SETUP.md): installatie, stap voor stap
 - [docs/ARCHITECTUUR.md](docs/ARCHITECTUUR.md): hoe het in elkaar zit en waarom
 - [docs/RUNBOOK.md](docs/RUNBOOK.md): dagelijks gebruik en wat te doen als er iets misgaat
 - [docs/KOSTEN.md](docs/KOSTEN.md): wat het kost en hoe de plafonds werken
 - [docs/lessen.md](docs/lessen.md): wat we leerden tijdens het bouwen (ook geheugen voor de agents)
+- [docs/ONDERZOEK-AGENTS.md](docs/ONDERZOEK-AGENTS.md): waarom de agents zo zijn ingericht (modellen, raad, keuring)
 
 ## Mappen
 ```
