@@ -15,9 +15,22 @@ Elk voorstel bevat precies deze vijf onderdelen:
 2. **Doelgroep** — wie precies (bv. "spelers van puzzelgames op CrazyGames, mobiel", "MKB-webshops in NL").
 3. **Bewijs** — links naar echte bronnen (fora, zoekdata, concurrenten, reviews). Geen redeneringen.
 4. **Kosten** — maximaal €20 aan AI-gebruik (standaard), plus eventuele uitgaven apart aangevraagd.
-5. **Meetpunt** — één getal met een drempel binnen maximaal 14 dagen, bv. `plays ≥ 500` of `signups ≥ 10`.
+5. **Test en meetpunt** — de kleinste echte test van de riskantste aanname, en één getal met een drempel binnen
+   maximaal 14 dagen, bv. `plays ≥ 500` of `signups ≥ 10`.
 
 Voeg altijd een **voorspelling** toe ("ik verwacht 700 plays"). De analist vergelijkt die later met de uitkomst.
+
+### De kleinste echte test per soort
+Echte mensen die iets doen, zeggen meer dan de beste redenering. Bouw alleen wat de test nodig heeft.
+| Soort | Kleinste echte test | Meetpunt (voorbeeld) |
+|---|---|---|
+| Game | Eén speelbaar level of één kernlus, op CrazyGames (via Kalle) | plays, gemiddelde speeltijd |
+| Website of tool | Een landingspagina met één belofte en een wachtlijst ("binnenkort") | aanmeldingen |
+| Blog of content | 3 sterke artikelen op vragen zonder goed antwoord | vertoningen en klikken (Search Console) |
+| Webshop of digitaal product | Een productpagina met voorbestelling of "laat me weten" | aanmeldingen, klikken op kopen |
+
+Content heeft tijd nodig: in 14 dagen meet je de eerste vertoningen, geen omzet. Wat klaar is, bepaal je vooraf met
+de skill `productkwaliteit`.
 
 ## 2. Na goedkeuring
 - HQ maakt een Paperclip-project met een **harde budgetstop**. Is het budget op, dan stopt Paperclip het werk.

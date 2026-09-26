@@ -86,9 +86,10 @@ paperclipai update                        # Paperclip
 ## Prompts en regels aanpassen
 Alles wat agents "weten" staat in `onderneming/company/`:
 - `agents/*.md`: CEO en analist
-- `templates/agents/*.md`: rollen in een tak (verkenner, criticus, bouwer, publicist, schrijver, tak-lead; de pitcher is weg: de lead maakt de top 5)
+- `templates/agents/*.md`: rollen in een tak (verkenner, criticus, bouwer, publicist, schrijver, tak-lead; de pitcher is weg: de lead maakt de top 5).
+  Elke rol heeft een `model`, een `effort` (verplicht bij Claude-modellen, niet bij Haiku) en een `maxPerBranch`
 - `skills/*.md`: spelregels die agents delen (HQ-API, onderzoek op het web, kennisgraaf, experiment-protocol,
-  geld en regels, ...)
+  productkwaliteit, geld en regels, ...)
 - `templates/branches/*.yaml`: welke agents en routines een nieuwe tak krijgt
 
 Pas aan, commit, en draai `update.sh`. Alleen wat echt veranderde wordt in Paperclip bijgewerkt. Een budget dat jij

@@ -28,13 +28,22 @@ leest later terug wat de raad dacht, en in het kantoor zie je wie er samen aan w
    `experiment-protocol`). Daar is geen aparte agent voor nodig: een extra agent helpt alleen als hij een
    eigen bron of een tegengestelde rol heeft (docs/ONDERZOEK-AGENTS.md). De verkenners hebben een eigen
    bron, de criticus een tegengestelde rol; de top 5 maken is geen van beide.
+   - **Vijf verschillende richtingen**, niet vijf varianten van hetzelfde. Taalmodellen herhalen zichzelf graag.
+   - Staat er een KEEP of een sterke les in de kennisbank, laat dan **één idee daarop voortbouwen**. Laat er ook
+     **één uit een hoek komen die we nog niet probeerden**.
+   - Elk idee noemt zijn **riskantste aanname** en de **kleinste echte test** die hem binnen 14 dagen kan
+     weerleggen (zie `experiment-protocol`).
 4. **Criticus** zoekt per pitch **minstens 3 bestaande concurrenten met live data** (links, gelezen met
    `hq-web` of `WebFetch`) en kijkt met `hq kennis` of we iets vergelijkbaars al eens afschoten. Hij schrijft
    waarom het zou mislukken en **schiet minstens 3 van de 5 af**. Een criticus die alles goedkeurt, is kapot.
-5. **Tak-lead** dient de 1–2 overgebleven pitches in als experiment (`POST /experiments`), met de
-   voorspelling van de raad erbij. Kalle kiest via de goedkeuringsknoppen.
+5. **Tak-lead** kiest uit wat overblijft door de ideeën **twee aan twee te vergelijken** ("A of B: welke geeft met
+   de kleinste test het duidelijkste signaal?"), niet met cijfers van 1 tot 10. Tweetallen vergelijken is
+   betrouwbaarder dan een AI die zelf punten geeft. Dien de 1–2 winnaars in als experiment (`POST /experiments`),
+   met de voorspelling van de raad erbij. Kalle kiest via de goedkeuringsknoppen.
 
 ## Regels
 - Bewijs = links naar echte bronnen. "Ik denk dat mensen dit willen" telt niet.
+- Nieuw op papier is geen bewijs. Ideeën van AI lijken origineler dan die van mensen, maar vallen bij uitvoering
+  vaker tegen. Kies daarom het idee dat het **snelst en goedkoopst echt te testen** is.
 - Maximaal 2 voorstellen per week per tak. Meer ideeën = minder aandacht per idee.
 - Schrijf alles kort in de Paperclip-taken, zodat de analist later kan terugzien wat de raad dacht.

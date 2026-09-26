@@ -395,7 +395,7 @@ export class DemoSource implements DataSource {
     const now = Date.now();
     const add = (seed: Seed & { branch: string; hqRole?: string; status?: OfficeAgent["status"] }) => {
       const template = seed.template;
-      const model = template === "verkenner" || seed.hqRole === "analyst" ? "claude-haiku-4-5" : seed.hqRole === "ceo" ? "claude-opus-5" : "claude-sonnet-5";
+      const model = template === "verkenner" ? "claude-haiku-4-5" : seed.hqRole === "ceo" ? "claude-opus-5" : "claude-sonnet-5";
       const budget = seed.hqRole === "ceo" ? 60 : seed.lead ? 15 : 8;
       const agent: OfficeAgent = {
         id: `demo-${seed.name.toLowerCase()}`,
@@ -502,7 +502,14 @@ export class DemoSource implements DataSource {
         id: this.nextApproval++,
         title: "Nieuwe agent: Altair (verkenner, Games-studio)",
         kind: "hire_agent",
-        summary: "Vega wil een tweede verkenner voor Poki. Kost ongeveer € 4 per maand (Haiku).",
+        // Zoals HQ het echt voorlegt: eerst de bezetting en de kosten van de tak (src/company/staffing.ts).
+        summary: [
+          "Bezetting Games-studio: 6 agents, waarvan 2 × verkenner (Rigel: levert, Deneb: levert). Hooguit 3 per tak.",
+          "Kosten: deze agent tot € 3,00 per maand (claude-haiku-4-5); de agents van Games-studio kostten de afgelopen 30 dagen samen € 21,40.",
+          "Na 14 dagen kijkt de nut-meter of hij iets oplevert. Zo niet, dan gaat hij vanzelf op pauze.",
+          "",
+          "Vega wil een derde verkenner met een eigen bron: Poki volgt nog niemand.",
+        ].join("\n"),
         amountEur: null,
         requestedByAgentId: "demo-vega",
         createdAt: new Date(now - 15 * 60_000).toISOString(),

@@ -1153,6 +1153,8 @@ input[type="number"],
 }
 .approvals .summary {
   font-size: 13px;
+  /* Verzoeken hebben regels (bezetting, kosten, reden): laat ze als regels staan. */
+  white-space: pre-line;
 }
 
 /* Projecten. */

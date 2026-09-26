@@ -21,10 +21,21 @@ const provider = (id: string) => PROVIDERS.find((p) => p.id === id)!;
 
 /** Modellen zoals OmniRoute 3.8 ze per aanbieder in zijn catalogus heeft. */
 const CATALOG: Record<string, string[]> = {
-  groq: ["meta-llama/llama-4-scout-17b-16e-instruct", "llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3-32b", "qwen/qwen3.6-27b", "openai/gpt-oss-safeguard-20b", "whisper-large-v3"],
-  cerebras: ["zai-glm-4.7", "gemma-4-31b", "gpt-oss-120b"],
+  groq: ["llama-3.3-70b-versatile", "openai/gpt-oss-120b", "openai/gpt-oss-20b", "qwen/qwen3.6-27b", "qwen/qwen3.8-27b", "openai/gpt-oss-safeguard-20b", "whisper-large-v3"],
+  sambanova: ["Meta-Llama-3.3-70B-Instruct", "DeepSeek-V3.2", "DeepSeek-V4-Flash", "gpt-oss-120b"],
   gemini: ["gemini-3.7-flash", "gemini-3.1-pro-preview", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemini-3.1-flash-tts-preview", "gemini-embedding-2"],
-  openrouter: ["openai/gpt-6-luna", "nex-agi/nex-n2.5-mini:free", "deepseek/deepseek-v4.1-flash:free", "anthropic/claude-opus-5.5", "qwen/qwen3.8-coder:free"],
+  // Het echte gratis aanbod van OpenRouter op 25 september 2026, plus twee betaalde modellen.
+  openrouter: [
+    "openai/gpt-6-luna",
+    "liquid/lfm-2.5-2.6b:free",
+    "nvidia/nemotron-3.5-content-safety:free",
+    "qwen/qwen3.8-27b:free",
+    "stealth/space-bunny-alpha",
+    "nvidia/nemotron-3-ultra-550b-a55b:free",
+    "moonshotai/kimi-k2.6",
+    "thinkingmachines/inkling:free",
+    "google/gemma-4-31b-it:free",
+  ],
 };
 
 /** Nep-OmniRoute: onthoudt wat HQ erin zet. */
@@ -76,13 +87,19 @@ class FakeOmni implements OmniApi {
 
 describe("gratis AI: modellen kiezen", () => {
   it("pakt de beste modellen die er nu zijn, en slaat spraak, embeddings en filters over", () => {
-    expect(pickModels(provider("groq"), CATALOG.groq!)).toEqual(["openai/gpt-oss-120b", "qwen/qwen3.6-27b", "llama-3.3-70b-versatile"]);
+    // Llama staat nog in de lijst, maar ging in augustus 2026 van de gratis laag af.
+    expect(pickModels(provider("groq"), CATALOG.groq!)).toEqual(["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "qwen/qwen3.6-27b"]);
     expect(pickModels(provider("gemini"), CATALOG.gemini!)).toEqual(["gemini-3.7-flash", "gemini-2.5-flash", "gemini-3.1-flash-lite"]);
-    expect(pickModels(provider("cerebras"), CATALOG.cerebras!, 2)).toEqual(["gpt-oss-120b", "zai-glm-4.7"]);
+    expect(pickModels(provider("sambanova"), CATALOG.sambanova!, 2)).toEqual(["DeepSeek-V4-Flash", "DeepSeek-V3.2"]);
   });
 
-  it("bij OpenRouter alleen de gratis modellen", () => {
-    expect(pickModels(provider("openrouter"), CATALOG.openrouter!)).toEqual(["deepseek/deepseek-v4.1-flash:free", "qwen/qwen3.8-coder:free", "nex-agi/nex-n2.5-mini:free"]);
+  it("bij OpenRouter alleen grote gratis modellen die met tools werken, geen piepkleine of filters", () => {
+    expect(pickModels(provider("openrouter"), CATALOG.openrouter!)).toEqual(["thinkingmachines/inkling:free", "nvidia/nemotron-3-ultra-550b-a55b:free", "qwen/qwen3.8-27b:free"]);
+    expect(pickModels(provider("openrouter"), ["liquid/lfm-2.5-2.6b:free", "nvidia/nemotron-3.5-content-safety:free", "stealth/space-bunny-alpha", "moonshotai/kimi-k2.6"])).toEqual([]);
+  });
+
+  it("aanbieders zonder echte gratis laag staan er niet in", () => {
+    expect(PROVIDERS.map((p) => p.id)).toEqual(["groq", "sambanova", "gemini", "huggingface", "mistral", "openrouter"]);
   });
 });
 
@@ -99,14 +116,14 @@ describe("gratis AI: OmniRoute inrichten", () => {
         name: "gratis",
         models: [
           "groq/openai/gpt-oss-120b",
+          "groq/qwen/qwen3.8-27b",
           "groq/qwen/qwen3.6-27b",
-          "groq/llama-3.3-70b-versatile",
           "gemini/gemini-3.7-flash",
           "gemini/gemini-2.5-flash",
           "gemini/gemini-3.1-flash-lite",
           // OpenRouter achteraan en met hooguit twee: de limiet geldt daar per account, niet per model.
-          "openrouter/deepseek/deepseek-v4.1-flash:free",
-          "openrouter/qwen/qwen3.8-coder:free",
+          "openrouter/thinkingmachines/inkling:free",
+          "openrouter/nvidia/nemotron-3-ultra-550b-a55b:free",
         ],
       },
     ]);
@@ -119,11 +136,12 @@ describe("gratis AI: OmniRoute inrichten", () => {
   it("tweede keer: sleutels bijwerken, combo vervangen, en de werkende sleutel houden", async () => {
     const omni = new FakeOmni();
     const first = await syncGratis(omni, { GROQ_API_KEY: "gsk_1" });
-    const second = await syncGratis(omni, { GROQ_API_KEY: "gsk_nieuw", CEREBRAS_API_KEY: "c_1" }, { hqKey: first.newKey! });
-    expect(second).toMatchObject({ added: ["Cerebras"], updated: ["Groq"], newKey: null });
+    const second = await syncGratis(omni, { GROQ_API_KEY: "gsk_nieuw", SAMBANOVA_API_KEY: "s_1", CEREBRAS_API_KEY: "c_1" }, { hqKey: first.newKey! });
+    // Cerebras heeft geen gratis laag meer: die sleutel laat HQ liggen.
+    expect(second).toMatchObject({ added: ["SambaNova"], updated: ["Groq"], newKey: null });
     expect(omni.apiKeys.get("c-groq")).toBe("gsk_nieuw");
     expect(omni.combosList).toHaveLength(1);
-    expect(omni.combosList[0]!.models.slice(3)).toEqual(["cerebras/gpt-oss-120b", "cerebras/zai-glm-4.7", "cerebras/gemma-4-31b"]);
+    expect(omni.combosList[0]!.models.slice(3)).toEqual(["sambanova/DeepSeek-V4-Flash", "sambanova/DeepSeek-V3.2", "sambanova/gpt-oss-120b"]);
     // Klopt de sleutel in hq.env niet meer, dan komt er een nieuwe.
     expect((await syncGratis(omni, {}, { hqKey: "sk-weg" })).newKey).toBe("sk-omni-2");
   });

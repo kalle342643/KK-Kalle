@@ -6,6 +6,7 @@ import {
   markApplied,
   mirrorApproval,
   notifyApproval,
+  prependApprovalSummary,
   recordDecision,
   requestApproval,
   type ApprovalRecord,
@@ -44,6 +45,8 @@ export async function decide(
 /** Hooks die andere modules registreren (voorkomt kringverwijzingen, bv. naar de Agent Factory). */
 export interface WorkflowHooks {
   createBranchFromTemplate?: (ctx: AppContext, details: BranchProposal & { approvalId: number }) => Promise<void>;
+  /** Bezetting en kosten bij een aanname die de sync als eerste ziet (Agent Factory). */
+  describeHire?: (ctx: AppContext, payload: Record<string, unknown>) => Promise<string>;
 }
 
 const hooks: WorkflowHooks = {};
@@ -132,8 +135,18 @@ export async function syncApprovals(ctx: AppContext): Promise<{ newPending: numb
   const pending = await ctx.paperclip.listApprovals(ctx.companyId, "pending");
   const pendingIds = new Set(pending.map((a) => a.id));
   for (const pc of pending) {
-    const { record, isNew } = await mirrorApproval(ctx, pc);
-    if (isNew) newPending += 1;
+    const mirrored = await mirrorApproval(ctx, pc);
+    let record = mirrored.record;
+    if (mirrored.isNew) {
+      newPending += 1;
+      if (record.kind === "hire_agent" && hooks.describeHire) {
+        try {
+          record = await prependApprovalSummary(ctx, record, await hooks.describeHire(ctx, pc.payload ?? {}));
+        } catch (err) {
+          ctx.log.warn("bezetting bij aanname niet gelukt", { approvalId: record.id, error: errorMessage(err) });
+        }
+      }
+    }
     await notifyApproval(ctx, record);
   }
   // Wat HQ nog als open ziet maar niet meer in de Paperclip-lijst staat, is ergens anders beslist.

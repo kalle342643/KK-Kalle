@@ -345,6 +345,13 @@ export async function formatApproval(ctx: AppContext, record: ApprovalRecord): P
   return lines.join("\n");
 }
 
+/** Zet uitleg bovenaan een verzoek (bv. de bezetting van de tak bij een aanname), vóór het naar Kalle gaat. */
+export async function prependApprovalSummary(ctx: AppContext, record: ApprovalRecord, text: string): Promise<ApprovalRecord> {
+  const summary = [text, record.summary].filter(Boolean).join("\n\n");
+  const rows = await ctx.db.query<ApprovalRow>("update approvals set summary = $2, updated_at = now() where id = $1 returning *", [record.id, summary]);
+  return toRecord(rows[0]!);
+}
+
 /** Stuurt het verzoek met knoppen naar de eigenaar (één keer). */
 export async function notifyApproval(ctx: AppContext, record: ApprovalRecord): Promise<void> {
   if (record.status !== "pending" || record.notifiedAt) return;

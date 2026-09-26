@@ -19,7 +19,7 @@ flowchart TD
       CC -.->|"rollen op gratis AI"| LL["gratis AI-router<br/>(OmniRoute, 127.0.0.1:20128)"]
     end
     CC -->|model| API["Claude API"]
-    LL -->|"eigen sleutel per aanbieder"| FREE["Groq · Cerebras · Gemini · …"]
+    LL -->|"eigen sleutel per aanbieder"| FREE["Groq · Gemini · SambaNova · …"]
     HQ -->|"alleen lezen"| GH["GitHub<br/>je projecten · Claude Code-commits"]
     HQ -->|gezondheidscheck| SITE["je sites<br/>(bv. /api/gezondheid)"]
     X["Stripe · CrazyGames-CSV · /omzet"] --> HQ
@@ -93,7 +93,9 @@ die in de werkplaats, zonder er iets aan te veranderen:
 - **GitHub, alleen lezen** (`HQ_GITHUB_TOKEN`), om de twee minuten, met ETags (een ongewijzigde pagina kost geen
   limiet): de hoofdbranch, branches van Claude Code (`claude/…`) en van open pull requests, hun commits, pull
   requests, tests (Actions en commit-statussen, zoals Vercel), de laatste uitrol naar productie (deployments) en
-  `BACKLOG.md`.
+  `BACKLOG.md`. Eén keer per uur kijkt HQ of het token nieuwe repositories heeft en volgt die vanzelf
+  (`src/code/follow.ts`): site uit het veld *Website*, gezondheidscheck als er een echte is. Wat je weghaalde of wat
+  gearchiveerd is, blijft weg (`HQ_AUTO_FOLLOW=uit` zet het uit).
 - **Claude Code-sessies** zijn te herkennen aan `Claude-Session: https://claude.ai/code/session_…` onder de commits
   (Claude Code in de cloud zet die er zelf onder) en aan de eigen branch. Eén branch = één sessie. Optioneel meldt
   een hook (`deploy/claude-code/hq-hook.mjs`) elke stap live aan `POST /api/hooks/claude-code`, met een eigen geheim
@@ -121,8 +123,8 @@ loopt naar de kennisruimte). Dat staat bij het voorstel dat jij goedkeurt, en de
 een eerder afgeschoten idee komt zo niet ongemerkt terug.
 
 ## Gratis AI
-[OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT) draait op de server en zet de gratis lagen van zeven
-aanbieders achter één model: de combo "gratis", met ±20 modellen in een vaste volgorde. Geeft er één een limietfout
+[OmniRoute](https://github.com/diegosouzapw/OmniRoute) (MIT) draait op de server en zet de gratis lagen van zes
+aanbieders achter één model: de combo "gratis", met ±15 modellen in een vaste volgorde. Geeft er één een limietfout
 (429), dan neemt de volgende het over. `dist/main.js gratis-ai --schrijf` beheert OmniRoute via zijn API: het zet je
 sleutels erin, vraagt welke modellen er nu zijn, kiest de beste en maakt een eigen sleutel voor HQ (die geen
 prompts bewaart en niets aan de tekst verandert). Rollen uit `HQ_GRATIS_AI_ROLES` draaien Claude Code via
@@ -221,7 +223,7 @@ het besluit uit. Beslis je in de Paperclip-UI, dan neemt HQ dat binnen twee minu
 | `spend` | agent via HQ | geboekt als uitgave; **jij** betaalt, agents kunnen dat niet |
 | `branch_create` | CEO via HQ | Agent Factory bouwt de tak (agents, routines, budget) |
 | `portfolio` | HQ, elke maandag | nieuwe budgetten per tak + maandplafond in Paperclip |
-| `hire_agent` | CEO/lead in Paperclip | Paperclip activeert de agent |
+| `hire_agent` | CEO/lead via HQ (`/hire`) | Paperclip activeert de agent. HQ weigert vooraf als de tak die rol al vol heeft (`maxPerBranch` in het sjabloon) of als een collega met dezelfde rol stilstaat, en zet bovenaan het verzoek de bezetting en de kosten van de tak. Kwam de aanname buiten HQ om binnen, dan staat dat erbij |
 | `ceo_strategy` | CEO in Paperclip | weekplan akkoord |
 | `budget_override` | Paperclip bij een budgetstop | ✅ = budget +50% en hervatten, ⏸ = gepauzeerd laten |
 

@@ -169,4 +169,6 @@ cat <<'NEXT'
                                   node --env-file=$HOME/.config/hq/hq.env dist/main.js bootstrap
                                   systemctl --user enable --now hq hq-backup.timer
   6. Het kantoor openen:          http://<servernaam>:8080/?token=<HQ_ADMIN_TOKEN>   (via Tailscale)
+  7. (Optioneel) Claude Code in de cloud live in het kantoor, als root of met sudo:
+                                  bash /home/ai/KK-Kalle/onderneming/deploy/claude-code/cloud-hook.sh
 NEXT

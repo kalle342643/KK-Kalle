@@ -26,8 +26,11 @@ export const agentFrontmatter = z.object({
   icon: z.enum(AGENT_ICONS).optional(),
   description: z.string().min(1),
   model: z.string().min(1),
+  /** Hoe diep het model nadenkt. Verplicht bij Claude-modellen die het kennen (zie effortProblem). */
   effort: z.enum(["low", "medium", "high"]).optional(),
   budgetEur: z.number().nonnegative(),
+  /** Hoeveel agents van dit sjabloon één tak hooguit heeft; HQ weigert een aanname daarboven. */
+  maxPerBranch: z.number().int().min(1).max(5).default(3),
   heartbeat: z
     .object({ enabled: z.boolean(), intervalSec: z.number().int().positive().optional() })
     .default({ enabled: false }),
@@ -113,10 +116,25 @@ function readDir(dir: string, ext: string): string[] {
     .map((f) => join(dir, f));
 }
 
+/**
+ * Effort hoort bij het model. Haiku 4.5 kent het niet (de API weigert het). Bij de andere Claude-modellen kies je het
+ * zelf per rol: zonder kiest Claude Code zijn eigen standaard, en die staat meestal hoog (duur en traag voor
+ * eenvoudig werk).
+ */
+export function effortProblem(model: string, effort: string | undefined): string | null {
+  if (!model.startsWith("claude-")) return null;
+  const haiku = model.includes("haiku");
+  if (haiku && effort) return `${model} kent geen effort; haal 'effort' weg.`;
+  if (!haiku && !effort) return `kies een effort (low, medium of high) voor ${model}; zonder kiest Claude Code zelf, meestal een hoge stand.`;
+  return null;
+}
+
 function loadAgent(path: string): AgentSpec {
   const { data, body } = splitFrontmatter(readFileSync(path, "utf8"));
   const parsed = agentFrontmatter.safeParse(data);
   if (!parsed.success) throw new Error(`${path}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
+  const problem = effortProblem(parsed.data.model, parsed.data.effort);
+  if (problem) throw new Error(`${path}: ${problem}`);
   return { ...parsed.data, key: basename(path, ".md"), instructions: body };
 }
 
