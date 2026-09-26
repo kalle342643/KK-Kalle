@@ -123,8 +123,8 @@ Uit de handleiding van Claude Code (Anthropic) en ervaringen op Hacker News:
 
 ## Wat er daarom veranderd is
 - **Geen aparte pitcher meer** in de tak-sjablonen. De tak-lead maakt de top 5 zelf. De regel uit je eigen plan
-  gold al: meer agents helpen alleen met een eigen bron of een tegenrol. Het sjabloon `pitcher` bestaat nog, voor
-  als je er ooit toch een wilt aannemen.
+  gold al: meer agents helpen alleen met een eigen bron of een tegenrol. (Later is ook het sjabloon `pitcher`
+  zelf weggehaald.)
 - **De dagelijkse analyse-run is uitgezet.** `bootstrap` pauzeert hem als hij al bestond. HQ controleert de cijfers
   zelf, zonder AI, en Argus krijgt pas een taak als er lessen te schrijven zijn.
 - **CEO en ideeënraad draaien alleen als het zin heeft.** De CEO schrijft geen weekplan zonder nieuws. De raad slaat
@@ -173,6 +173,226 @@ krijgen eerst twee weken.
 > welk bestand leest. Verander geen inhoud, alleen de plek. Laat daarna een reviewer-helper controleren dat er geen
 > regel verloren ging.
 
+## Deel 2: de ideale opzet (september 2026)
+
+Daarna vroeg Kalle: wat is de ideale opzet van modellen en agents, als ze ook zelf moeten bedenken wat ze maken (een
+website, een game, een blog)? Zijn alle agents zuinig ingericht, en weet de agent die agents aanneemt dit ook? En:
+kunnen we Kimi gebruiken, dat met heel veel agents tegelijk werkt, en gratis of open modellen? Is Jev van TypeSafe iets
+voor ons? En wat kunnen we halen uit *everything-claude-code*?
+
+### Het korte antwoord
+1. **De werkwijze om het model heen telt meer dan het model zelf.** Anthropic liet een model alleen een app bouwen:
+   20 minuten, $9, en de kern werkte niet. Met plannen, bouwen en keuren als aparte stappen: 6 uur, $200, en de app
+   werkte. Onze bouwer werkt nu zo: afspraken vooraf, één feature tegelijk, elke feature getest zoals een speler, en
+   een keuring door iemand anders.
+2. **Ideeën bedenken kan AI, kiezen kan het slecht.** AI-ideeën lijken origineler dan die van experts, maar vallen
+   bij uitvoering vaker tegen, en ze lijken op elkaar. Daarom: vijf verschillende richtingen, twee aan twee
+   vergelijken, en het idee kiezen dat het goedkoopst écht te testen is.
+3. **Elke rol op de denkstand die bij het werk past.** Zonder instelling kiest Claude Code zelf, meestal hoog. Nu
+   heeft elke rol een vaste stand, en HQ laadt geen sjabloon zonder.
+4. **Eerst hergebruiken, dan pas aannemen.** De Agent Factory kent de regels uit het onderzoek, en HQ controleert ze
+   bij elke aanname: een volle tak of een collega die stilstaat, betekent geen nieuwe agent.
+5. **Kimi: nu niet.** Sterk en goedkoop, maar nergens meer op een nette manier gratis, en Kimi Work is een app voor
+   je eigen computer. **Elk model een eigen agent: nee.** Wel elke rol op het goedkoopste model dat het werk aankan.
+6. **Jev: nu niet** (aanmelden staat dicht, en we hebben geen massawerk om te sorteren). **TypeScript voor de
+   bouwers: ja.** **everything-claude-code: niet installeren**, wel drie ideeën overnemen.
+
+### 1. Lange bouwklussen: de werkwijze om het model heen
+- **Anthropic, *Effective harnesses for long-running agents*.** Een eerste sessie zet de basis klaar: een lijst met
+  alle features (allemaal nog "niet klaar"), een startscript en een voortgangsbestand. Daarna doet elke sessie één
+  feature, test die end-to-end in een browser "zoals een mens", en commit. De featurelijst staat in JSON, omdat het
+  model JSON minder snel ongewild aanpast dan Markdown. Tests weghalen of aanpassen noemen ze "onaanvaardbaar".
+- **Anthropic, *Harness design for long-running application development*.** Planner, bouwer en keurder. Vooraf
+  spreken bouwer en keurder af wat "klaar" is. De keurder klikt met Playwright door de app en beoordeelt ontwerp,
+  originaliteit, vakmanschap en werking. Een aparte, strenge keurder is makkelijker te maken dan een bouwer die zijn
+  eigen werk kritisch bekijkt. Een keurder loont vooral bij werk aan de rand van wat het model kan. En: "elk onderdeel
+  is een aanname over wat het model niet zelf kan"; kijk bij een nieuw model opnieuw wat nog nodig is.
+- **Bij ons:** de lead is de planner (spec en 3–10 criteria vooraf), de bouwer werkt met `features.json`, `init.sh`
+  en `voortgang.md`, één feature per keer, getest met Playwright. De criticus keurt vóór publicatie, hooguit twee
+  rondes. Er kwam geen nieuwe agent bij: de criticus had de tegenrol al.
+
+### 2. Zelf bedenken wat je gaat maken
+- **Si, Yang en Hashimoto (2024)** lieten meer dan 100 onderzoekers blind ideeën van mensen en van een AI beoordelen.
+  De AI-ideeën scoorden origineler en iets minder haalbaar. Maar de AI herhaalt zichzelf (weinig variatie), en AI's die
+  ideeën beoordelen zijn onbetrouwbaar.
+- **Si, Hashimoto en Yang (2025), *The Ideation-Execution Gap*,** lieten de ideeën ook echt uitvoeren. Daarna daalden
+  de scores van de AI-ideeën veel meer dan die van de menselijke, en de voorsprong verdween. Nieuw op papier is niet
+  hetzelfde als werken.
+- **Google, AI co-scientist:** ideeën strijden twee aan twee in toernooien (Elo) in plaats van losse cijfers te
+  krijgen, en er komt steeds nieuwe kennis bij.
+- **Hu, Lu en Clune, ADAS:** een meta-agent die agents ontwerpt, werkt alleen omdat elke nieuwe agent op een
+  meetbare taak wordt getest, met een archief van wat werkte.
+- **Bij ons:**
+  - De raad levert vijf verschillende richtingen: één bouwt voort op een KEEP, één komt uit een nieuwe hoek. Elk idee
+    noemt zijn riskantste aanname en de kleinste echte test.
+  - De lead vergelijkt de ideeën twee aan twee, en de criticus kijkt ook of het haalbaar is.
+  - Een nieuwe agent is zelf een experiment: 14 dagen proeftijd, met de nut-meter als meetbare taak.
+
+### 3. Welk model voor welke rol
+Zonder `effort` kiest Claude Code zijn eigen standaard, en die staat meestal hoog. Prima voor een bouwklus, zonde voor
+het lezen van een pagina. Anthropic: laag voor eenvoudige taken en helpers, hoog is vaak de beste balans. Reken per
+afgeronde taak, niet per verzoek: een goedkoop model dat vaker mislukt, is duurder.
+
+| Rol | Model | Denkstand | Waarom |
+|---|---|---|---|
+| CEO Atlas | Opus 5 | hoog | weinig runs en veel afwegen; ook Anthropics onderzoekssysteem zet het sterkste model aan het hoofd |
+| tak-lead | Sonnet 5 | hoog | plannen, criteria, kiezen |
+| bouwer | Sonnet 5 | hoog | lange bouwklus; de werkwijze doet meer dan een duurder model |
+| criticus | Sonnet 5 | middel | het zoekwerk en de data doen het werk, niet het peinzen |
+| publicist, schrijver | Sonnet 5 | middel | vakwerk met een duidelijke lijst |
+| analist Argus | Sonnet 5 (was Haiku) | middel | draait weinig, maar alle agents lezen zijn lessen: kwaliteit loont |
+| verkenner | Haiku 4.5 | (geen) | veel lezen, goedkoop; Haiku kent geen effort |
+
+HQ controleert dit: een sjabloon met een Claude-model zonder `effort` laadt niet, en Haiku met `effort` ook niet.
+
+### 4. Kimi (Moonshot AI)
+- **Kimi K2.6** (april 2026) heeft open gewichten en een aangepaste MIT-licentie. Het model heeft ongeveer een
+  biljoen parameters en 256K context. Het is sterk in lang programmeerwerk en in *Agent Swarm*: tot 300 sub-agents en
+  4000 stappen tegelijk.
+- **Kimi Work** (juni 2026, eerst intern getest) is een agent op je eigen computer. Hij werkt met je mappen en in je
+  ingelogde browser, aangedreven door K2.6 met zo'n zwerm.
+- **Kimi K3** (juli 2026) heeft 2,8 biljoen parameters, open gewichten en 1M context.
+- **Prijs** (OpenRouter, 25 september 2026), per miljoen tokens:
+  - K2.6: $0,95/$4, ongeveer wat Haiku kost;
+  - K2.7-Code: $0,66/$3,30;
+  - K3: $3/$15, duurder dan Sonnet 5.
+  Moonshot heeft een adres dat Anthropic nabootst, dus Claude Code kan op Kimi draaien.
+- **Gratis?** Niet meer op een nette manier. De gratis K2.6 op OpenRouter is weg. Groq en Cloudflare vragen voor K2.6
+  een betaald plan. NVIDIA's gratis toegang is alleen om te proberen, niet voor echt werk.
+- **Oordeel:**
+  - **Kimi Work** is een app voor één persoon op zijn eigen computer, die in jouw ingelogde browser werkt. Precies dat
+    mogen onze agents niet. Voor jezelf kun je het proberen, in de holding niet.
+  - **Een zwerm van honderden agents** helpt bij heel breed webonderzoek; daar scoort Kimi's zwerm het best. Maar
+    meerdere agents kosten volgens Anthropic ±15× de tokens van een chat, en onze raad wil juist weinig, goede
+    waarnemingen uit eigen bronnen.
+  - **K2.6 als goedkope, betaalde bouwer** is een optie voor later, als de bouwkosten gaan knellen. Nadelen: geen
+    WebSearch van Claude, en je code en prompts gaan naar Moonshot.
+
+### 5. Gratis en open modellen: de stand in september 2026
+| Aanbieder | Gratis | Voor echt werk | Traint op je gegevens | Bij ons |
+|---|---|---|---|---|
+| Groq | ja, per model 30 per minuut en 1000 per dag | ja | nee | ✔ gpt-oss-120b, Qwen 3.8 (Llama is er sinds augustus af) |
+| SambaNova | ja, zonder betaalkaart | ja | nee | ✔ |
+| Google AI Studio (Gemini) | ja | ja, voor zakelijk gebruik; een app vóór EU-gebruikers moet betaald | in de EU/EER niet | ✔ (alleen voor onze eigen agents) |
+| Hugging Face | $0,10 per maand | hangt af van de partner | hangt af van de partner | ✔ (klein) |
+| Mistral | ja (Experiment-plan) | bedoeld om te proberen | ja, tenzij je het uitzet | ✔ achteraan |
+| OpenRouter | 20 per minuut, 50 per dag | ja | hangt af van het model | ✔ achteraan, alleen grote modellen (Inkling, Nemotron 3 Ultra, Qwen 3.8) |
+| Cerebras | nee, sinds augustus alleen proeftegoed met betaalkaart | — | — | ✖ eruit gehaald |
+| NVIDIA NIM | ja, maar alleen om te proberen | nee | — | ✖ |
+| Cohere | proefsleutel | nee | — | ✖ |
+| Cloudflare Workers AI | 10.000 "neurons" per dag | ja | nee | nog niet (vraagt ook een account-id; Kimi is daar betaald) |
+| GitHub Models | gestopt in juli 2026 | — | — | ✖ |
+
+HQ kiest bij OpenRouter nu alleen grote modellen die met tools overweg kunnen, bij naam. Het gratis aanbod wisselt vaak
+(in september helemaal), en er zitten ook piepkleine modellen en filters tussen waar een agent niets aan heeft.
+
+**Open modellen op je eigen server:** te traag voor agents. Een agent stuurt bij elke stap tienduizenden tokens mee, en
+een processor zonder videokaart doet daar minuten over. Hooguit voor nachtwerk zonder haast (Graphify), als de
+kennisbank groot is.
+
+### 6. Elk model een eigen agent?
+- Meer agents kosten meer tokens. De meeste fouten ontstaan door vage rollen en slechte afstemming (zie deel 1: 42% en
+  37% van de fouten).
+- Een ander model helpt wel bij een **onafhankelijk oordeel**. Verschillende modellen hebben andere blinde vlekken; een
+  kopie van hetzelfde model heeft dezelfde (Project Vend: de AI-baas had de blinde vlekken van de winkel-AI).
+  *everything-claude-code* doet dit ook: één externe tegenstem van een ander model, alleen bij beslissingen waar veel
+  van afhangt en alleen met toestemming.
+- **Bij ons:** elke rol draait op het goedkoopste model dat het werk aankan (Opus, Sonnet, Haiku, en gratis AI voor
+  verkenners). Een criticus op een ander model zou de plek zijn waar zo'n verschil loont. Op gratis AI mist hij alleen
+  Claude's WebSearch, en die heeft hij nodig voor concurrenten met live data. Daarom nu niet; misschien later als proef.
+
+### 7. Jev van TypeSafe AI (opgeslagen op verzoek)
+- **Wat:** een "System One"-model van TypeSafe AI (San Francisco, opgericht in 2024 door Diogo Almeida, Erik Gafni
+  en Sasha Sheng). Almeida werkte ±4 jaar bij OpenAI aan RLHF, InstructGPT, ChatGPT en GPT-4. Early access sinds
+  15 september 2026, met $40 miljoen startkapitaal onder leiding van DCVC.
+- **Hoe:** Jev schrijft geen tekst. Je geeft de toestand en vooraf bepaalde vragen, en Jev geeft getypte antwoorden
+  met kansen en een betrouwbaarheid terug. Er zijn drie soorten vragen: *Choice* (kies uit opties), *Score*
+  (plaats op een schaal) en *Noul* (ja/nee als kans). Getraind op synthetische data met "reinforcement learning from
+  calibrated decisions": antwoorden met 90% kans moeten ook ±90% van de keren kloppen.
+- **Prijs en snelheid:** $0,042 per miljoen invoertokens, uitvoer gratis, 70–500 ms per antwoord. Volgens TypeSafe tot
+  ±190× sneller en ±440× goedkoper dan grote taalmodellen bij classificatie. Dat zijn hun eigen metingen, niet
+  onafhankelijk getest. Er is een TypeScript-SDK (`@typesafe-ai/sdk`), en Jev zit ook in de Vercel AI Gateway.
+- **Let op:** "hallucineert niet" klopt alleen in de zin dat het niets buiten de opties kan verzinnen. Een verkeerde
+  keuze binnen de opties kan wel. Jev is zwak in rekenen, tellen, datums en alles wat tekst of code moet maken.
+  Nieuwe aanmeldingen stonden half september dicht.
+- **Waar het bij ons ooit zou passen:**
+  - duizenden reviews, reacties of mails sorteren als een product gebruikers heeft;
+  - snelle controles vóór een actie ("staat hier een persoonsgegeven in?");
+  - als extra signaal bij het vooronderzoek ("lijkt dit voorstel op een eerdere KILL?").
+- **Waarom nu niet:**
+  - Aanmelden kan niet.
+  - Onze beslissingen zijn er weinig, en over geld beslissen we bewust met vaste regels, niet met een AI (Project Vend).
+  - Er is geen massawerk.
+  - Een controle via Jev stuurt onze tekst naar nog een bedrijf.
+
+### 8. TypeScript voor AI-code
+- **Mündler e.a. (PLDI 2025):** ±94% van de compileerfouten in TypeScript die taalmodellen schrijven, zijn typefouten.
+  Met de types als leidraad halveerde het aantal compileerfouten.
+- **GitHub Octoverse 2025:** TypeScript werd in augustus 2025 de meest gebruikte taal op GitHub. GitHub schrijft dat
+  mede toe aan AI: getypte talen maken programmeren met agents betrouwbaarder.
+- **Bij ons:** HQ is al TypeScript. Bouwers schrijven nu TypeScript met `strict`, en `tsc --noEmit` is hun gratis
+  controle van een paar seconden (skill `productkwaliteit`).
+
+### 9. everything-claude-code (ECC)
+Kalles eigen GitHub bevat alleen website-1, KK-Kalle en Fluxgrid. Bekeken is daarom het openbare origineel,
+[affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code) (nu *ECC*, MIT-licentie): 68
+agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude Code en andere tools.
+- **Niet in z'n geheel installeren.** Van elke skill en agent staat de beschrijving in elke sessie en bij elke
+  helper, dus honderden skills kosten altijd tokens. ECC zegt zelf: "context window is precious", "don't
+  overcomplicate", en kies één profiel in plaats van alles te stapelen. Installeer alleen via de officiële bronnen:
+  ze waarschuwen zelf voor nagemaakte kopieën met malware.
+- **Overgenomen in de holding** (uit de skill `loop-design-check`, die precies over onze opzet gaat: plannen, bouwen,
+  keuren):
+  - De keurder is niet de bouwer, en waar het kan beslist een script: een Playwright-test die slaagt of faalt, geen
+    "ziet er goed uit".
+  - **Hooguit twee keer afkeuren**, daarna beslist de lead met Kalle: kleiner maken of stoppen. Zonder zo'n rem
+    blijven bouwer en keurder tokens verbranden.
+  - **Een meetlat nodigt uit tot vals spelen** (Goodhart). Daarom: geen werk maken om de nut-meter te halen, tests
+    nooit aanpassen om groen te worden, en de laatste knop (publiceren, geld) blijft bij Kalle.
+  - Een korte technische SEO-lijst (zoekvraag per pagina, titels, Core Web Vitals) in `productkwaliteit`.
+- **Bevestigd, dus niet overgenomen:**
+  - *gan-style-harness* is dezelfde planner-bouwer-keurder-opzet van Anthropic, maar voor klussen van $50–200. Wij
+    doen een lichte versie: één keuring, hooguit twee rondes.
+  - *council* en *council-multi-model* zijn een raad van stemmen en een tweede model als tegenstem; bij ons doet de
+    criticus dat met data.
+  - *continuous-learning* leert van sessies; bij ons doen de lessen van Argus dat, met de voorspelling naast de
+    uitkomst.
+- **Voor je eigen Claude Code-sessies:** kijk met `/context` wat je context vult, en zet connectors en plugins uit
+  die je bij programmeren niet gebruikt. Wil je iets uit ECC, kopieer dan één losse skill (bijvoorbeeld
+  `loop-design-check` of `verification-loop`) naar `~/.claude/skills`, niet het hele pakket.
+
+### Wat er daarom veranderd is (deel 2)
+- **Sjablonen:**
+  - Elke rol heeft een vaste denkstand (tabel hierboven). Argus draait op Sonnet.
+  - De criticus kreeg de keuring erbij: budget €5, 40 beurten.
+  - Elk sjabloon zegt hoeveel er per tak mogen (`maxPerBranch`).
+- **Bouwer:** `features.json`, `init.sh` en `voortgang.md`. Eén feature per keer, elke feature getest met Playwright
+  zoals een gebruiker. TypeScript met `strict`. Tests nooit weghalen of aanpassen.
+- **Lead:** spreekt vooraf af wat klaar is. Subtaken hebben vier onderdelen (doel, vorm, bronnen, grenzen) en horen
+  bij het project van het experiment. Eerst keuring, dan publicatie, en hooguit twee rondes.
+- **Criticus:** kijkt ook of een idee haalbaar is, keurt producten, en heeft een vaste zoekbegroting per pitch.
+- **Verkenner:** hooguit 8 zoekopdrachten en 10 pagina's, en stoppen bij 5 goede waarnemingen.
+- **Publicist en schrijver:** volgen de platformregels. De schrijver doet één artikel tegelijk en zet bovenaan wie
+  het nakijkt of dat het een AI-label krijgt.
+- **Nieuwe skill `productkwaliteit`:** het contract, de keuring en de regels per soort product (CrazyGames, Google,
+  AI Act, SEO).
+- **Ideeënraad en experiment-protocol:** vijf richtingen, twee aan twee vergelijken, en de kleinste echte test per
+  soort product.
+- **Agent Factory:**
+  - eerst hergebruiken;
+  - alleen een nieuwe agent met een eigen bron, een tegenrol of een eigen vak voor werk dat al wacht;
+  - een maximum per tak;
+  - elke aanname is een experiment;
+  - geen werk maken voor de nut-meter.
+- **HQ:**
+  - Een sjabloon zonder passende effort laadt niet.
+  - `POST /hire` weigert (409) als de tak de rol al vol heeft of als een collega met dezelfde rol stilstaat.
+  - Bovenaan elk aannameverzoek staan de bezetting en de kosten van de tak, ook als de aanname buiten HQ om binnenkwam.
+- **Gratis AI:**
+  - Cerebras is eruit.
+  - De lijsten van Groq en OpenRouter zijn bijgewerkt.
+  - Piepkleine modellen en filters komen er niet meer in.
+
 ## Bronnen
 - Anthropic, [How we built our multi-agent research system](https://www.anthropic.com/engineering/multi-agent-research-system)
 - Anthropic, [Building effective agents](https://www.anthropic.com/engineering/building-effective-agents)
@@ -188,3 +408,20 @@ krijgen eerst twee weken.
 - Xiang e.a., [When to use Graphs in RAG (GraphRAG-Bench)](https://arxiv.org/abs/2506.05690) (ICLR 2026)
 - [Graphify](https://github.com/Graphify-Labs/graphify) (README en benchmarks van de makers)
 - Hacker News: [Don't Build Multi-Agents](https://news.ycombinator.com/item?id=45096962), [Claude Code: Best practices for agentic coding](https://news.ycombinator.com/item?id=43735550)
+
+### Bronnen deel 2
+- Anthropic, [Effective harnesses for long-running agents](https://www.anthropic.com/engineering/effective-harnesses-for-long-running-agents)
+- Anthropic, [Harness design for long-running application development](https://www.anthropic.com/engineering/harness-design-long-running-apps)
+- Si, Yang en Hashimoto, [Can LLMs Generate Novel Research Ideas?](https://arxiv.org/abs/2409.04109) (2024)
+- Si, Hashimoto en Yang, [The Ideation-Execution Gap](https://arxiv.org/abs/2506.20803) (2025)
+- Google Research, [Accelerating scientific breakthroughs with an AI co-scientist](https://research.google/blog/accelerating-scientific-breakthroughs-with-an-ai-co-scientist/)
+- Hu, Lu en Clune, [Automated Design of Agentic Systems (ADAS)](https://arxiv.org/abs/2408.08435)
+- CrazyGames: [kwaliteit](https://docs.crazygames.com/requirements/quality/), [techniek](https://docs.crazygames.com/requirements/technical/), [gameplay](https://docs.crazygames.com/requirements/gameplay/)
+- Google Search Central: [spam policies](https://developers.google.com/search/docs/essentials/spam-policies), [AI-gegenereerde content](https://developers.google.com/search/docs/fundamentals/using-gen-ai-content)
+- EU AI Act, [artikel 50](https://artificialintelligenceact.eu/article/50/)
+- Mündler e.a., [Type-Constrained Code Generation with Language Models](https://arxiv.org/abs/2504.09246) (PLDI 2025)
+- GitHub, [Octoverse: AI leads TypeScript to #1](https://github.blog/news-insights/octoverse/octoverse-a-new-developer-joins-github-every-second-as-ai-leads-typescript-to-1/)
+- Kimi: [K2.6 (MarkTechPost)](https://www.marktechpost.com/2026/04/20/moonshot-ai-releases-kimi-k2-6-with-long-horizon-coding-agent-swarm-scaling-to-300-sub-agents-and-4000-coordinated-steps/), [Kimi Work (MarkTechPost)](https://www.marktechpost.com/2026/06/12/moonshot-ai-launches-kimi-work-a-local-desktop-agent-reportedly-running-on-kimi-k2-6-with-a-300-sub-agent-agent-swarm/), [Kimi in Claude Code](https://platform.kimi.ai/docs/guide/claude-code-kimi), prijzen via de [modellijst van OpenRouter](https://openrouter.ai/api/v1/models) (25 september 2026)
+- Gratis lagen: [overzicht van 17 aanbieders (september 2026)](https://klymentiev.com/blog/free-llm-api), [Gemini API-voorwaarden](https://ai.google.dev/gemini-api/terms), [NVIDIA API Trial Terms](https://assets.ngc.nvidia.com/products/api-catalog/legal/NVIDIA%20API%20Trial%20Terms%20of%20Service.pdf), [Cerebras-rate-limits](https://inference-docs.cerebras.ai/support/rate-limits), [Cloudflare Workers AI-prijzen](https://developers.cloudflare.com/workers-ai/platform/pricing/)
+- Jev: [TypeSafe-documentatie](https://docs.typesafe.ai/introduction), [The Register](https://www.theregister.com/ai-and-ml/2026/09/16/typesafe-ai-debuts-model-for-machines-that-plays-doom/5296711), [The Decoder](https://the-decoder.com/former-openai-researcher-builds-an-ai-model-that-judges-options-instead-of-writing-text/), [TechCrunch](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/), [Flavio Copes](https://flaviocopes.com/jev/)
+- [everything-claude-code / ECC](https://github.com/affaan-m/everything-claude-code): de skills `loop-design-check`, `gan-style-harness`, `context-budget`, `council-multi-model`, `seo` en *the-shortform-guide*

@@ -22,8 +22,8 @@ Prijzen van de Claude API per miljoen tokens (invoer / uitvoer), stand juni 2026
 | Model | Prijs | Gebruikt voor |
 |---|---|---|
 | Claude Opus 5 | $5 / $25 | CEO Atlas (strategie) |
-| Claude Sonnet 5 | $2 / $10 | tak-leads, criticus, bouwer, publicist, schrijver |
-| Claude Haiku 4.5 | $1 / $5 | analist Argus, verkenners |
+| Claude Sonnet 5 | $2 / $10 | tak-leads, bouwer (denkstand hoog); criticus, publicist, schrijver, analist Argus (middel) |
+| Claude Haiku 4.5 | $1 / $5 | verkenners |
 
 Tokens die uit de cache komen kosten ongeveer 10% van de invoerprijs. Claude Code hergebruikt veel context, dus
 een groot deel van de invoer is goedkoop.
@@ -33,7 +33,7 @@ een groot deel van de invoer is goedkoop.
 | Wat | Hoe vaak | Schatting |
 |---|---|---|
 | Strategieronde CEO (Opus) | wekelijks (alleen bij nieuws) + maandelijkse verkenning | €3–8 |
-| Analist (Haiku) | na elk afgerond experiment | €0,50–2 |
+| Analist (Sonnet, denkstand middel) | na elk afgerond experiment | €1–3 |
 | Ideeënraad per tak (verkenners, criticus, lead) | wekelijks, overgeslagen als er al 2 lopen | €4–8 per tak |
 | Weekstart per tak (Sonnet) | wekelijks | €1–2 per tak |
 | Bouwen tijdens een experiment (Sonnet) | 2–3 stevige sessies per week à ~€2,70 | €20–35 zolang er gebouwd wordt |
@@ -50,8 +50,8 @@ hoe dan ook bij de plafonds hieronder.
 1. **Anthropic Console:** maandlimiet op de API-sleutel. Harde stop, buiten het systeem.
 2. **Paperclip, bedrijf:** maandplafond = `HQ_GLOBAL_MONTHLY_CAP_EUR` (standaard €40) + 30% van de omzet van de
    laatste 30 dagen. Wordt bijgewerkt als jij het portfolio-voorstel goedkeurt.
-3. **Paperclip, per agent:** maandbudget uit het sjabloon (CEO €15, bouwer €15, lead €10, analist €5,
-   verkenner/criticus €3).
+3. **Paperclip, per agent:** maandbudget uit het sjabloon (CEO €15, bouwer €15, lead €10, analist €5, criticus €5
+   (ook de keuring), verkenner €3).
 4. **Paperclip, per experiment:** levenslang budget (standaard €20, max. €50 per verzoek) met harde stop.
 5. **HQ:** noodstop zodra de AI-kosten van vandaag boven `HQ_DAILY_SPEND_ALARM_EUR` (standaard €15) komen.
 
@@ -67,7 +67,9 @@ er al 2 experimenten lopen of wachten, en geen Graphify-extractie onder 100 less
 (📊 in het kantoor, en elke maandag in het dagrapport) laat per agent zien wat hij kostte en aantoonbaar opleverde,
 en pauzeert elke maandag wie in 30 dagen meer dan €1 kostte zonder resultaat (zie
 [ARCHITECTUUR.md](ARCHITECTUUR.md#de-nut-meter)). In het kantoor zit zo'n agent er nog, zonder naam. De figuranten
-in het kantoor kosten niets: ze bestaan alleen in je browser.
+in het kantoor kosten niets: ze bestaan alleen in je browser. Sinds deel 2 van het onderzoek heeft elke rol een vaste
+denkstand (zonder kiest Claude Code zelf, meestal hoog), neemt HQ geen agent aan voor een rol die in de tak al vol
+zit of stilstaat, en krijgt een product hooguit twee keuringsrondes.
 
 ## Goedkoper maken
 - De nut-meter pauzeert al wie niets oplevert. Wil je strenger zijn: pauzeer zelf wie "voor de sier?" staat,
@@ -78,7 +80,7 @@ in het kantoor kosten niets: ze bestaan alleen in je browser.
 - Claude-abonnement in plaats van API-sleutel via de AI-verbinding in Paperclip. Dan valt het gebruik binnen je
   abonnementslimiet, maar het beleid daarvoor veranderde in 2026 een paar keer: reken er niet op.
 - **Gratis AI** (SETUP.md, *Optioneel*): de kennisgraaf (`GRAPHIFY_BACKEND=gratis`) en eenvoudige rollen zoals
-  verkenners (`HQ_GRATIS_AI_ROLES=verkenner`) via OmniRoute, over de gratis lagen van zeven aanbieders (±20
+  verkenners (`HQ_GRATIS_AI_ROLES=verkenner`) via OmniRoute, over de gratis lagen van zes aanbieders (±15
   modellen). Kost €0 zolang je binnen hun limieten blijft; OmniRoute schakelt door naar de volgende als er één vol
   zit. Minder slim dan Claude, dus niet voor de CEO, de lead of de bouwer. Nooit via abonnementen, webchat-cookies
   of extra accounts: dat kan OmniRoute wel, maar het is tegen de voorwaarden van de aanbieders.

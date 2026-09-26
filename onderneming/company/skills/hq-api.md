@@ -88,7 +88,8 @@ hq POST /spend-requests '{"amountEur": 12, "what": "Domein fluxgrid.nl", "vendor
 
 ## Foutcodes
 - `400` ongeldige invoer (zie `issues`) · `401` token ongeldig · `404` bestaat niet
-- `409` al beslist of bestaat al · `423` **noodstop actief: stop direct met werken**
+- `409` al beslist, bestaat al, of (bij `/hire`) de tak heeft deze rol al vol of er staat er een stil
+- `423` **noodstop actief: stop direct met werken**
 - `429` te veel verzoeken vandaag: bundel je werk en probeer morgen opnieuw
 
 ## Nooit

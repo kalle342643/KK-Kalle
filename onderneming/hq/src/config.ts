@@ -65,6 +65,8 @@ const envSchema = z.object({
   HQ_GITHUB_TOKEN: z.string().optional(),
   /** Hoe vaak HQ GitHub bekijkt (seconden) en de sites controleert. */
   HQ_GITHUB_POLL_SECONDS: z.coerce.number().int().min(30).default(120),
+  /** Nieuwe repositories waar het token bij kan vanzelf volgen ("uit" = alleen wat je zelf toevoegt). */
+  HQ_AUTO_FOLLOW: z.string().default("aan"),
   HQ_HEALTH_CHECK_SECONDS: z.coerce.number().int().min(60).default(300),
   /** Geheim waarmee Claude Code-hooks live meldingen sturen (alleen schrijven). Leeg = uit. */
   HQ_HOOK_TOKEN: z.string().min(16).optional(),
@@ -165,6 +167,8 @@ export interface Config {
     githubToken: string | undefined;
     pollMs: number;
     healthMs: number;
+    /** Nieuwe repositories van het token vanzelf volgen. */
+    autoFollow: boolean;
     hookToken: string | undefined;
     ownerNames: string[];
   };
@@ -255,6 +259,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       githubToken: e.HQ_GITHUB_TOKEN,
       pollMs: e.HQ_GITHUB_POLL_SECONDS * 1000,
       healthMs: e.HQ_HEALTH_CHECK_SECONDS * 1000,
+      autoFollow: !/^(uit|nee|false|0|off|no)$/i.test(e.HQ_AUTO_FOLLOW.trim()),
       hookToken: e.HQ_HOOK_TOKEN,
       ownerNames: e.HQ_OWNER_NAMES.split(",").map((n) => n.trim()).filter(Boolean),
     },

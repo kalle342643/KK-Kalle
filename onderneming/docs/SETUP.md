@@ -163,10 +163,11 @@ alleen mee op GitHub; het verandert niets aan je repositories.
    en vink je de repositories aan die je wilt volgen, dan *Generate token*. (Met de hand: github.com → *Settings →
    Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*.) Zet het token als
    `HQ_GITHUB_TOKEN` in `hq.env` en herstart HQ.
-2. **Project volgen.** In het kantoor: 🛠️ *Werkplaats* → *Project volgen*. Kies de repository (de lijst komt uit
-   je token), geef een naam, het adres van de site en, als je die hebt, een gezondheidscheck (een adres dat 200
-   geeft als alles werkt, bijvoorbeeld `/api/gezondheid`). Een project zonder GitHub (alleen een site) kan ook;
-   een repository zonder site ook.
+2. **Projecten volgen gaat vanzelf.** Binnen een paar minuten volgt HQ elke repository waar het token bij kan. Het
+   adres van de site haalt het uit het veld *Website* van de repository (rechtsboven op GitHub, bij *About*). Een
+   gezondheidscheck zoekt het zelf (`/api/gezondheid`, `/api/health` of `/health`). Je krijgt één bericht met wat er
+   nieuw is. Niet volgen? Haal het project weg in het kantoor; dan komt het niet terug. Een project zonder GitHub
+   (alleen een site) voeg je toe met 🛠️ *Werkplaats* → *Project volgen*. Alles met de hand: `HQ_AUTO_FOLLOW=uit`.
 3. **Controleren:** `node --env-file=$HOME/.config/hq/hq.env dist/main.js werkplaats` haalt alles één keer op en
    toont per project de stand. Hetzelfde staat elke ochtend in je dagrapport.
 
@@ -194,6 +195,21 @@ hq-trends "browser puzzle games"    # recente discussies van Hacker News, GitHub
 gebruikt bewust alleen bronnen met een open API: Reddit, X, TikTok en YouTube staan uit (hun voorwaarden).
 In het kantoor zie je het terug: *"Rigel 🔎 zoekt: …"*, *"🌐 leest: crazygames.com/…"*.
 
+## 13. Andere AI-modellen en skills: wat nu, wat later
+Je hoeft hier nu niets voor te doen. Elke rol draait al op het model en de denkstand die bij zijn werk passen, en de
+gratis AI hieronder dekt de goedkope rollen. Dit is wat we uitzochten, en wanneer het wél zin krijgt (uitleg en bronnen:
+[ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-ideale-opzet-september-2026)):
+
+| Wat | Nu? | Wanneer wel |
+|---|---|---|
+| **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot) |
+| **Elk model een eigen agent** | Nee. Meer agents kosten meer en praten langs elkaar heen | Een ander model als tegenstem bij grote beslissingen; eventueel de criticus als proef op een ander model |
+| **Gratis modellen** | Ja, al ingericht (zes aanbieders, zie *Gratis AI* hieronder) | Draai `gratis-ai --schrijf` af en toe opnieuw: het aanbod wisselt vaak |
+| **Open modellen op je eigen server** | Nee. Te traag voor agents zonder videokaart | Voor nachtwerk (Graphify) als de kennisbank groot is |
+| **Jev (TypeSafe AI)** | Nee. Aanmelden staat dicht en er is geen massawerk | Als een tak duizenden reviews, reacties of mails moet sorteren |
+| **TypeScript** | Ja, staat aan: bouwers schrijven TypeScript met `strict` | — |
+| **everything-claude-code** | Niet installeren (honderden skills kosten in elke sessie tokens). De drie beste ideeën zitten al in de holding | Voor je eigen projecten: kopieer hooguit één losse skill, zoals `loop-design-check`, naar `~/.claude/skills` |
+
 ## Optioneel
 **Claude Code live in het kantoor.** Zonder extra's ziet HQ je Claude Code-werk aan de commits (om de paar
 minuten). Wil je elke stap live zien (opdracht, zoeken, bestanden, tests), dan stuurt een kleine hook dat naar HQ.
@@ -208,26 +224,25 @@ Claude Code niet ophouden.
 - *Op je eigen computer:* `bash onderneming/deploy/claude-code/install-hook.sh http://<servernaam>:8080/api/hooks/claude-code <HQ_HOOK_TOKEN>`
   (je computer zit via Tailscale al in je netwerk).
 - *Claude Code in de cloud (claude.ai/code):* die draait buiten je Tailscale-netwerk, dus HQ moet voor precies
-  dit ene adres bereikbaar zijn. Op de server: `sudo tailscale funnel --bg --set-path /api/hooks http://127.0.0.1:8080/api/hooks`
-  (Tailscale toont een link als Funnel nog aan moet in je tailnet). Controleer met
-  `curl -sS -X POST https://<servernaam>.<tailnet>.ts.net/api/hooks/claude-code -H "Authorization: Bearer <HQ_HOOK_TOKEN>" -H "content-type: application/json" -d '{"event":"ping","sessionId":"test"}'`
-  (antwoord `{"ok":true,…}`). Dan in je cloud-omgeving (menu van de omgeving in de titelbalk van een sessie →
-  *Edit*): zet `HQ_HOOK_URL` (dat https-adres) en `HQ_HOOK_TOKEN` bij de omgevingsvariabelen, voeg
-  `<servernaam>.<tailnet>.ts.net` toe aan de toegestane domeinen onder *Network access*, en zet als setup-script:
-  `curl -fsSL https://raw.githubusercontent.com/kalle342643/KK-Kalle/main/onderneming/deploy/claude-code/install-hook.sh | bash`.
-  (Dat adres wijst naar `main`: het werkt zodra deze code daar staat.) Nieuwe sessies melden zich dan live. Alleen `/api/hooks` staat open, en dat adres kan alleen meldingen
-  ontvangen met het geheim; het kantoor zelf blijft alleen via Tailscale bereikbaar.
+  dit ene adres bereikbaar zijn. Op de server, na `tailscale up`:
+  `sudo bash /home/ai/KK-Kalle/onderneming/deploy/claude-code/cloud-hook.sh`. Het script zet Tailscale Funnel aan
+  voor alleen `/api/hooks`, test het adres met je geheim, en laat zien wat je in je cloud-omgeving plakt: de
+  omgevingsvariabelen `HQ_HOOK_URL` en `HQ_HOOK_TOKEN`, het domein voor *Network access* en het setup-script. (Waar:
+  het menu van de omgeving in de titelbalk van een sessie → *Edit*.) Nieuwe sessies melden zich dan live. Alleen
+  `/api/hooks` staat open, en dat adres neemt alleen meldingen aan met het geheim; het kantoor zelf blijft alleen via
+  Tailscale bereikbaar.
 
-**Gratis AI (OmniRoute).** Laat agents of Graphify op de gratis lagen van zeven aanbieders draaien (samen ±20
+**Gratis AI (OmniRoute).** Laat agents of Graphify op de gratis lagen van zes aanbieders draaien (samen ±15
 modellen). Zit er één aan zijn limiet, dan neemt de volgende het over. [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
 (MIT) staat al op de server. HQ gebruikt alleen de nette kant: per aanbieder één eigen sleutel binnen hun gratis laag.
 Abonnementen koppelen (Claude, ChatGPT, Copilot), webchat-cookies of meerdere accounts per aanbieder kan OmniRoute
 ook, maar dat schendt hun voorwaarden en kan je accounts kosten (ook dat van Claude Code); HQ zet zulke
 verbindingen nooit in de combo.
 1. Start de router: `systemctl --user enable --now gratis-ai`.
-2. Maak sleutels aan (alleen wat je wilt): Groq, Cerebras, SambaNova, Google AI Studio, Hugging Face, Mistral,
+2. Maak sleutels aan (alleen wat je wilt): Groq, SambaNova, Google AI Studio, Hugging Face, Mistral en
    OpenRouter. Zet ze in `~/.config/hq/gratis-ai.env`; bij elke regel staat waar je hem haalt en wat er met je
-   gegevens gebeurt.
+   gegevens gebeurt. Groq alleen is al genoeg om te beginnen. (Cerebras staat er niet meer bij: sinds augustus 2026
+   heeft het geen gratis laag meer.)
 3. `node --env-file=$HOME/.config/hq/hq.env dist/main.js gratis-ai --schrijf`: zet je sleutels in OmniRoute, maakt de
    combo "gratis" (de beste modellen, per aanbieder de beste drie) en een eigen sleutel voor de agents (in `hq.env`).
    Daarna `dist/main.js bootstrap && systemctl --user restart hq`, en `… gratis-ai test` (moet "ok" antwoorden).

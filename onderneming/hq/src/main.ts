@@ -101,6 +101,7 @@ function factoryFor(ctx: AppContext): AgentFactory {
     createBranchFromTemplate: async (c, proposal) => {
       await factory.createBranchFromTemplate(c, proposal);
     },
+    describeHire: (c, payload) => factory.describeHireApproval(c, payload),
   });
   return factory;
 }

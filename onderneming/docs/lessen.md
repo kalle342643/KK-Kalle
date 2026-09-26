@@ -199,6 +199,34 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
 - **Paperclip draait alleen op Node ≥ 24.11** (de doctor blokkeert daaronder), OmniRoute op 22.22.2+ of 24. Op de
   server staat Node 24 (past bij allebei); in deze sandbox is de standaard 22.
 
+## De ideale opzet (25–26 september)
+Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-ideale-opzet-september-2026).
+- **Zonder `effort` kiest Claude Code zelf, en dat is meestal hoog.** Vijf van de acht rollen hadden geen denkstand,
+  dus ook een verkenner die alleen leest dacht op de duurste stand. Nu weigert de loader een sjabloon met een
+  Claude-model zonder effort, en Haiku met effort (Haiku 4.5 kent het niet).
+- **Controleer "gratis" elke paar maanden.** Tussen juli en september 2026 veranderde veel:
+  - Cerebras stopte zijn gratis laag.
+  - Groq haalde Llama eraf.
+  - OpenRouter verving al zijn gratis modellen.
+  - De gratis Kimi K2.6 verdween.
+  - GitHub Models stopte.
+
+  Een lijst met "de beste gratis modellen" veroudert dus snel. Kijk live (de modellijst van OpenRouter is openbaar)
+  en noem modellen bij naam: een vangnet als `:free$` pakte ook een model van 2,6B en een veiligheidsfilter.
+- **"Gratis" is niet altijd "mag voor echt werk".** De gratis lagen van NVIDIA NIM en Cohere zijn alleen om te
+  proberen. Lees de voorwaarden, niet alleen de prijspagina.
+- **Een meetlat nodigt uit tot vals spelen.** Tests aanpassen om groen te worden, of notities maken voor de
+  nut-meter. Zet naast elk doel een grens ("wat níet mag"), laat keuren door iemand anders dan de maker, en rem
+  herhaling af: hooguit twee keuringsrondes (idee uit `loop-design-check` van everything-claude-code).
+- **Een pakket met honderden skills is geen upgrade.** De beschrijving van elke skill en agent staat in elke sessie.
+  Neem één idee of één skill over, niet het hele pakket.
+- **De repo van de gebruiker eerst zoeken, dan pas de openbare.** "De everything Claude skill op mijn GitHub" stond
+  niet tussen Kalles eigen repositories; het openbare origineel wel. Zeg dat erbij, dan kan hij de juiste aanwijzen.
+- **Jev (TypeSafe AI), om te onthouden:**
+  - Het is een beslismodel, geen taalmodel: *Choice*, *Score* en *Noul*, $0,042 per miljoen invoertokens, 70–500 ms.
+  - Handig voor veel kleine keuzes, zoals sorteren, routeren of controleren. Niet voor tekst, rekenen of datums.
+  - Aanmelden stond in september dicht. Pas nuttig als we massawerk hebben.
+
 ## Strategie (uit het onderzoek, nog te bewijzen)
 - AI is slecht in echte gaten in de markt vinden. Daarom: bewijslinks verplicht, een criticus die ≥ 3 van de 5 pitches
   afschiet, en niets boven €20 zonder gemeten resultaat.
@@ -232,5 +260,15 @@ Het hele onderzoek staat in [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Wat we e
 - **De nut-meter met echte cijfers:** getest met nep-kosten; of €1 in 30 dagen de goede drempel is, blijkt pas als
   de agents echt werken. Het automatisch pauzeren en het tellen van afgeronde opdrachten zijn getest tegen een
   nep-Paperclip met de velden zoals de echte ze logt (`details.status`, `_previous`, `originKind`), niet met echte runs.
+- **De nieuwe bouwerwerkwijze in een echte run:** `features.json`, `init.sh`, één feature per sessie en de keuring door
+  de criticus staan in de sjablonen, maar zijn nog niet in een echte Paperclip-run gedraaid. Kijk bij het eerste
+  experiment of de criticus de projectworkspace krijgt (subtaak in hetzelfde project) en Playwright kan starten.
+- **De bezettingscontrole met echte aannames:** getest met de nep-Paperclip, die `agentId` en `metadata` in de
+  approval zet zoals Paperclip dat volgens zijn API doet. Controleer bij de eerste echte aanname of de regel
+  "Bezetting …" bovenaan het verzoek staat.
+- **Repositories vanzelf volgen:** getest met een nep-GitHub (`/user/repos`) en nep-sites. Met een fine-grained token
+  toont GitHub alleen de repositories die je bij het maken aanvinkte; controleer na het eerste bericht of het klopt.
+- **`cloud-hook.sh`:** getest met een nep-`tailscale` en nep-`curl` (juiste Funnel-opdracht, juiste uitvoer, stopt
+  netjes zonder geheim). Echte Funnel-toegang is niet getest.
 - **De helpers `onderzoeker` en `reviewer` in echt werk:** Claude Code laadt ze (getest), maar hoe vaak hij ze uit
   zichzelf inzet en of dat tokens bespaart, moet in de praktijk blijken. Vraag er eventueel zelf om.

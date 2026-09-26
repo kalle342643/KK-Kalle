@@ -16,7 +16,7 @@ Claude Code-sessie die eraan werkt als poppetje aan een bureau.
 **Agents op het web.** Elke agent zoekt en leest op het web (WebSearch, WebFetch, `hq-web` met een echte browser,
 `hq-trends` voor wat er speelt), altijd eerst de kennisbank, en binnen de regels: alleen openbare pagina's,
 robots.txt, geen persoonsgegevens. **Gratis AI:** eenvoudige rollen en de kennisgraaf kunnen via een router op de
-gratis lagen van Groq, Cerebras en Google draaien, met doorschakelen als er één vol zit.
+gratis lagen van Groq, Google en een paar andere aanbieders draaien, met doorschakelen als er één vol zit.
 
 ```mermaid
 flowchart LR

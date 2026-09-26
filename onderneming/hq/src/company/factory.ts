@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mirrorApproval, markApplied, notifyApproval } from "../domain/approvals.js";
+import { mirrorApproval, markApplied, notifyApproval, prependApprovalSummary } from "../domain/approvals.js";
 import { audit, countRecent } from "../domain/audit.js";
 import { DomainError, getBranchBySlug, requireBranch, updateBranch, type Branch } from "../domain/branches.js";
 import { errorMessage, type Actor, type AppContext } from "../domain/context.js";
@@ -10,6 +10,7 @@ import { PaperclipError } from "../paperclip/client.js";
 import type { HireAgentInput, PcAgent } from "../paperclip/types.js";
 import { GRATIS_MODEL, gratisAgentEnv } from "../ai/gratis.js";
 import { render, type AgentSpec, type BranchTemplate, type CompanyDefinition } from "./loader.js";
+import { checkStaffing, describeForeignHire } from "./staffing.js";
 
 /**
  * Paperclips eigen skills die elke agent nodig heeft om met taken en geheugen te werken.
@@ -23,7 +24,10 @@ export interface TemplateSummary {
   title: string;
   role: string;
   model: string;
+  effort: string | null;
   budgetEur: number;
+  /** Hoeveel een tak er hooguit van heeft. */
+  maxPerBranch: number;
   description: string;
 }
 
@@ -45,7 +49,9 @@ export class AgentFactory {
       title: t.title,
       role: t.role,
       model: t.model,
+      effort: t.effort ?? null,
       budgetEur: t.budgetEur,
+      maxPerBranch: t.maxPerBranch,
       description: t.description,
     }));
   }
@@ -159,6 +165,9 @@ export class AgentFactory {
     const spec = this.agentTemplate(input.template);
     const branch = await requireBranch(ctx.db, input.branch);
     if (branch.status !== "active") throw new DomainError(`Tak '${branch.slug}' is ${branch.status}.`);
+    // Eerst hergebruiken (skill agent-factory): een volle tak of een collega die niets doet, lost een aanname niet op.
+    const staffing = await checkStaffing(ctx, spec, branch);
+    if (staffing.blocker) throw new DomainError(staffing.blocker, 409);
     const name = await this.uniqueName(ctx, input.name ?? spec.name, branch);
     const hire = this.buildHire(ctx, spec, { name, branch, reportsTo: branch.leadAgentId ?? requester.id });
     hire.capabilities = `${hire.capabilities}\n\nReden van aanname: ${input.reason}`;
@@ -175,11 +184,25 @@ export class AgentFactory {
     await audit(ctx.db, actor, "agent.hire", { template: spec.key, branch: branch.slug, agentId: agent.id });
     let approvalId: number | null = null;
     if (approval) {
-      const { record } = await mirrorApproval(ctx, approval);
+      const mirrored = await mirrorApproval(ctx, approval);
+      // Nieuw = nog niet door de approval-sync opgepikt (die zet er dan zelf de bezetting bij).
+      const record = mirrored.isNew ? await prependApprovalSummary(ctx, mirrored.record, staffing.lines.join("\n")) : mirrored.record;
       await notifyApproval(ctx, record);
       approvalId = record.id;
     }
     return { agentId: agent.id, approvalId };
+  }
+
+  /**
+   * Uitleg bij een aanname die de approval-sync als eerste ziet (bijvoorbeeld een agent die rechtstreeks in
+   * Paperclip iemand aannam): sjabloon en tak uit de metadata die HQ meegeeft, anders een waarschuwing.
+   */
+  async describeHireApproval(ctx: AppContext, payload: Record<string, unknown>): Promise<string> {
+    const hq = ((payload.metadata as Record<string, unknown> | undefined)?.hq ?? {}) as { template?: string; branch?: string };
+    const spec = this.def.agentTemplates.find((t) => t.key === hq.template) ?? null;
+    const branch = hq.branch ? ((await getBranchBySlug(ctx.db, hq.branch)) ?? null) : null;
+    const agentId = typeof payload.agentId === "string" ? payload.agentId : null;
+    return describeForeignHire(ctx, spec, branch, agentId);
   }
 
   /**

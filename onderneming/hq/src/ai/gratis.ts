@@ -32,28 +32,25 @@ export interface FreeProvider {
   mayTrain: boolean;
 }
 
-const chatOnly = (id: string) => !/whisper|tts|embed|guard|safeguard|rerank|ocr|image|vision-exp|moderation/i.test(id);
+const chatOnly = (id: string) => !/whisper|tts|embed|guard|safeguard|safety|rerank|ocr|image|vision-exp|moderation/i.test(id);
 
-/** In deze volgorde komen ze in de combo: snel en privacy-vriendelijk eerst. */
+/**
+ * In deze volgorde komen ze in de combo: snel en privacy-vriendelijk eerst. Stand september 2026
+ * (docs/ONDERZOEK-AGENTS.md, "Gratis en open modellen"). Bewust níet in de lijst:
+ * - Cerebras: sinds augustus 2026 geen gratis laag meer, alleen proeftegoed met een betaalkaart;
+ * - NVIDIA NIM en Cohere: gratis alleen om te proberen, niet voor echt werk (hun voorwaarden);
+ * - Kimi K2.6 en K3: nergens meer gratis (OpenRouter, Groq en Cloudflare vragen nu geld).
+ */
 export const PROVIDERS: FreeProvider[] = [
   {
     id: "groq",
     name: "Groq",
     envKey: "GROQ_API_KEY",
     keyUrl: "https://console.groq.com/keys",
-    prefer: [/^openai\/gpt-oss-120b$/, /^qwen\/qwen3\.\d+-\d+b$/, /^llama-3\.3-70b-versatile$/, /^qwen\/qwen3-32b$/, /^meta-llama\/llama-4/, /^openai\/gpt-oss-20b$/],
+    // Llama ging in augustus 2026 van de gratis laag af.
+    prefer: [/^openai\/gpt-oss-120b$/, /^qwen\/qwen3\.8-\d+b$/, /^qwen\/qwen3\.\d+-\d+b$/, /^openai\/gpt-oss-20b$/],
     allow: chatOnly,
     note: "Gratis laag met limieten per minuut en per dag, per model. Traint niet op je gegevens.",
-    mayTrain: false,
-  },
-  {
-    id: "cerebras",
-    name: "Cerebras",
-    envKey: "CEREBRAS_API_KEY",
-    keyUrl: "https://cloud.cerebras.ai",
-    prefer: [/^gpt-oss-120b$/, /^zai-glm/, /^qwen-3/, /^gemma-4/, /^llama/],
-    allow: chatOnly,
-    note: "Gratis laag met een dagelijks tokenlimiet; het aanbod aan modellen wisselt vaak.",
     mayTrain: false,
   },
   {
@@ -61,7 +58,7 @@ export const PROVIDERS: FreeProvider[] = [
     name: "SambaNova",
     envKey: "SAMBANOVA_API_KEY",
     keyUrl: "https://cloud.sambanova.ai/apis",
-    prefer: [/^DeepSeek-V3\.\d+$/, /^gpt-oss-120b$/, /^MiniMax-M\d/, /^Meta-Llama-3\.3-70B/, /^gemma-4/],
+    prefer: [/^DeepSeek-V4/, /^DeepSeek-V3\.\d+$/, /^gpt-oss-120b$/, /^MiniMax-M\d/, /^Meta-Llama-3\.3-70B/, /^gemma-4/],
     allow: chatOnly,
     note: "Gratis laag met limieten per minuut en per dag.",
     mayTrain: false,
@@ -93,7 +90,7 @@ export const PROVIDERS: FreeProvider[] = [
     keyUrl: "https://console.mistral.ai/api-keys",
     prefer: [/^mistral-small-latest$/, /^mistral-medium/, /^devstral-latest$/, /^mistral-large-latest$/],
     allow: chatOnly,
-    note: "Gratis Experiment-plan (telefoonverificatie). Mistral mag die gegevens voor training gebruiken, tenzij je dat in de console uitzet.",
+    note: "Gratis Experiment-plan (telefoonverificatie), bedoeld om te proberen. Mistral gebruikt die gegevens voor training, tenzij je dat uitzet (Admin → Privacy).",
     mayTrain: true,
   },
   {
@@ -101,9 +98,18 @@ export const PROVIDERS: FreeProvider[] = [
     name: "OpenRouter (gratis modellen)",
     envKey: "OPENROUTER_API_KEY",
     keyUrl: "https://openrouter.ai/keys",
-    prefer: [/^openai\/gpt-oss-120b:free$/, /^deepseek\/.*:free$/, /^qwen\/.*:free$/, /^meta-llama\/.*:free$/, /:free$/],
+    // Alleen grote modellen die met tools overweg kunnen, bij naam: het gratis aanbod wisselt vaak (in september 2026
+    // helemaal) en bevat ook piepkleine modellen en filters waar een agent niets aan heeft.
+    prefer: [
+      /^thinkingmachines\/inkling:free$/,
+      /^nvidia\/nemotron-3-ultra-[\w-]+:free$/,
+      /^qwen\/qwen3[\w.-]*:free$/,
+      /^google\/gemma-4-31b[\w-]*:free$/,
+      /^nvidia\/nemotron-3-super-[\w-]+:free$/,
+      /^deepseek\/[\w.-]+:free$/,
+    ],
     allow: (id) => id.endsWith(":free") && chatOnly(id),
-    note: "Ongeveer 50 verzoeken per dag zonder tegoed. Sommige gratis modellen bewaren of gebruiken je prompts: daarom als laatste in de rij.",
+    note: "20 verzoeken per minuut en 50 per dag (1000 als je ooit $10 tegoed kocht). Sommige gratis modellen bewaren of gebruiken je prompts: daarom als laatste in de rij.",
     mayTrain: true,
   },
 ];

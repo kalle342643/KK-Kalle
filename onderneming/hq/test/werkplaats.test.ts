@@ -4,6 +4,7 @@ import { parseBacklog } from "../src/code/backlog.js";
 import { GitHubClient, GitHubError, parseCommitMessage, type GitHubApi } from "../src/code/github.js";
 import { codeOverview, codeReportLines } from "../src/code/overview.js";
 import { getCodeProject, saveCodeProject } from "../src/code/projects.js";
+import { findHealthUrl, followNewRepos, siteUrl } from "../src/code/follow.js";
 import { CodeWatcher } from "../src/code/watch.js";
 import { buildOfficeSnapshot } from "../src/office/snapshot.js";
 import { createTestEnv, type TestEnv } from "./helpers/context.js";
@@ -443,5 +444,70 @@ describe("werkplaats in het kantoor en via de API", () => {
     expect(await client.get("/repos/a/b")).toEqual({ ok: 1 });
     expect(seen[0]).toMatchObject({ authorization: "Bearer tok" });
     expect(seen[1]).toMatchObject({ "if-none-match": '"e1"' });
+  });
+});
+
+describe("de werkplaats volgt je repositories vanzelf", () => {
+  const repos = [
+    { full_name: REPO, name: "scanner", homepage: "scanner.example", description: "Scant sites op fouten." },
+    { full_name: "demo-holding/oud", name: "oud", homepage: null, description: null, archived: true },
+    { full_name: "demo-holding/weg", name: "weg", homepage: null, description: null },
+    { full_name: "demo-holding/puzzel", name: "puzzel", homepage: "https://puzzel.example/", description: null },
+  ];
+  // De scanner heeft een gezondheidscheck op /api/health; de puzzel geeft op elk adres gewoon zijn pagina terug.
+  const fetchImpl = async (url: string) => {
+    if (url === "https://scanner.example/api/health") return new Response('{"ok":true}', { status: 200, headers: { "content-type": "application/json" } });
+    if (url.startsWith("https://puzzel.example/")) return new Response("<html>spel</html>", { status: 200, headers: { "content-type": "text/html" } });
+    return new Response("niet gevonden", { status: 404 });
+  };
+
+  it("volgt nieuwe repositories met hun site en gezondheidscheck, maar niet wat je weghaalde of wat gearchiveerd is", async () => {
+    gh.set("/user/repos?per_page=100&sort=pushed", repos);
+    // Deze haalde je eerder weg in het kantoor: die komt niet terug.
+    await saveCodeProject(env.ctx, { name: "weg", repo: "demo-holding/weg" }, "owner");
+    await env.db.query("update code_projects set archived_at = now() where key = 'weg'");
+
+    expect(await followNewRepos(env.ctx, gh, fetchImpl as typeof fetch)).toEqual(["scanner", "puzzel"]);
+    expect(await getCodeProject(env.db, "scanner")).toMatchObject({
+      repo: REPO,
+      url: "https://scanner.example",
+      healthUrl: "https://scanner.example/api/health",
+      description: "Scant sites op fouten.",
+    });
+    // Een pagina die op elk adres gewoon antwoordt, is geen gezondheidscheck: dan controleert HQ de site zelf.
+    expect(await getCodeProject(env.db, "puzzel")).toMatchObject({ url: "https://puzzel.example", healthUrl: null });
+    expect(await getCodeProject(env.db, "weg")).toMatchObject({ archivedAt: expect.any(Date) });
+    expect(env.notifier.last()!.text).toBe(
+      "🛠️ Werkplaats: ik volg nu scanner en puzzel. Die kwamen mee met je GitHub-token. Niet volgen? Haal ze weg in het kantoor; dan komen ze niet terug.",
+    );
+    // Een tweede keer: niets nieuws, geen bericht.
+    const sent = env.notifier.texts().length;
+    expect(await followNewRepos(env.ctx, gh, fetchImpl as typeof fetch)).toEqual([]);
+    expect(env.notifier.texts().length).toBe(sent);
+  });
+
+  it("kijkt hooguit één keer per uur, en helemaal niet met HQ_AUTO_FOLLOW=uit", async () => {
+    gh.set("/user/repos?per_page=100&sort=pushed", []);
+    const watcher = new CodeWatcher(env.ctx, gh, fetchImpl as typeof fetch);
+    await watcher.pollAll();
+    await watcher.pollAll();
+    expect(gh.calls.filter((c) => c.startsWith("/user/repos"))).toHaveLength(1);
+    env.clock.now = new Date(env.clock.now.getTime() + 3_600_000);
+    await watcher.pollAll();
+    expect(gh.calls.filter((c) => c.startsWith("/user/repos"))).toHaveLength(2);
+
+    env.ctx.config.code.autoFollow = false;
+    env.clock.now = new Date(env.clock.now.getTime() + 3_600_000);
+    await watcher.pollAll();
+    expect(gh.calls.filter((c) => c.startsWith("/user/repos"))).toHaveLength(2);
+  });
+
+  it("maakt van het veld website een bruikbaar adres", async () => {
+    expect(siteUrl("scanner.example")).toBe("https://scanner.example");
+    expect(siteUrl(" https://a.example/pad/ ")).toBe("https://a.example/pad");
+    expect(siteUrl("")).toBeNull();
+    expect(siteUrl("localhost")).toBeNull();
+    expect(siteUrl("ftp://a.example")).toBeNull();
+    expect(await findHealthUrl("https://nergens.example", (async () => { throw new Error("offline"); }) as typeof fetch)).toBeNull();
   });
 });

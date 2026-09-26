@@ -1,6 +1,7 @@
 import { errorMessage, type AppContext } from "../domain/context.js";
 import type { CiState } from "../office/types.js";
 import { parseBacklog } from "./backlog.js";
+import { followNewRepos } from "./follow.js";
 import { decodeContent, GitHubError, parseCommitMessage, type GitHubApi } from "./github.js";
 import { listCodeProjects, saveHealth, saveState, type CodeProjectRow, type HealthState, type ProjectState } from "./projects.js";
 import { actorIdOf, sessionOnBranch, setSessionPr, touchSession } from "./sessions.js";
@@ -73,6 +74,8 @@ export class CodeWatcher {
   private healthTimer: NodeJS.Timeout | undefined;
   private stopped = true;
   private polling = false;
+  /** Wanneer HQ voor het laatst keek of het token nieuwe repositories heeft (één keer per uur is genoeg). */
+  private followCheckedAt = 0;
 
   constructor(
     private readonly ctx: AppContext,
@@ -109,6 +112,13 @@ export class CodeWatcher {
     if (!this.gh || this.polling) return;
     this.polling = true;
     try {
+      const now = this.ctx.now().getTime();
+      if (this.ctx.config.code.autoFollow && now - this.followCheckedAt >= 3_600_000) {
+        this.followCheckedAt = now;
+        await followNewRepos(this.ctx, this.gh, this.fetchImpl as typeof fetch).catch((err) =>
+          this.ctx.log.warn("werkplaats: nieuwe repositories volgen mislukt", { error: errorMessage(err) }),
+        );
+      }
       for (const p of await listCodeProjects(this.ctx.db)) {
         if (!p.repo) continue;
         await this.pollProject(p);

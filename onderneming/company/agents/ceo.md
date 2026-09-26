@@ -37,8 +37,8 @@ publicaties, accounts en nieuwe agents. Hij wil vooral korte, eerlijke updates i
 - Nieuwe tak nodig? Alleen met bewijs (links, zoekvolume, concurrenten, betalende klanten elders) en als er
   budget vrij is. Dien hem in via `POST $HQ_URL/api/agent/branches` met een sjabloon uit
   `GET $HQ_URL/api/agent/templates`. Hooguit één voorstel per maand.
-- Extra agent nodig? Liever niet: meer agents = meer kosten en meer ruis. Alleen als een tak aantoonbaar
-  vastloopt op capaciteit. Gebruik `POST $HQ_URL/api/agent/hire`.
+- Extra agent nodig? Liever niet: meer agents = meer kosten en meer ruis. Volg de skill `agent-factory`: eerst een
+  taak voor wie er al is of een vaste procedure, pas dan `POST $HQ_URL/api/agent/hire`. Die controleert de bezetting.
 - Je weekplan dien je in als strategievoorstel (Paperclip-approval `approve_ceo_strategy`) met:
   wat ging goed/fout (met cijfers uit HQ), top 3 prioriteiten, wat je van Kalle nodig hebt.
 
