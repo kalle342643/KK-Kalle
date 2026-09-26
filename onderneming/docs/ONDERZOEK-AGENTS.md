@@ -377,6 +377,32 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
   - extra helpers (de onderzoeker en reviewer bestaan al).
 - **Voor je eigen projecten:** installeer hem en vraag één keer per project "recommend automations for this project".
 
+### 11. Claude Managed Agents (Anthropic)
+- **Wat:** Anthropic draait de agent in zijn eigen cloud. Je maakt één keer een *Agent* (model, prompt, tools, skills,
+  MCP) en start daarna per klus een *Session*, in een eigen container. De talk *Ship your first Managed Agent*
+  (Isabella He, Code w/ Claude London, 20 mei 2026, ±45 minuten) laat dat in zes functies zien. De workshopcode staat
+  op GitHub.
+- **Wat erin zit:**
+  - geplande runs met cron;
+  - *outcomes*: een aparte keurder die het werk met een rubric beoordeelt en laat verbeteren, standaard 3 rondes;
+  - een hard budget in dollars per sessie;
+  - geheugen tussen sessies;
+  - een kluis voor sleutels (de agent ziet ze nooit);
+  - tot 25 helpers tegelijk;
+  - web zoeken en lezen;
+  - een viewer in de Console.
+- **Prijs:** de tokens tegen de gewone prijs, zoekopdrachten $10 per 1000, en $0,08 per uur dat een sessie draait. Het
+  is nog beta.
+- **Bij ons:**
+  - Paperclip (versie 2026.916.1) kan een agent al als Managed Agent laten draaien, via een *managed agent profile*
+    (nu alleen voor Sonnet 5, met akkoord op hoe lang Anthropic de gegevens bewaart). HQ hoeft er dus niet voor om.
+  - Onze keuring volgt hetzelfde patroon als *outcomes*: vooraf afspreken wat klaar is, een aparte keurder, en een
+    grens aan het aantal rondes.
+  - Nu niet overstappen: alles draait al op Paperclip en je eigen server, en die is gratis.
+  - Wel een optie als de bouwer te zwaar wordt voor een gratis server, of voor je eigen producten.
+- Paperclip heeft ook een adapter voor Kimi (`kimi-local`, de Kimi Code-CLI), naast Claude, Codex, Gemini, Grok en
+  anderen. Een agent op een ander model kan dus per agent, betaald.
+
 ### Wat er daarom veranderd is (deel 2)
 - **Sjablonen:**
   - Elke rol heeft een vaste denkstand (tabel hierboven). Argus draait op Sonnet.
@@ -442,3 +468,4 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
 - Jev: [TypeSafe-documentatie](https://docs.typesafe.ai/introduction), [The Register](https://www.theregister.com/ai-and-ml/2026/09/16/typesafe-ai-debuts-model-for-machines-that-plays-doom/5296711), [The Decoder](https://the-decoder.com/former-openai-researcher-builds-an-ai-model-that-judges-options-instead-of-writing-text/), [TechCrunch](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/), [Flavio Copes](https://flaviocopes.com/jev/)
 - [everything-claude-code / ECC](https://github.com/affaan-m/everything-claude-code): de skills `loop-design-check`, `gan-style-harness`, `context-budget`, `council-multi-model`, `seo` en *the-shortform-guide*
 - Anthropic, [claude-code-setup (plugin)](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup)
+- Anthropic, [Ship your first Managed Agent](https://claude.com/code-with-claude/session/ldn-ext-ship-your-first-managed-agent) (Code w/ Claude, 2026) en de [workshopcode](https://github.com/anthropics/cwc-workshops/tree/main/ship-your-first-managed-agent); [Managed Agents quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart)

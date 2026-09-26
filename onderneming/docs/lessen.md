@@ -234,6 +234,9 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
 - **Berichten die tijdens het werk binnenkomen, staan niet als gewone berichten in het logboek.** Wie alle verzoeken
   terug wil vinden, moet ook die tussendoor-berichten en de meegestuurde foto's meenemen. Anders mis je er een paar,
   zoals het bericht over Jev of de uitleg van je eigen project.
+- **Kijk eerst wat Paperclip zelf al kan.** Bij de vraag over Kimi en over Anthropics Managed Agents bleek Paperclip
+  (2026.916.1) voor allebei al een koppeling te hebben: de adapter `kimi-local` en een *managed agent profile*
+  (`claude_managed`). Zoek dus eerst in de adapters en diensten van Paperclip, voor je zelf een koppeling plant.
 - **Een repo zonder `CLAUDE.md` laat elke nieuwe sessie de regels opnieuw raden.** De analyse van `claude-code-setup`
   vond dat meteen. Houd hem kort, met alleen wat elke sessie nodig heeft.
 

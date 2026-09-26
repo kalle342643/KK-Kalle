@@ -6,7 +6,7 @@ nieuws, dan komt het erbij (regel in `CLAUDE.md`). Niets overslaan, ook niet wat
 Deze repository is openbaar. Details van zijn eigen projecten (klanten, KvK, plannen) staan daarom niet hier, maar in
 de backlog van dat project. Het kantoor toont die punten onder *Jouw beurt* zodra HQ het project volgt.
 
-Bijgewerkt: 26 september 2026.
+Bijgewerkt: 26 september 2026 (21 berichten).
 
 ## 1. Nu doen (jij), in deze volgorde
 Dit vraagt jouw accounts of geld; dat doet geen agent voor je.
@@ -84,6 +84,7 @@ Dat is allemaal gebouwd. Het draait zodra de server staat.
 | 18 | 25 sep | Kimi Work en zwermen; alle gratis modellen; elk model een eigen agent; open-source modellen | Uitgezocht. Cerebras eruit (niet meer gratis), lijsten van Groq en OpenRouter bijgewerkt | Kimi en de rest: §4 |
 | 19 | 25 sep | De "everything Claude"-skill | Niet bij jouw repositories gevonden; het openbare origineel bekeken. Niet installeren; 3 ideeën overgenomen | Bedoelde je een andere? Stuur de link |
 | 20 | 26 sep | `/plugin install claude-code-setup@claude-plugins-official`, en "alles in het stappenplan" | Dit stappenplan. De plugin-analyse op deze repo gedaan: `CLAUDE.md` erbij, met de regel dat alles hier komt | Jouw projecten: §1 punt 11 en §4 |
+| 21 | 26 sep | Screenshot: "Anthropic's gratis gids van 37 minuten over agents" (*Ship your first Managed Agent*, Isabella He) | Uitgezocht: Claude Managed Agents, Anthropics eigen platform dat agents in hún cloud draait (met schema's, een keurder met rubric, een budget per sessie, geheugen en een kluis). Paperclip kan het al gebruiken. De talk en de code zijn gratis: je hoeft niet te reageren | Kijk de [talk](https://claude.com/code-with-claude/session/ldn-ext-ship-your-first-managed-agent) als je wilt. Overstappen: nu niet (§4) |
 
 **Je doelen uit bericht 2:**
 - **CEO-agent:** ✔ Atlas, met een weekplan en elke maand een kansenverkenning.
@@ -103,7 +104,8 @@ Dat is allemaal gebouwd. Het draait zodra de server staat.
 ## 4. Later: wanneer het wél zin krijgt
 | Wat | Nu? | Wanneer wel |
 |---|---|---|
-| **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot) |
+| **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot). Paperclip heeft er ook een eigen adapter voor (`kimi-local`), per agent in te stellen |
+| **Claude Managed Agents** (Anthropic draait de agent in zijn cloud) | Nee. HQ en de agents draaien al op Paperclip; het is nog beta; je betaalt API-tarieven plus $0,08 per uur looptijd | Als de bouwer te zwaar wordt voor je gratis server, of voor je eigen producten (bv. geplande scans). Paperclip kan een agent al zo laten draaien (een "managed agent profile", nu alleen voor Sonnet 5). De keuring met een rubric en de hooguit twee rondes zitten er ook in |
 | **Elk model een eigen agent** | Nee. Meer agents kosten meer en praten langs elkaar heen | Een ander model als tegenstem bij grote beslissingen; eventueel de criticus als proef op een ander model |
 | **Gratis modellen** | Ja, ingericht (zes aanbieders) | Draai `gratis-ai --schrijf` af en toe opnieuw: het aanbod wisselt vaak |
 | **Open modellen op je eigen server** | Nee. Te traag voor agents zonder videokaart | Voor nachtwerk (Graphify) als de kennisbank groot is |
