@@ -6,7 +6,7 @@ nieuws, dan komt het erbij (regel in `CLAUDE.md`). Niets overslaan, ook niet wat
 Deze repository is openbaar. Details van zijn eigen projecten (klanten, KvK, plannen) staan daarom niet hier, maar in
 de backlog van dat project. Het kantoor toont die punten onder *Jouw beurt* zodra HQ het project volgt.
 
-Bijgewerkt: 27 september 2026 (24 berichten).
+Bijgewerkt: 27 september 2026 (25 berichten).
 
 ## 1. Nu doen (jij), in deze volgorde
 Dit vraagt jouw accounts of geld; dat doet geen agent voor je.
@@ -14,7 +14,7 @@ Dit vraagt jouw accounts of geld; dat doet geen agent voor je.
 1. [ ] **Je kantoor openen** (het artifact *KK Kantoor*, link in de chat) en bij Claude Code Remote *Toestaan*
    kiezen. Vanaf nu geef je daar al je opdrachten: 🧭 *Hoofdagent*. Zie [SETUP.md](SETUP.md), *Je kantoor op
    claude.ai*.
-2. [ ] **PR #4 mergen** (het echte kantoor, de hoofdagent en de stamboom), of zeg dat ik het doe.
+2. [x] **PR [#4](https://github.com/kalle342643/KK-Kalle/pull/4) mergen** (het echte kantoor, de hoofdagent en de stamboom). Gedaan.
 3. [ ] **Server** kiezen en `setup-vps.sh` draaien: Oracle Always Free, je eigen pc of Hetzner
    ([SETUP.md](SETUP.md), stap 1–2).
 4. [ ] **Tailscale** koppelen: `tailscale up` (stap 3).
@@ -95,6 +95,7 @@ Claude-sessies, de hoofdagent en de stamboom (bericht 22).
 | 22 | 26–27 sep | "Zelf ideeën bedenken kan ik ook: dan zeg ik mijn plan tegen de hoofdagent, die kijkt ernaar, maakt er een afdeling voor en verdeelt het onder agents." "PR #3 mergen." "Richt alles in alsof het echt is; alles wat mijn Claude-account doet wil ik daar zien, en ik stuur geen prompts meer in een gewone chat, alleen nog in de artifact naar de hoofdagent." Daarna een foto (Valeri Does AI: de stamboom van een *creative studio*, met teams en hun agents): "dit moet sowieso, een stamboom of handig overzicht van iedereen die iets doet; wat niet verbonden is, los van elkaar". En: "alles wat ik zeg, onthouden en in het stappenplan" | PR #3 gemerged. **Het echte kantoor** als artifact op claude.ai: live al je Claude-sessies (connector Claude Code Remote), een eigen kamer voor de hoofdagent en voor elke afdeling, 🧭 *Hoofdagent* om opdrachten te geven, 🌳 *Stamboom* (jij → hoofdagent → afdelingen → agents; wat nergens onder hangt, staat los), routines en 🛑 *Stop alles*. Elke opdracht start een hoofdagent-sessie met de skill `hoofdagent`: eerlijk bekijken, afdeling maken (tags), werk verdelen over sessies. Op je server werkt Atlas je plan uit (skill `plan-van-kalle`, `POST /api/owner/plans`); de hoofdagent kan het hem geven met `HQ_PLAN_TOKEN`. De wekelijkse ideeënraad en de maandelijkse kansenverkenning zijn uit: die draaien alleen als jij erom vraagt. De stamboom zit ook in het kantoor op je server en in de demo | Open je kantoor en kies *Toestaan* (§1 punt 1). Server later vandaag (§1 punt 3) |
 | 23 | 27 sep | "Als ik ooit Grok-agents koop, kan ik dat hierin combineren?" (twee keer gestuurd) | Ja. Paperclip heeft een adapter voor Grok Build, de programmeer-CLI van xAI (`grok_local`). Een sjabloon kan nu `adapter: grok_local` krijgen; HQ vertaalt de denkstand en het aantal beurten, en de gratis router blijft voor Claude | Pas als je het koopt: §4 |
 | 24 | 27 sep | "Ga door waar je mee bezig was voordat de limiet resette", "Ga door" | Doorgegaan: berichten 22 en 23 afgemaakt, getest en in PR #4 gezet | — |
+| 25 | 27 sep | "Merge" | PR #4 gemerged: het echte kantoor, de hoofdagent-skill en de stamboom staan op main. Nieuwe hoofdagent-sessies uit je kantoor gebruiken ze meteen | Open je kantoor en geef je eerste opdracht (§1 punt 1) |
 
 **Je doelen uit bericht 2:**
 - **CEO-agent:** ✔ Atlas, met een weekplan. Jouw plannen werkt hij uit (skill `plan-van-kalle`); zelf bedenkt hij geen
