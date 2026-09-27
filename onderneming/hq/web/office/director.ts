@@ -141,38 +141,50 @@ export class Director {
     }
   }
 
+  /** Bureaus voor sessies in een ruimte: de afdeling van de sessie, anders de werkplaats. */
+  private sessionDesksIn(room: string | null): Desk[] {
+    const inRoom = (slug: string) => {
+      const roomId = this.layout.roomOfBranch.get(slug);
+      return roomId ? this.layout.desks.filter((d) => d.roomId === roomId && !d.agentId && !d.extra) : [];
+    };
+    const own = room ? inRoom(room) : [];
+    return own.length ? own : this.layout.desks.filter((d) => d.id.startsWith(`${WORKSHOP_SLUG}:`));
+  }
+
   /**
-   * Sessies aan de bureaus van de werkplaats: wie er al zat blijft zitten, nieuwe krijgen een vrij bureau.
-   * Een helper (sub-agent) krijgt het vrije bureau het dichtst bij zijn sessie.
+   * Sessies aan hun bureau: in hun afdeling (hoofdagent, afdeling) of anders in de werkplaats. Wie er al zat blijft
+   * zitten, nieuwe krijgen een vrij bureau. Een helper (sub-agent) krijgt het vrije bureau het dichtst bij zijn sessie.
    */
-  private assignSessionDesks(ids: string[]): void {
-    const desks = this.layout.desks.filter((d) => d.id.startsWith(`${WORKSHOP_SLUG}:`));
-    const wanted = new Set(ids);
+  private assignSessionDesks(people: Array<{ id: string; room: string | null }>): void {
+    const roomOf = new Map(people.map((p) => [p.id, p.room] as const));
     for (const [actorId, deskId] of [...this.sessionDesks]) {
-      if (!wanted.has(actorId) || !desks.some((d) => d.id === deskId)) {
+      const room = roomOf.get(actorId);
+      if (room === undefined || !this.sessionDesksIn(room).some((d) => d.id === deskId)) {
         this.sessionDesks.delete(actorId);
         this.deskOccupant.delete(deskId);
       }
     }
     // Eerst de sessies, dan pas de helpers: die zoeken hun sessie op.
-    for (const id of [...ids].sort((a, b) => Number(isHelperId(a)) - Number(isHelperId(b)))) {
+    for (const { id, room } of [...people].sort((a, b) => Number(isHelperId(a.id)) - Number(isHelperId(b.id)))) {
       if (this.sessionDesks.has(id)) continue;
+      const desks = this.sessionDesksIn(room);
       const parentDesk = isHelperId(id) ? desks.find((d) => d.id === this.sessionDesks.get(parentOf(id))) : undefined;
       const free = desks
         .filter((d) => !this.deskOccupant.has(d.id))
         .sort((a, b) => (parentDesk ? dist(a.seat, parentDesk.seat) - dist(b.seat, parentDesk.seat) : 0))[0];
-      if (!free) break;
+      if (!free) continue;
       this.sessionDesks.set(id, free.id);
       this.deskOccupant.set(free.id, id);
     }
   }
 
-  /** Iedereen die in de werkplaats hoort: de sessies en hun helpers. */
-  private workshopActors(): string[] {
-    const out: string[] = [];
+  /** Iedereen die aan een sessiebureau zit: de sessies (met hun afdeling) en hun helpers. */
+  private workshopActors(): Array<{ id: string; room: string | null }> {
+    const out: Array<{ id: string; room: string | null }> = [];
     for (const s of this.snap?.code?.sessions ?? []) {
       if (s.state === "done") continue;
-      out.push(s.actorId, ...(s.helpers ?? []).map((h) => h.actorId));
+      const room = s.room ?? null;
+      out.push({ id: s.actorId, room }, ...(s.helpers ?? []).map((h) => ({ id: h.actorId, room })));
     }
     return out;
   }
@@ -228,17 +240,20 @@ export class Director {
     };
   }
 
-  /** Een Claude Code-sessie als poppetje: oranje label met het project, de opdracht als rol. */
+  /** Een Claude Code-sessie als poppetje: oranje label met het project (of de afdeling), de opdracht als rol. */
   private sessionInfo(s: CodeSession): ActorInfo {
     const project = this.snap?.code.projects.find((p) => p.key === s.projectKey)?.name ?? "een project";
+    const label = s.label ?? `Claude · ${project}`;
+    const boss = s.account?.kind === "hoofdagent";
     return {
       id: s.actorId,
       kind: "claude",
-      name: `Claude · ${project}`,
-      label: `Claude · ${project}`,
+      name: label,
+      label,
       role: s.title ?? "Claude Code",
-      accent: "#d97757",
-      look: defaultLook(`claude:${s.projectKey ?? s.id}`, null),
+      // De hoofdagent in goud (zoals de directie), afdelingen in de kleur van hun kamer, de rest Claude-oranje.
+      accent: boss ? "#d4a017" : s.room ? (this.layout.rooms.find((r) => r.id === this.layout.roomOfBranch.get(s.room!))?.accent ?? "#d97757") : "#d97757",
+      look: defaultLook(boss ? `hoofdagent:${s.id}` : `claude:${s.account?.team ?? s.projectKey ?? s.id}:${s.account?.role ?? ""}`, boss ? "ceo" : null),
     };
   }
 
@@ -263,9 +278,11 @@ export class Director {
     const helpers = new Map<string, { session: CodeSession; helper: CodeHelper }>();
     for (const session of sessions.values()) for (const helper of session.helpers ?? []) helpers.set(helper.actorId, { session, helper });
     this.assignSessionDesks(this.workshopActors());
+    // De HQ-bot loopt alleen rond als er een HQ is (niet in het kantoor op je Claude-account).
+    const bot = snap.people.some((p) => p.id === BOT_ID);
     const wanted = new Map<string, OfficeAgent | null>([
       [OWNER_ID, null],
-      [BOT_ID, null],
+      ...(bot ? [[BOT_ID, null] as const] : []),
       ...snap.agents.filter((a) => a.status !== "terminated").map((a) => [a.id, a] as const),
       ...[...sessions.keys()].map((id) => [id, null] as const),
       ...[...helpers.keys()].map((id) => [id, null] as const),
@@ -296,7 +313,11 @@ export class Director {
           // Nieuw: komt binnen door de voordeur. Een sollicitant gaat op de bank zitten, een nieuwe collega naar zijn bureau.
           actor.place(this.layout.entrance, false);
           const hello = session
-            ? `👋 Claude Code hier, ik werk aan ${info.name.replace(/^Claude · /, "")}`
+            ? session.account?.kind === "hoofdagent"
+              ? "👋 Hoofdagent hier, ik ga ermee aan de slag"
+              : session.account?.team
+                ? `👋 ${info.label} meldt zich`
+                : `👋 Claude Code hier, ik werk aan ${info.name.replace(/^Claude · /, "")}`
             : status === "pending_approval"
               ? `👋 Hoi! Ik ben ${info.label}`
               : `👋 Hallo allemaal, ik ben ${info.label}`;
@@ -602,6 +623,14 @@ export class Director {
           a.say("👋 Aan de slag", 3, "happy");
         } else if (action === "waiting") {
           a.say("⏳ Even wachten op mijn helpers", 4, "info");
+        } else if (action === "needs-you") {
+          // Het kantoor op je Claude-account: de sessie heeft jou nodig (een vraag of toestemming).
+          a.setWorking(false, a.taskText);
+          a.say("✋ Ik wacht op jou", 6, "info");
+          if (a.seated && a.idle) a.queue(standUp(), act("interact-right", 1.6), sitHere(a.home ?? { x: a.pos.x, z: a.pos.z, facing: 0 }));
+        } else if (action === "failed") {
+          a.setWorking(false, a.taskText);
+          a.say("❌ Ik loop vast", 5, "info");
         }
         break;
       }
@@ -859,27 +888,42 @@ export class Director {
       switch (room.kind) {
         case "dept":
         case "control": {
-          const members = [...this.actors.values()].filter((a) => a.home && roomAt(this.layout, a.home.x, a.home.z)?.id === room.id && a.info.kind === "agent");
+          // Agents en (op je Claude-account) sessies die hier hun bureau hebben.
+          const members = [...this.actors.values()].filter(
+            (a) => a.home && roomAt(this.layout, a.home.x, a.home.z)?.id === room.id && (a.info.kind === "agent" || a.info.kind === "claude"),
+          );
           const working = members.filter((a) => a.working).length;
           busy = working > 0;
-          status = members.length ? `${working}/${members.length} aan het werk` : room.kind === "control" ? "cijfers live" : "nog leeg";
+          status = members.length ? `${working}/${members.length} aan het werk` : room.kind === "control" ? (snap.account ? "schermen live" : "cijfers live") : "nog leeg";
           if (room.kind === "control") status = `📊 ${status}`;
           break;
         }
         case "knowledge": {
           const n = here.length;
           busy = n > 0;
-          status = n ? `🔎 ${n} ${n === 1 ? "zoekt" : "zoeken"} iets op` : `${snap.knowledge.nodes} knopen · ${snap.knowledge.source === "graphify" ? "Graphify" : "HQ-graaf"}`;
+          status = n
+            ? `🔎 ${n} ${n === 1 ? "zoekt" : "zoeken"} iets op`
+            : snap.account
+              ? "komt met je server"
+              : `${snap.knowledge.nodes} knopen · ${snap.knowledge.source === "graphify" ? "Graphify" : "HQ-graaf"}`;
           break;
         }
         case "meeting": {
           busy = Boolean(this.meeting);
           status = this.meeting
             ? `🤝 Samen aan: ${short(this.meeting.title ?? "één klus", 40)} (${this.meeting.members.size})`
-            : `📋 ${snap.projects.filter((p) => p.status === "running").length} lopende projecten`;
+            : snap.account
+              ? `📋 sessiebord · ${snap.account.totals.working} bezig`
+              : `📋 ${snap.projects.filter((p) => p.status === "running").length} lopende projecten`;
           break;
         }
         case "owner":
+          if (snap.account) {
+            const waiting = snap.account.totals.waiting;
+            busy = waiting > 0;
+            status = waiting ? `✋ ${waiting} ${waiting === 1 ? "sessie wacht" : "sessies wachten"} op jou` : "🧭 opdrachten geef je hier";
+            break;
+          }
           busy = snap.approvals.length > 0;
           status = snap.approvals.length ? `📥 ${snap.approvals.length} ${snap.approvals.length === 1 ? "verzoek wacht" : "verzoeken wachten"} op jou` : "niets te beslissen";
           break;
@@ -892,11 +936,12 @@ export class Director {
         case "ceo": {
           const ceo = snap.agents.find((a) => a.hqRole === "ceo");
           busy = ceo?.status === "running";
-          status = ceo ? (ceo.status === "running" ? "aan het werk" : ceo.status === "paused" ? "gepauzeerd" : "beschikbaar") : "vacature";
+          status = ceo ? (ceo.status === "running" ? "aan het werk" : ceo.status === "paused" ? "gepauzeerd" : "beschikbaar") : snap.account ? "Atlas komt met je server" : "vacature";
           break;
         }
         case "workshop": {
-          const sessions = snap.code.sessions.filter((s) => s.state !== "done");
+          // Alleen wie hier zit: sessies van de hoofdagent en afdelingen hebben een eigen kamer.
+          const sessions = snap.code.sessions.filter((s) => s.state !== "done" && !s.room);
           const working = sessions.filter((s) => s.state === "working").length;
           const down = snap.code.projects.filter((p) => p.health.state === "down").length;
           busy = working > 0 || down > 0;

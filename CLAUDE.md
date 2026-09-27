@@ -3,6 +3,9 @@
 Kalle (18) bouwt hier een AI-holding. Paperclip draait de agents. HQ (`onderneming/hq`) regelt geld, experimenten,
 goedkeuringen, de noodstop en het 3D-kantoor. Antwoord Kalle in het Nederlands: kort, eerst het antwoord.
 
+Kalle plant zelf en geeft zijn opdrachten in zijn kantoor op claude.ai (een artifact). Elke opdracht start een sessie
+met de tag `hoofdagent`: volg dan de skill `.claude/skills/hoofdagent/SKILL.md`.
+
 ## Vaste regels van Kalle
 - Publiceer nooit iets op CrazyGames en maak geen accounts aan. Dat doet hij zelf.
 - Vraag nooit om wachtwoorden of betaalgegevens. Alleen API-sleutels die hij zelf als secret instelt.
@@ -23,6 +26,7 @@ npm ci
 npm run typecheck && npm test && npm run build     # alle drie groen
 shellcheck -x ../deploy/*.sh ../deploy/claude-code/*.sh
 npm run demo                                       # demo-kantoor: dist/demo/kantoor-demo.html
+npm run kantoor                                    # echt kantoor (artifact op claude.ai): dist/kantoor/kantoor.html
 ```
 - Node ≥ 22.12; de server en CI draaien Node 24.
 - Tests draaien op PGlite en een nep-Paperclip (`test/helpers`). Een echte Paperclip is niet nodig.

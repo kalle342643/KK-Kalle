@@ -32,9 +32,10 @@ een groot deel van de invoer is goedkoop.
 
 | Wat | Hoe vaak | Schatting |
 |---|---|---|
-| Strategieronde CEO (Opus) | wekelijks (alleen bij nieuws) + maandelijkse verkenning | €3–8 |
+| Strategieronde CEO (Opus) | wekelijks (alleen bij nieuws) | €2–6 |
+| Een plan van jou uitwerken (Atlas, Opus) | per plan dat je stuurt | €1–3 per plan |
 | Analist (Sonnet, denkstand middel) | na elk afgerond experiment | €1–3 |
-| Ideeënraad per tak (verkenners, criticus, lead) | wekelijks, overgeslagen als er al 2 lopen | €4–8 per tak |
+| Ideeënraad per tak (verkenners, criticus, lead) | alleen als jij erom vraagt | €4–8 per keer |
 | Weekstart per tak (Sonnet) | wekelijks | €1–2 per tak |
 | Bouwen tijdens een experiment (Sonnet) | 2–3 stevige sessies per week à ~€2,70 | €20–35 zolang er gebouwd wordt |
 | Kennisgraaf (Graphify met Haiku, optioneel) | 's nachts, over de kennisbank-map | centen per nacht zolang de map klein is; eigen sleutel met eigen limiet |
@@ -75,7 +76,7 @@ zit of stilstaat, en krijgt een product hooguit twee keuringsrondes.
 - De nut-meter pauzeert al wie niets oplevert. Wil je strenger zijn: pauzeer zelf wie "voor de sier?" staat,
   zonder op maandag te wachten.
 - Minder agents per tak (één verkenner in plaats van twee).
-- Ideeënraad om de twee weken in plaats van wekelijks (cron in `company/templates/branches/*.yaml`).
+- De ideeënraad draait al alleen als je erom vraagt (sinds 26 september: jij plant zelf).
 - Een lager model voor een rol (`model:` in het sjabloon); `update.sh` zet het door.
 - Claude-abonnement in plaats van API-sleutel via de AI-verbinding in Paperclip. Dan valt het gebruik binnen je
   abonnementslimiet, maar het beleid daarvoor veranderde in 2026 een paar keer: reken er niet op.

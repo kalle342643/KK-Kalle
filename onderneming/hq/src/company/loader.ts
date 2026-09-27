@@ -25,6 +25,11 @@ export const agentFrontmatter = z.object({
   title: z.string().min(1),
   icon: z.enum(AGENT_ICONS).optional(),
   description: z.string().min(1),
+  /**
+   * Wie het werk doet: Claude Code (standaard) of de Grok Build-CLI van xAI (Paperclip-adapter `grok_local`; op de
+   * server `grok login` met een SuperGrok-abonnement, of XAI_API_KEY). Zie ONDERZOEK-AGENTS.md, Grok.
+   */
+  adapter: z.enum(["claude_local", "grok_local"]).default("claude_local"),
   model: z.string().min(1),
   /** Hoe diep het model nadenkt. Verplicht bij Claude-modellen die het kennen (zie effortProblem). */
   effort: z.enum(["low", "medium", "high"]).optional(),
@@ -129,11 +134,16 @@ export function effortProblem(model: string, effort: string | undefined): string
   return null;
 }
 
+/** Een Grok-agent draait een Grok-model (grok-build, grok-4.x); een Claude-model kan de Grok-CLI niet draaien. */
+export function grokProblem(model: string): string | null {
+  return model.startsWith("grok-") ? null : `adapter grok_local draait alleen Grok-modellen (bv. grok-build of grok-4.7), niet ${model}.`;
+}
+
 function loadAgent(path: string): AgentSpec {
   const { data, body } = splitFrontmatter(readFileSync(path, "utf8"));
   const parsed = agentFrontmatter.safeParse(data);
   if (!parsed.success) throw new Error(`${path}: ${parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`).join("; ")}`);
-  const problem = effortProblem(parsed.data.model, parsed.data.effort);
+  const problem = parsed.data.adapter === "grok_local" ? grokProblem(parsed.data.model) : effortProblem(parsed.data.model, parsed.data.effort);
   if (problem) throw new Error(`${path}: ${problem}`);
   return { ...parsed.data, key: basename(path, ".md"), instructions: body };
 }

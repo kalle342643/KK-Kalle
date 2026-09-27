@@ -6,6 +6,7 @@
 #    sturen; het kantoor zelf blijft alleen via Tailscale bereikbaar.
 # 2. Test dat adres met het geheim uit hq.env.
 # 3. Laat zien wat je in je cloud-omgeving plakt (omgevingsvariabelen, domein, setup-script).
+#    Staat HQ_PLAN_TOKEN in hq.env, dan ook HQ_URL en HQ_PLAN_TOKEN: daarmee geeft de hoofdagent plannen aan Atlas.
 set -euo pipefail
 
 AI_USER="${AI_USER:-ai}"
@@ -19,6 +20,7 @@ value() { grep -E "^$1=" "$ENV_FILE" | tail -n1 | cut -d= -f2- | tr -d '"' || tr
 
 [[ -r "$ENV_FILE" ]] || fail "Kan $ENV_FILE niet lezen. Draai dit met sudo, of zet HQ_ENV=<pad naar hq.env>."
 token="$(value HQ_HOOK_TOKEN)"
+plan_token="$(value HQ_PLAN_TOKEN)"
 port="$(value HQ_PORT)"
 port="${port:-8080}"
 [[ -n "$token" ]] || fail "HQ_HOOK_TOKEN is leeg in $ENV_FILE. Vul een geheim in (openssl rand -hex 24) en herstart HQ."
@@ -39,13 +41,20 @@ else
   echo "⚠️  Nog geen antwoord. Draait HQ (als $AI_USER: systemctl --user status hq)? Funnel kan ook een minuut nodig hebben."
 fi
 
+plan_lines=""
+if [[ -n "$plan_token" ]]; then
+  plan_lines="
+     HQ_URL=https://${host}
+     HQ_PLAN_TOKEN=${plan_token}"
+fi
+
 cat <<EOF
 
 Plak dit in je cloud-omgeving (claude.ai/code → de omgeving in de titelbalk van een sessie → Edit):
 
 1. Omgevingsvariabelen:
      HQ_HOOK_URL=$url
-     HQ_HOOK_TOKEN=$token
+     HQ_HOOK_TOKEN=$token${plan_lines}
 2. Network access → toegestane domeinen:
      $host
 3. Setup-script:
@@ -53,3 +62,6 @@ Plak dit in je cloud-omgeving (claude.ai/code → de omgeving in de titelbalk va
 
 Nieuwe cloud-sessies melden zich daarna live in het kantoor.
 EOF
+if [[ -z "$plan_token" ]]; then
+  echo "Tip: zet ook HQ_PLAN_TOKEN (openssl rand -hex 24) in hq.env, herstart HQ en draai dit opnieuw. Dan kan de hoofdagent plannen aan Atlas geven."
+fi

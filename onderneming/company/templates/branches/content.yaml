@@ -14,12 +14,3 @@ routines:
     priority: high
     description: |
       Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ en plan de schrijftaken van deze week.
-  - title: "Ideeënraad {{BRANCH_NAME}}"
-    assignee: Eik
-    cron: "0 10 * * 3"
-    priority: medium
-    description: |
-      Draai de ideeënraad (skill ideeenraad). Lopen er in deze tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over en
-      schrijf in één regel waarom: meer ideeën dan Kalle kan kiezen is weggegooid geld.
-      Beuk verkent zoekvragen zonder goed antwoord (zoekdata, fora, "vs"-zoekopdrachten) en affiliate-programma's
-      met een eerlijke vergoeding. Daarna maak jij de top 5, dan Wilg (schiet ≥3 af).

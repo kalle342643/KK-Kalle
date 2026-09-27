@@ -1,18 +1,19 @@
 ---
 name: ideeenraad
-description: Hoe de wekelijkse ideeënraad van een tak werkt (verkenners, top 5 door de lead, criticus) en hoe het beste idee een experiment wordt.
+description: Hoe de ideeënraad werkt als Kalle erom vraagt (verkenners, vijf richtingen door de lead, criticus, twee aan twee kiezen) en hoe het beste idee een experiment wordt.
 tagline: Verkennen, pitchen, afschieten, kiezen
 ---
 
 # De ideeënraad
 
-Eén keer per week, als batch. Het doel is niet "veel ideeën" maar **1 of 2 ideeën die een experiment van
-€20 waard zijn**. AI is slecht in het vinden van echte gaten in de markt: het stelt vaak ideeën voor die al
+**Alleen als Kalle erom vraagt.** Kalle plant zelf (sinds 26 september 2026): zijn plannen gaan naar Atlas, die ze
+uitwerkt met de skill `plan-van-kalle`. Vraagt hij om richtingen ("bedenk er vijf voor X"), dan draait deze raad.
+Het doel is niet "veel ideeën" maar **1 of 2 ideeën die een experiment van €20 waard zijn**. AI is slecht in het vinden van echte gaten in de markt: het stelt vaak ideeën voor die al
 honderd keer bestaan. De raad is zo ingericht dat dat eruit gefilterd wordt.
 
 ## Eerst: is er ruimte?
-Lopen er in de tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Dan sla je de raad deze week
-over. Meer voorstellen dan Kalle kan kiezen is weggegooid geld, en minder aandacht per idee.
+Lopen er in de tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Zeg dat dan eerst tegen Kalle in
+één regel, en wacht op zijn antwoord. Meer voorstellen dan Kalle kan kiezen is weggegooid geld, en minder aandacht per idee.
 
 ## Volgorde (de tak-lead regelt dit met Paperclip-taken)
 De raad is **één taak met subtaken**. Jouw raad-taak is de bovenliggende taak; maak voor elke verkenner en voor
@@ -45,5 +46,5 @@ leest later terug wat de raad dacht, en in het kantoor zie je wie er samen aan w
 - Bewijs = links naar echte bronnen. "Ik denk dat mensen dit willen" telt niet.
 - Nieuw op papier is geen bewijs. Ideeën van AI lijken origineler dan die van mensen, maar vallen bij uitvoering
   vaker tegen. Kies daarom het idee dat het **snelst en goedkoopst echt te testen** is.
-- Maximaal 2 voorstellen per week per tak. Meer ideeën = minder aandacht per idee.
+- Maximaal 2 voorstellen per keer per tak. Meer ideeën = minder aandacht per idee.
 - Schrijf alles kort in de Paperclip-taken, zodat de analist later kan terugzien wat de raad dacht.

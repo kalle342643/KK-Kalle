@@ -3,7 +3,7 @@
  * de whiteboards per afdeling, de cijfermuur in de controlekamer en het scherm van de CEO.
  * Echte cijfers uit HQ; de uitgebreide versies (met tooltips) staan in de panelen.
  */
-import type { CodeProject, OfficeBranch, OfficeProject, OfficeSnapshot } from "../../src/office/types.js";
+import type { CodeProject, CodeSession, OfficeBranch, OfficeProject, OfficeSnapshot } from "../../src/office/types.js";
 import { FONT, fitText, roundRect, type CanvasScreen } from "./screens.js";
 
 const eur = (n: number, digits = 0) =>
@@ -87,7 +87,7 @@ export function drawWhiteboard(s: CanvasScreen, branch: OfficeBranch | undefined
       ctx.font = `600 ${h * 0.08}px ${FONT}`;
       ctx.fillText("Nog geen experimenten", w * 0.05, h * 0.4);
       ctx.font = `500 ${h * 0.06}px ${FONT}`;
-      ctx.fillText("De ideeënraad komt woensdag bij elkaar.", w * 0.05, h * 0.55);
+      ctx.fillText("Stuur je plan naar de hoofdagent.", w * 0.05, h * 0.55);
       return;
     }
     mine.forEach((p, k) => {
@@ -253,6 +253,8 @@ export function ago(iso: string | null | undefined, now = Date.now()): string {
 /** De stand van een project in één oogopslag, in woorden én kleur (niet alleen kleur). */
 export function codeStatus(p: CodeProject): Array<{ icon: string; text: string; tone: "good" | "bad" | "warn" | "muted" }> {
   const out: Array<{ icon: string; text: string; tone: "good" | "bad" | "warn" | "muted" }> = [];
+  // Het kantoor op je Claude-account ziet alleen de sessies; site, tests en uitrol ziet HQ op je server.
+  if (p.source === "account") return [{ icon: "○", text: "Site, tests en uitrol ziet je server (HQ)", tone: "muted" }];
   const h = p.health;
   if (h.state === "down") out.push({ icon: "●", text: `Ligt eruit${h.status ? ` (${h.status})` : ""}`, tone: "bad" });
   else if (h.state === "up") out.push({ icon: "●", text: `Online${h.uptime24h !== null ? ` · ${Math.round(h.uptime24h * 100)}% vandaag` : ""}`, tone: "good" });
@@ -306,5 +308,227 @@ export function drawCodeBoard(s: CanvasScreen, p: CodeProject | undefined, sessi
     fitText(ctx, mine ? `📋 ${mine} voor jou` : "📋 niets voor jou", w * 0.07, h * 0.9, w * 0.4, h * 0.07, 1);
     ctx.fillStyle = sessions ? "#ffb38a" : "#8a93a6";
     fitText(ctx, sessions ? `🤖 ${sessions} ${sessions === 1 ? "sessie" : "sessies"}` : "🤖 niemand bezig", w * 0.55, h * 0.9, w * 0.4, h * 0.07, 1);
+  });
+}
+
+// ---------------------------------------------------------------- het kantoor op je Claude-account
+
+/** Status van een sessie in woorden én kleur (niet alleen kleur). */
+export const BUCKET: Record<NonNullable<CodeSession["account"]>["bucket"], { label: string; color: string; tone: "good" | "warn" | "info" | "bad" | "muted" }> = {
+  working: { label: "bezig", color: "#2f9e44", tone: "good" },
+  waiting: { label: "wacht op jou", color: "#e8a000", tone: "warn" },
+  review: { label: "klaar, kijk even", color: "#2a78d6", tone: "info" },
+  done: { label: "klaar", color: "#8a93a6", tone: "muted" },
+  failed: { label: "vastgelopen", color: "#d03b3b", tone: "bad" },
+  archived: { label: "gearchiveerd", color: "#8a93a6", tone: "muted" },
+};
+
+const bucketOf = (s: CodeSession) => s.account?.bucket ?? (s.state === "working" ? "working" : "done");
+
+/** Het scherm in de directie: wat je Claude-account nu doet. */
+export function drawAccountKpi(s: CanvasScreen, snap: OfficeSnapshot): void {
+  const acc = snap.account;
+  s.draw((ctx, w, h) => {
+    screenBg(ctx, w, h, "Claude · nu");
+    if (!acc || acc.state !== "ok") {
+      ctx.fillStyle = "#c3c2b7";
+      ctx.font = `600 ${h * 0.07}px ${FONT}`;
+      fitText(ctx, acc?.state === "loading" ? "Verbinden…" : "Geen verbinding met je account", w * 0.06, h * 0.5, w * 0.88, h * 0.08, 2);
+      return;
+    }
+    const t = acc.totals;
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${h * 0.2}px ${FONT}`;
+    ctx.textAlign = "left";
+    ctx.fillText(String(t.working), w * 0.06, h * 0.5);
+    ctx.fillStyle = "#c3c2b7";
+    ctx.font = `600 ${h * 0.065}px ${FONT}`;
+    ctx.fillText(t.working === 1 ? "sessie bezig" : "sessies bezig", w * 0.06, h * 0.62);
+    const rows: Array<[string, number, string]> = [
+      ["wacht op jou", t.waiting, "#f5c451"],
+      ["klaar, kijk even", t.review, "#7fb4f5"],
+      ["vastgelopen", t.failed, "#f07a7a"],
+    ];
+    rows.forEach(([label, n, color], k) => {
+      const y = h * 0.34 + k * h * 0.13;
+      ctx.textAlign = "right";
+      ctx.fillStyle = n ? color : "#6f778a";
+      ctx.font = `800 ${h * 0.09}px ${FONT}`;
+      ctx.fillText(String(n), w * 0.62, y);
+      ctx.textAlign = "left";
+      ctx.font = `600 ${h * 0.06}px ${FONT}`;
+      fitText(ctx, label, w * 0.65, y, w * 0.31, h * 0.06, 1);
+    });
+    if (acc.limit) {
+      const ok = acc.limit.status === "allowed";
+      ctx.fillStyle = ok ? "#5fd35f" : "#f5c451";
+      ctx.font = `600 ${h * 0.058}px ${FONT}`;
+      ctx.textAlign = "left";
+      fitText(ctx, ok ? "● Limiet: ruimte genoeg" : `● Limiet: ${acc.limit.status}`, w * 0.06, h * 0.9, w * 0.88, h * 0.06, 1);
+    }
+  });
+}
+
+/** De schermenwand in de controlekamer: wie nu werkt, de afdelingen en je routines. */
+export function drawAccountWall(screens: CanvasScreen[], snap: OfficeSnapshot): void {
+  const [a, b, c] = screens;
+  const acc = snap.account;
+  const sessions = snap.code.sessions;
+  if (a) {
+    a.draw((ctx, w, h) => {
+      screenBg(ctx, w, h, "Nu bezig");
+      const busy = sessions.filter((x) => bucketOf(x) === "working" || bucketOf(x) === "waiting").slice(0, 5);
+      if (!busy.length) {
+        ctx.fillStyle = "#c3c2b7";
+        ctx.font = `600 ${h * 0.075}px ${FONT}`;
+        fitText(ctx, acc?.state === "ok" ? "Niemand is nu bezig" : "Nog geen gegevens", w * 0.06, h * 0.5, w * 0.88, h * 0.08, 1);
+      }
+      busy.forEach((x, k) => {
+        const y = h * 0.28 + k * h * 0.14;
+        const st = BUCKET[bucketOf(x)];
+        ctx.fillStyle = st.color;
+        ctx.beginPath();
+        ctx.arc(w * 0.06, y - h * 0.02, h * 0.022, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `700 ${h * 0.056}px ${FONT}`;
+        ctx.textAlign = "left";
+        fitText(ctx, x.label ?? "Claude", w * 0.1, y, w * 0.34, h * 0.06, 1);
+        ctx.fillStyle = "#c3c2b7";
+        ctx.font = `500 ${h * 0.05}px ${FONT}`;
+        fitText(ctx, x.lastAction ?? x.title ?? "", w * 0.46, y, w * 0.5, h * 0.055, 1);
+      });
+    });
+  }
+  if (b) {
+    b.draw((ctx, w, h) => {
+      screenBg(ctx, w, h, "Afdelingen");
+      const teams = acc?.teams ?? [];
+      if (!teams.length) {
+        ctx.fillStyle = "#c3c2b7";
+        ctx.font = `600 ${h * 0.07}px ${FONT}`;
+        fitText(ctx, "Nog geen afdelingen. Stuur je plan naar de hoofdagent.", w * 0.06, h * 0.5, w * 0.88, h * 0.08, 2);
+      }
+      teams.slice(0, 5).forEach((t, k) => {
+        const y = h * 0.28 + k * h * 0.14;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `700 ${h * 0.06}px ${FONT}`;
+        ctx.textAlign = "left";
+        fitText(ctx, t.name, w * 0.05, y, w * 0.5, h * 0.06, 1);
+        ctx.fillStyle = t.waiting ? "#f5c451" : t.working ? "#5fd35f" : "#c3c2b7";
+        ctx.font = `600 ${h * 0.052}px ${FONT}`;
+        ctx.textAlign = "right";
+        ctx.fillText(`${t.sessions} ${t.sessions === 1 ? "agent" : "agents"} · ${t.working} bezig${t.waiting ? ` · ${t.waiting} wacht` : ""}`, w * 0.95, y);
+      });
+    });
+  }
+  if (c) {
+    c.draw((ctx, w, h) => {
+      screenBg(ctx, w, h, "Routines");
+      const list = (acc?.routines ?? []).filter((r) => r.enabled).slice(0, 5);
+      if (!list.length) {
+        ctx.fillStyle = "#c3c2b7";
+        ctx.font = `600 ${h * 0.07}px ${FONT}`;
+        fitText(ctx, acc?.routinesError ? "Routines niet te zien" : "Geen routines ingepland", w * 0.06, h * 0.5, w * 0.88, h * 0.08, 1);
+      }
+      list.forEach((r, k) => {
+        const y = h * 0.28 + k * h * 0.14;
+        ctx.fillStyle = "#ffffff";
+        ctx.font = `700 ${h * 0.056}px ${FONT}`;
+        ctx.textAlign = "left";
+        fitText(ctx, r.name, w * 0.05, y, w * 0.55, h * 0.06, 1);
+        ctx.fillStyle = "#c3c2b7";
+        ctx.font = `500 ${h * 0.05}px ${FONT}`;
+        ctx.textAlign = "right";
+        ctx.fillText(r.nextRunAt ? `volgende ${whenShort(r.nextRunAt)}` : "–", w * 0.95, y);
+      });
+    });
+  }
+}
+
+const whenShort = (iso: string) => {
+  const d = new Date(iso);
+  const today = new Date();
+  const time = d.toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" });
+  return d.toDateString() === today.toDateString() ? time : `${d.toLocaleDateString("nl-NL", { weekday: "short" })} ${time}`;
+};
+
+/** Het bord in de vergaderzaal: al je sessies in drie kolommen. */
+export function drawSessionBoard(s: CanvasScreen, sessions: CodeSession[]): void {
+  const cols: Array<{ label: string; buckets: string[]; color: string }> = [
+    { label: "Bezig", buckets: ["working"], color: BUCKET.working.color },
+    { label: "Wacht op jou", buckets: ["waiting", "failed"], color: BUCKET.waiting.color },
+    { label: "Klaar", buckets: ["review", "done"], color: BUCKET.review.color },
+  ];
+  s.draw((ctx, w, h) => {
+    ctx.fillStyle = "#f7f3ea";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = "#3a3024";
+    ctx.font = `800 ${h * 0.085}px ${FONT}`;
+    ctx.textAlign = "left";
+    ctx.fillText("📋 Sessiebord", w * 0.02, h * 0.1);
+    const colW = (w * 0.96) / cols.length;
+    cols.forEach((col, k) => {
+      const x = w * 0.02 + k * colW;
+      const all = sessions.filter((x) => col.buckets.includes(bucketOf(x)));
+      ctx.fillStyle = col.color;
+      roundRect(ctx, x + 4, h * 0.14, colW - 8, h * 0.075, 8);
+      ctx.fill();
+      ctx.fillStyle = "#ffffff";
+      ctx.font = `700 ${h * 0.05}px ${FONT}`;
+      ctx.fillText(`${col.label} (${all.length})`, x + 14, h * 0.195);
+      all.slice(0, 5).forEach((item, n) => {
+        const y = h * 0.24 + n * h * 0.15;
+        ctx.fillStyle = "#ffffff";
+        ctx.shadowColor = "rgba(0,0,0,0.12)";
+        ctx.shadowBlur = 6;
+        roundRect(ctx, x + 6, y, colW - 12, h * 0.135, 8);
+        ctx.fill();
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = item.account?.kind === "hoofdagent" ? "#d4a017" : "#d97757";
+        roundRect(ctx, x + 6, y, 8, h * 0.135, 4);
+        ctx.fill();
+        ctx.fillStyle = "#1d2433";
+        ctx.font = `700 ${h * 0.042}px ${FONT}`;
+        fitText(ctx, item.label ?? "Claude", x + 20, y + h * 0.05, colW - 34, h * 0.045, 1);
+        ctx.fillStyle = "#5b6477";
+        ctx.font = `500 ${h * 0.034}px ${FONT}`;
+        fitText(ctx, item.title ?? item.lastAction ?? "", x + 20, y + h * 0.1, colW - 34, h * 0.04, 1);
+      });
+    });
+  });
+}
+
+/** Het whiteboard van een afdeling (of de hoofdagent): wie erin zit en wat ze doen. */
+export function drawTeamBoard(s: CanvasScreen, name: string, members: CodeSession[], accent: string): void {
+  s.draw((ctx, w, h) => {
+    ctx.fillStyle = "#fbfbf8";
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = accent;
+    ctx.fillRect(0, 0, w, h * 0.12);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = `800 ${h * 0.085}px ${FONT}`;
+    ctx.textAlign = "left";
+    fitText(ctx, `${name} · ${members.length} ${members.length === 1 ? "agent" : "agents"}`, w * 0.03, h * 0.09, w * 0.94, h * 0.1, 1);
+    if (!members.length) {
+      ctx.fillStyle = "#8a93a6";
+      ctx.font = `600 ${h * 0.075}px ${FONT}`;
+      fitText(ctx, "Nog niemand. Stuur je plan naar de hoofdagent.", w * 0.05, h * 0.45, w * 0.9, h * 0.08, 2);
+      return;
+    }
+    members.slice(0, 4).forEach((m, k) => {
+      const y = h * 0.24 + k * h * 0.19;
+      const st = BUCKET[bucketOf(m)];
+      ctx.fillStyle = st.color;
+      ctx.beginPath();
+      ctx.arc(w * 0.05, y - h * 0.02, h * 0.025, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#1d2433";
+      ctx.font = `700 ${h * 0.068}px ${FONT}`;
+      fitText(ctx, `${m.label ?? "Claude"} · ${st.label}`, w * 0.09, y, w * 0.87, h * 0.07, 1);
+      ctx.fillStyle = "#5b6477";
+      ctx.font = `500 ${h * 0.055}px ${FONT}`;
+      fitText(ctx, m.lastAction ?? m.title ?? "", w * 0.09, y + h * 0.07, w * 0.87, h * 0.06, 1);
+    });
   });
 }

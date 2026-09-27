@@ -91,8 +91,10 @@ export class AgentFactory {
       BRANCH_NAME: opts.branch?.name ?? "Holding",
     };
     // Draait deze rol op de gratis AI-router? Dan praat Claude Code met OmniRoute in plaats van met Anthropic.
+    // (Alleen voor Claude Code: een Grok-agent gebruikt zijn eigen login.)
     const gratis = ctx.config.gratisAi;
-    const onGratis = Boolean(gratis.key) && gratis.roles.includes(spec.key);
+    const grok = spec.adapter === "grok_local";
+    const onGratis = !grok && Boolean(gratis.key) && gratis.roles.includes(spec.key);
     const hire: HireAgentInput = {
       name: opts.name,
       role: spec.role,
@@ -101,11 +103,12 @@ export class AgentFactory {
       reportsTo: opts.reportsTo,
       capabilities: render(spec.description, vars),
       desiredSkills: [...CORE_SKILLS, ...(spec.canCreateAgents ? [HIRING_SKILL] : []), ...spec.skills],
-      adapterType: "claude_local",
+      adapterType: spec.adapter,
+      // Zelfde betekenis, andere veldnamen: de Grok-adapter kent reasoningEffort en maxTurns.
       adapterConfig: {
         model: onGratis ? GRATIS_MODEL : spec.model,
-        ...(spec.effort ? { effort: spec.effort } : {}),
-        ...(spec.maxTurnsPerRun ? { maxTurnsPerRun: spec.maxTurnsPerRun } : {}),
+        ...(spec.effort ? (grok ? { reasoningEffort: spec.effort } : { effort: spec.effort }) : {}),
+        ...(spec.maxTurnsPerRun ? (grok ? { maxTurns: spec.maxTurnsPerRun } : { maxTurnsPerRun: spec.maxTurnsPerRun }) : {}),
         ...(spec.timeoutSec ? { timeoutSec: spec.timeoutSec } : {}),
         env: {
           HQ_URL: this.agentUrl,

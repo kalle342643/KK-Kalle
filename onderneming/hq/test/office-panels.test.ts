@@ -186,3 +186,51 @@ describe("taken geven vanuit het kantoor", () => {
     expect((await app.request(`/api/owner/agents/${env.scout.id}/task`, post({ title: "Doe iets" }))).status).toBe(423);
   });
 });
+
+describe("jij plant, Atlas werkt het uit", () => {
+  const post = (body: unknown, token?: string) => ({
+    method: "POST",
+    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
+    body: JSON.stringify(body),
+  });
+
+  it("maakt van je plan een taak voor de CEO, en jij loopt er in het kantoor heen", async () => {
+    const ceo = env.paperclip.seedAgent(env.ctx.companyId, { name: "Atlas", role: "ceo", title: "CEO" });
+    const app = createApp(env.ctx);
+    const res = await app.request("/api/owner/plans", post({ plan: "# Puzzelgame testen\nIk wil weten of een kleine puzzelgame spelers trekt." }));
+    expect(res.status).toBe(201);
+    expect(await res.json()).toMatchObject({ agentId: ceo.id, agentName: "Atlas" });
+    const issue = env.paperclip.issues.at(-1)!;
+    expect(issue).toMatchObject({ title: "Plan van Kalle: Puzzelgame testen", assigneeAgentId: ceo.id, priority: "high" });
+    expect(issue.description).toContain("plan-van-kalle");
+    expect(issue.description).toContain("via het kantoor");
+    expect(await last()).toMatchObject({ type: "talk", agentId: "owner", targetAgentId: ceo.id, text: "Nieuw plan voor jou: Puzzelgame testen" });
+    // Van jezelf krijg je geen bericht.
+    expect(env.notifier.sent).toHaveLength(0);
+  });
+
+  it("de hoofdagent kan alleen met zijn eigen geheim een plan geven, en jij hoort het meteen", async () => {
+    env.paperclip.seedAgent(env.ctx.companyId, { name: "Atlas", role: "ceo", title: "CEO" });
+    const ctx = { ...env.ctx, config: { ...env.ctx.config, adminToken: "eigenaar-geheim-0123456789", code: { ...env.ctx.config.code, planToken: "plan-geheim-van-16-tekens" } } };
+    const app = createApp(ctx);
+    const plan = { plan: "Uitgewerkt plan: kleinste echte test is een speelbare demo op itch.io", session: "https://claude.ai/code/session_01ABC" };
+    expect((await app.request("/api/hooks/plan", post(plan))).status).toBe(401);
+    expect((await app.request("/api/hooks/plan", post(plan, "fout-geheim-van-16-tekens"))).status).toBe(401);
+    const res = await app.request("/api/hooks/plan", post(plan, "plan-geheim-van-16-tekens"));
+    expect(res.status).toBe(201);
+    expect(env.paperclip.issues.at(-1)!.description).toContain("session_01ABC");
+    expect(env.notifier.sent.at(-1)!.text).toContain("De hoofdagent gaf Atlas een plan");
+    // Het geheim geeft geen toegang tot de rest van HQ.
+    expect((await app.request("/api/owner/office", { headers: { authorization: "Bearer plan-geheim-van-16-tekens" } })).status).toBe(401);
+  });
+
+  it("staat uit zonder geheim, en niet tijdens de noodstop of zonder CEO", async () => {
+    const app = createApp(env.ctx);
+    expect((await app.request("/api/hooks/plan", post({ plan: "Een plan van tien tekens" }, "wat-dan-ook-16-tekens"))).status).toBe(404);
+    expect((await app.request("/api/owner/plans", post({ plan: "Een plan van tien tekens" }))).status).toBe(409);
+    env.paperclip.seedAgent(env.ctx.companyId, { name: "Atlas", role: "ceo", title: "CEO" });
+    expect((await app.request("/api/owner/plans", post({ plan: "kort" }))).status).toBe(400);
+    await halt(env.ctx, "test", "owner");
+    expect((await app.request("/api/owner/plans", post({ plan: "Een plan van tien tekens" }))).status).toBe(423);
+  });
+});

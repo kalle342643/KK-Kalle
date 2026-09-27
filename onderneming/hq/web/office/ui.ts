@@ -4,12 +4,13 @@
  * jouw bureau), meldingen en de noodstop.
  */
 import type { AgentValue, CodeProject, CodeSession, OfficeAgent, OfficeEvent, OfficeProject, OfficeSnapshot, ProjectDetail } from "../../src/office/types.js";
-import { codeStatus, COLUMNS, progressOf } from "./boards.js";
+import { BUCKET, codeStatus, COLUMNS, progressOf } from "./boards.js";
 import { hideTip, lineChart, pairedBars } from "./charts.js";
-import type { DataSource, RevenueInput } from "./data.js";
+import type { DataSource, PlanInput, RevenueInput } from "./data.js";
 import { isExtraId, type Director, type Liveliness } from "./director.js";
 import { layoutGraph } from "./hologram.js";
 import { BOT_ID, OWNER_ID, type Layout } from "./layout.js";
+import { buildTree, type TreeNode } from "./tree.js";
 import type { Pick, World } from "./world.js";
 
 type Child = Node | string | null | undefined | false;
@@ -79,7 +80,11 @@ export type PanelKind =
   | "workshop"
   | "code"
   | "session"
-  | "follow";
+  | "follow"
+  /** Je plan of opdracht voor de hoofdagent (op je server: Atlas). */
+  | "plan"
+  /** Kantoor op je Claude-account: wat vanzelf draait. */
+  | "routines";
 
 const SESSION_STATE: Record<CodeSession["state"], { label: string; tone: string }> = {
   working: { label: "bezig", tone: "good" },
@@ -119,6 +124,8 @@ export function savedLiveliness(): Liveliness {
 
 export class Ui {
   private snap: OfficeSnapshot | null = null;
+  /** Het kantoor op je Claude-account (artifact): sessies in plaats van HQ. */
+  private readonly account: boolean;
   private readonly events: OfficeEvent[] = [];
   private panel: { kind: PanelKind; arg?: string } | null = null;
   /** Formulieren die je aan het invullen bent, blijven staan als het paneel ververst (dat gebeurt bij elke gebeurtenis). */
@@ -143,6 +150,7 @@ export class Ui {
     private readonly deps: UiDeps,
   ) {
     const mode = deps.source.mode;
+    this.account = mode === "account";
     const company = h("b", { class: "company" }, "HQ");
     const status = h("span", { class: "pill" }, "…");
     const conn = h("span", { class: "conn", title: "Live verbinding" });
@@ -155,12 +163,23 @@ export class Ui {
       h(
         "nav",
         { class: "actions" },
-        h("button", { onclick: () => this.open("projects"), title: "Alle projecten", "aria-label": "Projecten" }, "📋", h("span", {}, " Projecten")),
-        h("button", { onclick: () => this.open("workshop"), title: "Werkplaats: je projecten en Claude Code", "aria-label": "Werkplaats" }, "🛠️", h("span", {}, " Werkplaats")),
-        h("button", { onclick: () => this.open("stats"), title: "Cijfers en grafieken", "aria-label": "Cijfers" }, "📊", h("span", {}, " Cijfers")),
-        h("button", { onclick: () => this.open("team"), title: "Wie werkt er", "aria-label": "Team" }, "👥", h("span", {}, " Team")),
-        h("button", { onclick: () => this.open("knowledge"), title: "Kennisbank", "aria-label": "Kennis" }, "🧠", h("span", {}, " Kennis")),
-        h("button", { class: "danger", onclick: () => this.confirmHalt(), title: "Alles stoppen", "aria-label": "Noodstop" }, "🛑", h("span", {}, " Noodstop")),
+        ...(this.account
+          ? [
+              h("button", { class: "primary", onclick: () => this.open("plan"), title: "Opdracht of plan voor de hoofdagent", "aria-label": "Hoofdagent" }, "🧭", h("span", {}, " Hoofdagent")),
+              h("button", { onclick: () => this.open("team"), title: "Stamboom: wie doet wat, en onder wie", "aria-label": "Stamboom" }, "🌳", h("span", {}, " Stamboom")),
+              h("button", { onclick: () => this.open("workshop"), title: "Al je Claude-sessies", "aria-label": "Sessies" }, "🛠️", h("span", {}, " Sessies")),
+              h("button", { onclick: () => this.open("routines"), title: "Wat vanzelf draait", "aria-label": "Routines" }, "⏰", h("span", {}, " Routines")),
+              h("button", { class: "danger", onclick: () => this.confirmStopAll(), title: "Alle sessies laten stoppen", "aria-label": "Stop alles" }, "🛑", h("span", {}, " Stop alles")),
+            ]
+          : [
+              h("button", { class: "primary", onclick: () => this.open("plan"), title: "Je plan naar Atlas (CEO)", "aria-label": "Plan" }, "🧭", h("span", {}, " Plan")),
+              h("button", { onclick: () => this.open("projects"), title: "Alle projecten", "aria-label": "Projecten" }, "📋", h("span", {}, " Projecten")),
+              h("button", { onclick: () => this.open("workshop"), title: "Werkplaats: je projecten en Claude Code", "aria-label": "Werkplaats" }, "🛠️", h("span", {}, " Werkplaats")),
+              h("button", { onclick: () => this.open("stats"), title: "Cijfers en grafieken", "aria-label": "Cijfers" }, "📊", h("span", {}, " Cijfers")),
+              h("button", { onclick: () => this.open("team"), title: "Stamboom: wie doet wat, en onder wie", "aria-label": "Stamboom" }, "🌳", h("span", {}, " Stamboom")),
+              h("button", { onclick: () => this.open("knowledge"), title: "Kennisbank", "aria-label": "Kennis" }, "🧠", h("span", {}, " Kennis")),
+              h("button", { class: "danger", onclick: () => this.confirmHalt(), title: "Alles stoppen", "aria-label": "Noodstop" }, "🛑", h("span", {}, " Noodstop")),
+            ]),
       ),
     );
     const feedList = h("ol", { class: "feed-list", "aria-live": "polite" });
@@ -260,7 +279,8 @@ export class Ui {
 
   setConnected(ok: boolean): void {
     this.el.conn.classList.toggle("ok", ok);
-    this.el.conn.title = ok ? "Live verbonden met HQ" : "Verbinding weg, opnieuw verbinden…";
+    const what = this.account ? "je Claude-account" : "HQ";
+    this.el.conn.title = ok ? `Live verbonden met ${what}` : this.account ? "Geen verbinding met je Claude-account" : "Verbinding weg, opnieuw verbinden…";
   }
 
   // ---------------------------------------------------------------- momentopname
@@ -269,6 +289,10 @@ export class Ui {
     this.snap = snap;
     if (!this.events.length) this.events.push(...snap.events);
     this.el.company.textContent = snap.companyName;
+    if (snap.account) {
+      this.updateAccount(snap);
+      return;
+    }
     this.el.status.textContent = snap.halted ? "⛔ Noodstop" : "🟢 Alles draait";
     this.el.status.className = `pill ${snap.halted ? "bad" : "good"}`;
     const working = snap.agents.filter((a) => a.status === "running").length;
@@ -290,8 +314,36 @@ export class Ui {
     }
     if (snap.paperclipError) this.toastOnce(`paperclip:${snap.paperclipError}`, `⚠️ Paperclip onbereikbaar: ${snap.paperclipError}`, "warn");
     this.renderFeed();
-    const keep: PanelKind[] = ["project", "knowledge", "follow"];
+    const keep: PanelKind[] = ["project", "knowledge", "follow", "plan"];
     if (this.panel && !keep.includes(this.panel.kind)) this.render();
+  }
+
+  /** Bovenbalk en melding voor het kantoor op je Claude-account. */
+  private updateAccount(snap: OfficeSnapshot): void {
+    const acc = snap.account!;
+    const t = acc.totals;
+    const state = { ok: ["🟢 Live", "good"], loading: ["⏳ Verbinden…", "info"], blocked: ["⚠️ Geen toegang", "bad"], unavailable: ["⚠️ Niet verbonden", "bad"] }[acc.state];
+    this.el.status.textContent = state[0]!;
+    this.el.status.className = `pill ${state[1]}`;
+    const limit = acc.limit;
+    const resets = limit?.resetsAt ? time(limit.resetsAt) : null;
+    this.el.kpis.replaceChildren(
+      chip("Bezig", String(t.working), "Claude-sessies", () => this.open("workshop")),
+      chip("Wacht op jou", String(t.waiting), t.waiting ? "kijk nu" : "niets", () => this.open("workshop"), t.waiting > 0),
+      chip("Klaar", String(t.review), "om te bekijken", () => this.open("workshop")),
+      chip("Afdelingen", String(acc.teams.length), "stamboom", () => this.open("team")),
+      ...(limit
+        ? [chip("Limiet", limit.status === "allowed" ? "ruim" : "op", resets ? `reset ${resets}` : "gebruikslimiet", undefined, limit.status !== "allowed", "Je Claude-gebruikslimiet, zoals je laatst actieve sessie hem zag.")]
+        : []),
+    );
+    const trouble = acc.state === "blocked" || acc.state === "unavailable";
+    this.el.banner.hidden = !trouble;
+    if (trouble) this.el.banner.replaceChildren(h("span", {}, `⚠️ ${acc.message ?? "Geen verbinding met je Claude-account."}`));
+    else if (acc.message && acc.state === "ok") this.toastOnce(`acc:${acc.message}`, `⚠️ ${acc.message}`, "warn");
+    this.renderFeed();
+    const keep: PanelKind[] = ["plan"];
+    if (this.panel && !keep.includes(this.panel.kind)) this.render();
+    else if (this.panel?.kind === "plan") this.refreshPlanList();
   }
 
   /** Werkplaats in de bovenbalk: rood als een site eruit ligt, anders hoeveel Claude-sessies bezig zijn. */
@@ -476,6 +528,7 @@ export class Ui {
 
   pick(pick: Pick | null): void {
     if (!pick) return;
+    if (this.account && this.pickAccount(pick)) return;
     switch (pick.kind) {
       case "agent":
         if (isExtraId(pick.id)) {
@@ -518,6 +571,35 @@ export class Ui {
       case "room":
         this.open("room", pick.id);
         break;
+    }
+  }
+
+  /** Op je Claude-account horen sommige dingen bij je sessies; wat bij HQ hoort, zegt dat eerlijk. */
+  private pickAccount(pick: Pick): boolean {
+    switch (pick.kind) {
+      case "kanban":
+        this.open("workshop");
+        return true;
+      case "video-wall":
+        this.open("team");
+        return true;
+      case "vault":
+        this.toast("💰 De kluis (omzet en kosten) komt met je server. Hier zie je alleen wat je Claude-account doet.", "info");
+        return true;
+      case "owner-desk":
+        this.open("plan");
+        return true;
+      case "red-button":
+        this.confirmStopAll();
+        return true;
+      case "hologram":
+        this.toast("🧠 De kennisbank (Graphify) komt met je server.", "info");
+        return true;
+      case "whiteboard":
+        this.open("room", `dept-${pick.id}`);
+        return true;
+      default:
+        return false;
     }
   }
 
@@ -601,6 +683,12 @@ export class Ui {
         break;
       case "follow":
         body.replaceChildren(this.followPanel(p.arg));
+        break;
+      case "plan":
+        body.replaceChildren(this.planPanel(p.arg));
+        break;
+      case "routines":
+        body.replaceChildren(this.routinesPanel());
         break;
     }
     body.scrollTop = scroll;
@@ -724,6 +812,11 @@ export class Ui {
       if (agent.status !== "pending_approval" && agent.status !== "terminated") parts.push(this.taskForm(id, nickname || name));
       const projects = snap.projects.filter((p) => p.leadAgentId === id && ["running", "proposed", "keep", "iterate"].includes(p.status));
       if (projects.length) parts.push(h("h3", {}, "Leidt"), ...projects.map((p) => this.projectCard(p)));
+    } else if (id === OWNER_ID && this.account) {
+      parts.push(
+        h("p", {}, "Jij plant. De hoofdagent werkt je plan uit, maakt er een afdeling voor en verdeelt het werk."),
+        h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.open("plan") }, "🧭 Opdracht aan de hoofdagent"), h("button", { onclick: () => this.open("team") }, "🌳 Stamboom")),
+      );
     } else if (id === OWNER_ID) {
       parts.push(h("h3", {}, `Op je bureau (${snap.approvals.length})`), this.approvalsList());
     } else {
@@ -1252,60 +1345,84 @@ export class Ui {
 
   // ---- team
 
+  // ---- de stamboom
+
+  /** Wie wat doet en onder wie: jij, de hoofdagent (of Atlas), de afdelingen, en wat los staat. */
   private teamPanel(): HTMLElement {
     const snap = this.snap!;
-    const person = (a: OfficeAgent) => {
-      const st = STATUS[a.status] ?? { label: a.status, tone: "muted" };
-      return h(
-        "li",
-        {},
-        h(
-          "button",
-          { class: "person", onclick: () => this.focusActor(a.id, true) },
-          h("span", { class: `dot ${st.tone}` }),
-          h("b", {}, a.nickname || a.name),
-          h("span", { class: "muted" }, ` ${a.title ?? a.role}${a.status === "pending_approval" ? " · sollicitant" : ""}`),
-          h("span", { class: "model" }, modelName(a.model)),
-        ),
-      );
+    const tree = buildTree(snap, {
+      modelName: (m) => modelName(m),
+      accentOf: (slug) => this.accentOf(slug),
+      ownerName: this.label(OWNER_ID),
+    });
+    const openNode = (n: TreeNode) => {
+      if (n.id.startsWith("cc:")) {
+        this.focusActor(n.id);
+        this.open("session", n.id);
+      } else if (n.id.startsWith("team:")) {
+        const slug = n.id.slice(5);
+        const roomId = this.deps.layout().roomOfBranch.get(slug);
+        const room = this.deps.layout().rooms.find((r) => r.id === roomId);
+        if (room) {
+          this.deps.world.fit(room.rect, true);
+          this.open("room", room.id);
+        }
+      } else {
+        this.focusActor(n.id, true);
+      }
     };
-    const ceo = snap.agents.find((a) => a.hqRole === "ceo");
-    const groups = [
-      { slug: "holding", name: "Controlekamer" },
-      ...snap.branches.filter((b) => b.slug !== "holding").map((b) => ({ slug: b.slug, name: b.name })),
-    ];
+    const card = (n: TreeNode): HTMLElement =>
+      h(
+        "button",
+        { class: `node kind-${n.kind}`, style: n.accent ? `--accent:${n.accent}` : "", onclick: () => openNode(n) },
+        h("span", { class: "node-top" }, h("span", { class: "node-role" }, n.role), n.model ? h("span", { class: "node-model" }, n.model) : null),
+        h("b", { class: "node-name" }, n.name),
+        n.status.label ? h("span", { class: `node-status tone-${n.status.tone}` }, h("i", { class: `dot ${n.status.tone}`, "aria-hidden": "true" }), n.status.label) : null,
+        n.detail ? h("span", { class: "node-detail" }, n.detail) : null,
+        n.meta ? h("span", { class: "node-meta" }, n.meta) : null,
+      );
+    const branch = (n: TreeNode): HTMLElement => h("li", {}, card(n), n.children.length ? h("ul", {}, ...n.children.map(branch)) : null);
+    const empty = !tree.root.children.length && !tree.loose.length;
     return h(
       "div",
-      { class: "team-panel" },
-      h("h2", {}, "👥 Team"),
-      h("p", { class: "muted" }, "Wie er werkt, voor wie, en met welk model. Klik op een naam om die agent in het kantoor te zien."),
+      { class: "tree-panel" },
+      h("h2", {}, "🌳 Stamboom"),
       h(
-        "ul",
-        { class: "org" },
-        h(
-          "li",
-          {},
-          h("button", { class: "person owner", onclick: () => this.focusActor(OWNER_ID, true) }, h("span", { class: "dot info" }), h("b", {}, this.label(OWNER_ID)), h("span", { class: "muted" }, " eigenaar")),
-          h(
-            "ul",
-            {},
-            ceo ? person(ceo) : h("li", { class: "muted" }, "Nog geen CEO"),
-            h(
-              "li",
-              {},
-              h("ul", {}, ...groups.map((g) => {
-                const members = snap.agents.filter((a) => (a.branch === g.slug || (g.slug === "holding" && !snap.branches.some((b) => b.slug === a.branch))) && a !== ceo);
-                return h(
-                  "li",
-                  { class: "group", style: `--accent:${this.accentOf(g.slug)}` },
-                  h("span", { class: "group-name" }, `${g.name} (${members.length})`),
-                  h("ul", {}, ...(g.slug === "holding" ? [h("li", {}, h("button", { class: "person", onclick: () => this.focusActor(BOT_ID, true) }, h("span", { class: "dot good" }), h("b", {}, this.label(BOT_ID)), h("span", { class: "muted" }, " berichten & cijfers")))] : []), ...members.map(person)),
-                );
-              })),
-            ),
-          ),
-        ),
+        "p",
+        { class: "muted" },
+        this.account
+          ? "Wie wat doet en onder wie. Jij plant, de hoofdagent werkt het uit en verdeelt het over een afdeling. Wat nergens onder hangt, staat los."
+          : "Wie wat doet en onder wie. Jij plant, Atlas (CEO) werkt het uit en verdeelt het over de afdelingen. Wat nergens onder hangt, staat los.",
       ),
+      tree.teams.length
+        ? h(
+            "div",
+            { class: "team-cards" },
+            ...tree.teams.map((t) =>
+              h(
+                "button",
+                { class: "team-card", style: t.accent ? `--accent:${t.accent}` : "", onclick: () => openNode({ id: t.id } as TreeNode) },
+                h("b", {}, t.name),
+                h("span", { class: "small" }, `${t.members} ${t.members === 1 ? "agent" : "agents"} · ${t.working} bezig${t.waiting ? ` · ${t.waiting} wacht` : ""}`),
+                t.models.length ? h("span", { class: "small muted" }, t.models.join(", ")) : null,
+              ),
+            ),
+          )
+        : null,
+      empty
+        ? h(
+            "section",
+            { class: "card hint" },
+            h("b", {}, "Nog niemand aan het werk"),
+            h("p", { class: "small" }, this.account ? "Stuur je eerste plan naar de hoofdagent. Hij maakt er een afdeling voor en verdeelt het werk; dat zie je hier groeien." : "Zodra er agents zijn, zie je hier wie onder wie werkt."),
+            h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.open("plan") }, this.account ? "🧭 Naar de hoofdagent" : "🧭 Plan naar Atlas")),
+          )
+        : null,
+      h("ul", { class: "tree" }, branch(tree.root)),
+      tree.hidden ? h("p", { class: "small muted" }, `En ${tree.hidden} eerdere, afgeronde ${tree.hidden === 1 ? "opdracht" : "opdrachten"} zonder afdeling.`) : null,
+      tree.loose.length ? h("h3", {}, `Los van elkaar (${tree.loose.length})`) : null,
+      tree.loose.length ? h("p", { class: "small muted" }, this.account ? "Sessies die niet bij de hoofdagent of een afdeling horen, bijvoorbeeld wat je zelf in een chat of op je computer startte." : "Claude Code-sessies die aan je projecten werken.") : null,
+      tree.loose.length ? h("ul", { class: "tree loose" }, ...tree.loose.map(branch)) : null,
     );
   }
 
@@ -1443,6 +1560,7 @@ export class Ui {
       hall: "Receptie. Nieuwe agents wachten hier op de bank tot jij ze aanneemt.",
       workshop: "De werkplaats: hier werken je Claude Code-sessies aan je projecten. Elk bord laat zien of de site online is, of de tests groen zijn, wat er live staat en wat er op jou wacht.",
     };
+    if (this.account) return this.accountRoomPanel(room);
     const parts: Child[] = [h("h2", {}, room.kind === "hall" ? "Receptie" : room.name), h("p", { class: "muted" }, text[room.kind] ?? "")];
     if (room.kind === "dept" && room.branch) {
       const branch = snap.branches.find((b) => b.slug === room.branch);
@@ -1468,7 +1586,75 @@ export class Ui {
     return h("div", {}, ...parts);
   }
 
+  /** Een ruimte in het kantoor op je Claude-account: wie er zit, en wat er nog komt met je server. */
+  private accountRoomPanel(room: Layout["rooms"][number]): HTMLElement {
+    const text: Partial<Record<string, string>> = {
+      ceo: "De directie. Hier komt Atlas (CEO) te zitten zodra je server draait. Het scherm laat zien wat je Claude-account nu doet.",
+      knowledge: "De kennisbank met de Graphify-kennisgraaf komt met je server. Tot dan onthouden je agents wat werkt in lessen.md in je repository.",
+      meeting: "Vergaderzaal met het sessiebord: wie bezig is, wie op je wacht en wat klaar is.",
+      pantry: "De koffiehoek. Alleen voor de sfeer; het kost niets.",
+      owner: "Jouw kantoor. Klik op je bureau om de hoofdagent een opdracht te geven.",
+      control: "De controlekamer: de schermen tonen wie nu werkt, je afdelingen en je routines. HQ en de HQ-bot komen hier zodra je server draait.",
+      hall: "Receptie. Nieuwe sessies komen hier binnen en lopen naar hun bureau.",
+      workshop: "De werkplaats: sessies die niet bij de hoofdagent of een afdeling horen, aan de repository waar ze aan werken.",
+    };
+    const members = room.branch ? this.snap!.code.sessions.filter((s) => s.room === room.branch && s.account?.bucket !== "archived") : [];
+    const isTeam = room.kind === "dept" && room.branch;
+    const shortcuts: Partial<Record<string, [string, PanelKind]>> = {
+      meeting: ["📋 Alle sessies", "workshop"],
+      owner: ["🧭 Opdracht aan de hoofdagent", "plan"],
+      control: ["🌳 Stamboom", "team"],
+      workshop: ["🛠️ Alle sessies", "workshop"],
+    };
+    const sc = shortcuts[room.kind];
+    return h(
+      "div",
+      {},
+      h("h2", {}, room.kind === "hall" ? "Receptie" : room.name),
+      h(
+        "p",
+        { class: "muted" },
+        isTeam
+          ? room.branch === "hoofdagent"
+            ? "De kamer van de hoofdagent: elke opdracht die je hem geeft, zit hier aan een bureau tot hij klaar is."
+            : "Een afdeling die de hoofdagent maakte. Hier zitten de agents die aan dit plan werken."
+          : (text[room.kind] ?? ""),
+      ),
+      isTeam ? h("h3", {}, `Wie er zit (${members.length})`) : null,
+      isTeam ? (members.length ? h("ul", { class: "org sessions" }, ...members.map((m) => this.sessionItem(m))) : h("p", { class: "muted small" }, "Nog niemand.")) : null,
+      sc ? h("div", { class: "buttons" }, h("button", { onclick: () => this.open(sc[1]) }, sc[0])) : null,
+      h("div", { class: "buttons" }, h("button", { onclick: () => this.deps.world.fit(room.rect, true) }, "🔍 Zoom in op deze ruimte")),
+    );
+  }
+
   private helpPanel(): HTMLElement {
+    if (this.account) {
+      return h(
+        "div",
+        { class: "help" },
+        h("h2", {}, "Hoe werkt je kantoor?"),
+        h(
+          "ul",
+          {},
+          h("li", {}, "Dit is je echte kantoor: alles wat je Claude-account doet. Elk poppetje met een naam is een echte Claude-sessie, in de cloud of op je computer."),
+          h("li", {}, "🧭 Hoofdagent: hier geef je al je opdrachten. Jij plant, hij werkt het uit, maakt een afdeling en verdeelt het werk. Elke opdracht wordt een eigen sessie."),
+          h("li", {}, "🌳 Stamboom: jij bovenaan, daaronder de hoofdagent, dan de afdelingen met hun agents. Wat nergens onder hangt, staat los."),
+          h("li", {}, "Kamers: de hoofdagent heeft een eigen kamer, elke afdeling ook. Losse sessies zitten in de werkplaats, bij hun repository."),
+          h("li", {}, "✋ = wacht op jou (een vraag of toestemming). Open de sessie in Claude om te antwoorden. 🛑 laat een sessie stoppen met wat hij doet."),
+          h("li", {}, "Geld, experimenten, de kennisbank en de Paperclip-agents komen erbij zodra je server (HQ) draait. Tot dan staan die ruimtes leeg: niets hier is verzonnen."),
+          h("li", {}, "Het kantoor kijkt elke halve minuut of er iets veranderde. Slepen = bewegen, scrollen of knijpen = zoomen, Q/E of ⟲ ⟳ = draaien."),
+        ),
+        h("h3", {}, "Wat mag deze pagina?"),
+        h(
+          "p",
+          { class: "small" },
+          "Via de koppeling Claude Code Remote, en alleen met jouw toestemming: je sessies en routines lezen, een hoofdagent starten, een sessie stoppen of archiveren. De pagina ziet nooit je wachtwoord of tokens. Iemand anders die hem opent, ziet zijn eigen sessies, niet de jouwe.",
+        ),
+        h("h3", {}, "Kost het kantoor tokens?"),
+        h("p", { class: "small" }, "Kijken niet: het kantoor doet zelf geen AI-aanvraag. Alleen de sessies die je start, tellen mee voor je gebruikslimiet."),
+        h("p", { class: "small muted" }, "3D-poppetjes en meubels: Kenney (www.kenney.nl), CC0."),
+      );
+    }
     return h(
       "div",
       { class: "help" },
@@ -1492,7 +1678,7 @@ export class Ui {
         h(
           "li",
           {},
-          "🤝 Samen aan tafel = ze werken op hetzelfde moment aan dezelfde klus (bv. de ideeënraad). 📥 = taak ontvangen, 👀 = gelezen, ☑️ = opdracht af. Niemand zegt iets wat niet echt gezegd is.",
+          "🤝 Samen aan tafel = ze werken op hetzelfde moment aan dezelfde klus (bv. een plan van Kalle). 📥 = taak ontvangen, 👀 = gelezen, ☑️ = opdracht af. Niemand zegt iets wat niet echt gezegd is.",
         ),
         h("li", {}, "Slepen = bewegen, scrollen of knijpen = zoomen, Q/E of ⟲ ⟳ = draaien."),
         h("li", {}, "🐢 🙂 🎉 bepaalt hoeveel figuranten er zijn en hoeveel iedereen 'uit zichzelf' rondloopt (koffie, praatje). Dat is alleen sfeer en kost niets."),
@@ -1530,7 +1716,8 @@ export class Ui {
   }
 
   private sessionItem(s: CodeSession): HTMLElement {
-    const st = SESSION_STATE[s.state];
+    const b = s.account ? BUCKET[s.account.bucket] : null;
+    const st = b ? { label: b.label, tone: b.tone } : SESSION_STATE[s.state];
     const project = this.snap!.code.projects.find((p) => p.key === s.projectKey)?.name ?? "onbekend project";
     return h(
       "li",
@@ -1545,18 +1732,19 @@ export class Ui {
           },
         },
         h("span", { class: `dot ${st.tone}` }),
-        h("b", {}, `Claude · ${project}`),
-        h("span", { class: "muted" }, ` ${s.title ?? s.branch ?? "sessie"}`),
+        h("b", {}, s.label ?? `Claude · ${project}`),
+        h("span", { class: "muted" }, ` ${(s.account?.kind === "hoofdagent" ? s.title?.replace(/^Hoofdagent:\s*/, "") : s.title) ?? s.branch ?? "sessie"}`),
       ),
       h(
         "div",
         { class: "small muted indent" },
-        `${st.label} · ${s.lastAction ?? "–"} · ${ago(s.lastActivityAt)}${s.helpers?.length ? ` · 🧑‍🤝‍🧑 ${s.helpers.map((x) => x.label).join(", ")}` : ""}`,
+        `${st.label} · ${s.account?.bucket === "waiting" && s.account.needsAction ? s.account.needsAction : (s.lastAction ?? "–")} · ${ago(s.lastActivityAt)}${s.helpers?.length ? ` · 🧑‍🤝‍🧑 ${s.helpers.map((x) => x.label).join(", ")}` : ""}`,
       ),
     );
   }
 
   private workshopPanel(): HTMLElement {
+    if (this.account) return this.accountSessionsPanel();
     const code = this.snap!.code;
     const sessions = code.sessions.filter((s) => s.state !== "done");
     const parts: Child[] = [
@@ -1578,7 +1766,38 @@ export class Ui {
     return h("div", { class: "workshop-panel" }, ...parts);
   }
 
+  /** Op je Claude-account: al je sessies, wat op jou wacht bovenaan. */
+  private accountSessionsPanel(): HTMLElement {
+    const all = this.snap!.code.sessions.filter((s) => s.account?.bucket !== "archived");
+    const groups: Array<[string, string[]]> = [
+      ["Wacht op jou", ["waiting"]],
+      ["Vastgelopen", ["failed"]],
+      ["Bezig", ["working"]],
+      ["Klaar, kijk even", ["review"]],
+      ["Klaar (laatste twee weken)", ["done"]],
+    ];
+    const acc = this.snap!.account;
+    return h(
+      "div",
+      { class: "workshop-panel" },
+      h("h2", {}, "🛠️ Je Claude-sessies"),
+      h(
+        "p",
+        { class: "muted" },
+        "Alles wat je Claude-account doet: sessies in de cloud en op je computer. Klik op een sessie voor wat hij doet, om hem te stoppen of om hem in Claude te openen.",
+      ),
+      acc?.updatedAt ? h("p", { class: "small muted" }, `Bijgewerkt om ${new Date(acc.updatedAt).toLocaleTimeString("nl-NL", { hour: "2-digit", minute: "2-digit" })}; het kantoor kijkt elke halve minuut opnieuw.`) : null,
+      ...groups.flatMap(([title, buckets]) => {
+        const list = all.filter((s) => buckets.includes(s.account?.bucket ?? ""));
+        return list.length ? [h("h3", {}, `${title} (${list.length})`), h("ul", { class: "org sessions" }, ...list.map((s) => this.sessionItem(s)))] : [];
+      }),
+      all.length ? null : h("p", { class: "muted" }, acc?.state === "ok" ? "Geen sessies in de laatste twee weken. Geef de hoofdagent een opdracht om te beginnen." : (acc?.message ?? "Nog geen gegevens.")),
+      h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.open("plan") }, "🧭 Opdracht aan de hoofdagent")),
+    );
+  }
+
   private codePanel(key: string): HTMLElement {
+    if (this.account) return this.accountCodePanel(key);
     const p = this.snap!.code.projects.find((x) => x.key === key);
     if (!p) return h("div", {}, h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"), h("p", { class: "muted" }, "Dit project volg je niet meer."));
     const sessions = this.sessionsOf(key);
@@ -1660,6 +1879,23 @@ export class Ui {
     );
   }
 
+  /** Op je Claude-account: een repository met de sessies die eraan werken. */
+  private accountCodePanel(key: string): HTMLElement {
+    const p = this.snap!.code.projects.find((x) => x.key === key);
+    const sessions = this.sessionsOf(key).filter((s) => s.account?.bucket !== "archived");
+    return h(
+      "div",
+      { class: "code-panel" },
+      h("button", { class: "back", onclick: () => this.open("workshop") }, "← Sessies"),
+      h("h2", {}, p?.name ?? key),
+      h("p", { class: "muted" }, "Hier zie je welke sessies aan deze repository werken. Of de site online is en de tests groen zijn, ziet je server (HQ)."),
+      p?.repoUrl ? h("div", { class: "buttons links" }, h("a", { class: "button", href: p.repoUrl, target: "_blank", rel: "noopener" }, "🐙 GitHub")) : null,
+      h("h3", {}, `Sessies (${sessions.length})`),
+      sessions.length ? h("ul", { class: "org sessions" }, ...sessions.map((s) => this.sessionItem(s))) : h("p", { class: "muted small" }, "Geen sessies de laatste twee weken."),
+      h("div", { class: "buttons" }, h("button", { class: "good", onclick: () => this.open("plan", `project:${p?.repo ?? key}`) }, "🧭 Opdracht voor dit project")),
+    );
+  }
+
   /** Opdracht met context kopiëren en Claude Code openen. */
   private sendToClaude(p: CodeProject, text: string): boolean {
     const task = text.trim();
@@ -1680,7 +1916,9 @@ export class Ui {
   }
 
   private sessionPanel(actorId: string): HTMLElement {
-    const s = this.snap!.code.sessions.find((x) => x.actorId === actorId);
+    const found = this.snap!.code.sessions.find((x) => x.actorId === actorId);
+    if (found?.account) return this.accountSessionPanel(found);
+    const s = found;
     if (!s) return h("div", {}, h("button", { class: "back", onclick: () => this.open("workshop") }, "← Werkplaats"), h("p", { class: "muted" }, "Deze sessie is klaar en uit de werkplaats vertrokken."));
     const st = SESSION_STATE[s.state];
     const project = this.snap!.code.projects.find((p) => p.key === s.projectKey);
@@ -1736,6 +1974,68 @@ export class Ui {
         s.pr ? h("a", { class: "button", href: s.pr.url, target: "_blank", rel: "noopener" }, `🔀 PR #${s.pr.number}`) : null,
         h("button", { onclick: () => this.follow(actorId) }, this.deps.director.follow === actorId ? "📍 Volgen uit" : "📍 Volgen"),
       ),
+      mine.length ? h("h3", {}, "Recent") : null,
+      mine.length ? h("ol", { class: "timeline" }, ...mine.map((e) => h("li", {}, h("time", {}, time(e.at)), h("span", {}, this.describe(e))))) : null,
+    );
+  }
+
+  /** Een sessie van je Claude-account: wat hij doet, wat hij van je nodig heeft, en stoppen of archiveren. */
+  private accountSessionPanel(s: CodeSession): HTMLElement {
+    const a = s.account!;
+    const b = BUCKET[a.bucket];
+    const mine = this.events.filter((e) => e.agentId === s.actorId).slice(-12).reverse();
+    const parent = a.parentId ? this.snap!.code.sessions.find((x) => x.id === a.parentId) : undefined;
+    const confirmArchive = h("div", { class: "card hint", hidden: true });
+    confirmArchive.append(
+      h("p", { class: "small" }, "Archiveren = de sessie is klaar en wordt alleen-lezen. In Claude kun je hem terughalen."),
+      h(
+        "div",
+        { class: "buttons" },
+        h("button", { onclick: () => (confirmArchive.hidden = true) }, "Annuleren"),
+        h("button", { class: "warn", onclick: () => void this.act(() => this.deps.source.archiveSession!(s.id), "🗄️ Gearchiveerd") }, "🗄️ Ja, archiveren"),
+      ),
+    );
+    return h(
+      "div",
+      { class: "agent-panel" },
+      h("button", { class: "back", onclick: () => this.open("workshop") }, "← Sessies"),
+      h("h2", {}, a.kind === "hoofdagent" ? "🧭 Hoofdagent" : `🤖 ${s.label ?? "Claude"}`),
+      h(
+        "p",
+        { class: "muted" },
+        [a.where === "computer" ? "Op je computer" : a.where === "cloud" ? "In de cloud" : "Claude", a.repo, s.branch ? `branch ${s.branch}` : null].filter(Boolean).join(" · "),
+      ),
+      h(
+        "section",
+        { class: "card now" },
+        h("div", { class: "row" }, h("span", { class: `pill ${b.tone}` }, b.label), h("span", { class: "muted" }, `sinds ${time(s.startedAt)} · ${ago(s.lastActivityAt)} actief`)),
+        a.bucket === "waiting" ? h("p", { class: "task warn-text" }, `✋ ${a.needsAction ?? "Hij wacht op een antwoord of toestemming van jou. Open de sessie om te antwoorden."}`) : null,
+        h("h3", {}, "Opdracht"),
+        h("p", { class: "task" }, s.title ?? "Zonder titel"),
+        h("h3", {}, a.bucket === "working" ? "Nu" : "Laatste stap"),
+        h("p", {}, s.lastAction ?? "–"),
+        a.statusDetail && a.statusDetail !== s.lastAction ? h("p", { class: "small muted" }, a.statusDetail) : null,
+      ),
+      h(
+        "section",
+        { class: "card grid2" },
+        stat("Model", modelName(a.model)),
+        stat("API-waarde", a.costUsd ? `$${a.costUsd.toFixed(2)}` : "–"),
+        a.teamName ? stat("Afdeling", a.teamName) : null,
+        a.role ? stat("Rol", a.role) : null,
+        parent ? stat("Gestart door", parent.label ?? "Claude") : null,
+      ),
+      a.costUsd ? h("p", { class: "small muted" }, "API-waarde = wat dit via de API gekost zou hebben. Met je Claude-abonnement betaal je dit niet apart; het telt wel mee voor je gebruikslimiet.") : null,
+      h(
+        "div",
+        { class: "buttons" },
+        s.url ? h("a", { class: "button good", href: s.url, target: "_blank", rel: "noopener" }, a.bucket === "waiting" ? "💬 Antwoord in Claude" : "💬 Open in Claude") : null,
+        a.kind === "hoofdagent" ? h("button", { onclick: () => this.open("plan", `vervolg:${s.id}`) }, "🧭 Vervolgopdracht") : null,
+        a.bucket === "working" && this.deps.source.stopSession ? h("button", { class: "warn", onclick: () => void this.act(() => this.deps.source.stopSession!(s.id), "🛑 Gestopt") }, "🛑 Stop") : null,
+        a.bucket !== "working" && this.deps.source.archiveSession ? h("button", { onclick: () => (confirmArchive.hidden = false) }, "🗄️ Archiveren") : null,
+        h("button", { onclick: () => this.follow(s.actorId) }, this.deps.director.follow === s.actorId ? "📍 Volgen uit" : "📍 Volgen"),
+      ),
+      confirmArchive,
       mine.length ? h("h3", {}, "Recent") : null,
       mine.length ? h("ol", { class: "timeline" }, ...mine.map((e) => h("li", {}, h("time", {}, time(e.at)), h("span", {}, this.describe(e))))) : null,
     );
@@ -1799,6 +2099,203 @@ export class Ui {
       field("Backlog-bestand", backlog, "Punten onder een kopje als 'dit ligt bij Kalle' komen in het kantoor bij jou te staan."),
       h("div", { class: "buttons" }, h("button", { class: "good", onclick: save }, existing ? "Opslaan" : "Volgen")),
     );
+  }
+
+  // ---- de hoofdagent
+
+  /** Lijst met opdrachten aan de hoofdagent (wordt bijgewerkt zonder dat je getypte tekst verdwijnt). */
+  private planList: HTMLElement | null = null;
+
+  private bosses(): CodeSession[] {
+    return (this.snap?.code.sessions ?? []).filter((s) => s.account?.kind === "hoofdagent" && s.account.bucket !== "archived");
+  }
+
+  private refreshPlanList(): void {
+    if (!this.planList?.isConnected) return;
+    const list = this.bosses().slice(0, 12);
+    this.planList.replaceChildren(
+      list.length
+        ? h("ul", { class: "org sessions" }, ...list.map((x) => this.sessionItem(x)))
+        : h("p", { class: "muted small" }, this.account ? "Nog geen opdrachten. Je eerste plan verschijnt hier, en in de kamer van de hoofdagent." : "Atlas krijgt je plan als taak; je ziet hem ermee aan de slag gaan."),
+    );
+  }
+
+  /** Jij plant, de hoofdagent (of Atlas op je server) werkt het uit. `arg`: "vervolg:<sessie-id>" of "project:<repo>". */
+  private planPanel(arg?: string): HTMLElement {
+    let text = this.drafts.get("plan") as HTMLTextAreaElement | undefined;
+    if (!text) {
+      text = h("textarea", {
+        id: "plan-text",
+        rows: "7",
+        placeholder: this.account
+          ? "Je plan of opdracht. Bijvoorbeeld: ik wil testen of een kleine puzzelgame over X spelers trekt. Wat is de goedkoopste echte test, welke afdeling hoort erbij, en wie doet wat?"
+          : "Je plan voor Atlas. Wat wil je bereiken, waarom denk je dat het werkt, en hoeveel mag de eerste test kosten?",
+        "aria-label": "Je plan",
+      }) as HTMLTextAreaElement;
+      this.drafts.set("plan", text);
+    }
+    if (arg?.startsWith("project:") && !text.value.trim()) text.value = `Project ${arg.slice(8)}: `;
+    const bosses = this.bosses();
+    const follow = this.account
+      ? (h(
+          "select",
+          { id: "plan-followup", "aria-label": "Nieuw of vervolg" },
+          h("option", { value: "" }, "Nieuwe opdracht"),
+          ...bosses.slice(0, 10).map((b) => h("option", { value: b.id, ...(arg === `vervolg:${b.id}` ? { selected: true } : {}) }, `Vervolg op: ${(b.title ?? "opdracht").replace(/^Hoofdagent:\s*/, "")}`)),
+        ) as HTMLSelectElement)
+      : null;
+    const envs = this.snap?.account?.environments ?? [];
+    const env =
+      this.account && envs.length > 1
+        ? (h("select", { id: "plan-env", "aria-label": "Omgeving" }, h("option", { value: "" }, "Omgeving: je laatst gebruikte"), ...envs.map((e) => h("option", { value: e.id }, `Omgeving: ${e.name}`))) as HTMLSelectElement)
+        : null;
+    const result = h("div", { class: "plan-result", "aria-live": "polite" });
+    const label = this.account ? "🧭 Stuur naar de hoofdagent" : "🧭 Stuur naar Atlas";
+    const btn = h("button", { class: "good" }, label) as HTMLButtonElement;
+    btn.addEventListener("click", () => {
+      const value = text!.value.trim();
+      if (value.length < 3) {
+        this.toast(this.account ? "Schrijf eerst wat de hoofdagent moet doen." : "Schrijf eerst je plan.", "warn");
+        return;
+      }
+      const followUp = follow?.value ? (bosses.find((b) => b.id === follow.value) ?? null) : null;
+      const input: PlanInput = { text: value, followUp: followUp ? { id: followUp.id, title: followUp.title } : null, environmentId: env?.value || null };
+      btn.disabled = true;
+      btn.textContent = "Versturen…";
+      void this.deps.source
+        .sendPlan(input)
+        .then(async (res) => {
+          text!.value = "";
+          if (follow) follow.value = "";
+          this.toast(`🧭 ${res.message}`, "good");
+          result.replaceChildren(
+            h("p", { class: "small" }, `✅ ${res.message} `, res.url ? h("a", { href: res.url, target: "_blank", rel: "noopener" }, "Open de sessie") : null),
+          );
+          await this.deps.refresh();
+          this.refreshPlanList();
+        })
+        .catch((err: unknown) => {
+          const msg = err instanceof Error ? err.message : String(err);
+          this.toast(`⚠️ ${msg}`, "bad");
+          result.replaceChildren(h("p", { class: "small warn-text" }, msg));
+        })
+        .finally(() => {
+          btn.disabled = false;
+          btn.textContent = label;
+        });
+    });
+    this.planList = h("div", { class: "plan-list" });
+    this.refreshPlanList();
+    return h(
+      "div",
+      { class: "plan-panel" },
+      h("h2", {}, this.account ? "🧭 Hoofdagent" : "🧭 Plan naar Atlas"),
+      h(
+        "p",
+        { class: "muted" },
+        this.account
+          ? "Jij plant, de hoofdagent werkt het uit. Hij kijkt er eerlijk naar, zoekt de goedkoopste echte test, maakt er een afdeling voor en verdeelt het werk over agents. Elke opdracht wordt een eigen sessie in de repository van je holding."
+          : "Jij plant, Atlas werkt het uit: hij kijkt er eerlijk naar, stelt een afdeling en een eerste experiment voor en vraagt jou om een ja voordat er geld of een nieuwe agent bij komt.",
+      ),
+      text,
+      follow || env ? h("div", { class: "plan-options" }, follow, env) : null,
+      h("div", { class: "buttons" }, btn),
+      result,
+      h(
+        "p",
+        { class: "small muted" },
+        "Wat hij nooit doet: iets publiceren of accounts aanmaken, betalen, of naar main pushen. Twijfelt hij, dan vraagt hij het je; dan staat hij op \u2018wacht op jou\u2019.",
+      ),
+      h("h3", {}, this.account ? "Opdrachten" : "Opdrachten aan Atlas"),
+      this.planList,
+    );
+  }
+
+  /** Wat vanzelf draait op je Claude-account. */
+  private routinesPanel(): HTMLElement {
+    const acc = this.snap?.account;
+    if (!acc) return h("div", {}, h("h2", {}, "⏰ Routines"), h("p", { class: "muted" }, "De vaste routines van je agents staan in Paperclip op je server."));
+    return h(
+      "div",
+      { class: "routines-panel" },
+      h("h2", {}, "⏰ Routines"),
+      h("p", { class: "muted" }, "Wat vanzelf draait op je Claude-account, door jou of de hoofdagent ingepland. De tijden staan in je eigen tijdzone."),
+      acc.routinesError ? h("section", { class: "card hint" }, h("p", { class: "small" }, acc.routinesError)) : null,
+      acc.routines.length
+        ? h(
+            "ul",
+            { class: "org routines" },
+            ...acc.routines.map((r) =>
+              h(
+                "li",
+                {},
+                h("div", { class: "person static" }, h("span", { class: `dot ${r.enabled ? "good" : "muted"}` }), h("b", {}, r.name), h("span", { class: "muted" }, r.enabled ? "" : " · staat uit")),
+                h(
+                  "div",
+                  { class: "small muted indent" },
+                  [r.cron ? `schema ${r.cron}` : null, r.nextRunAt ? `volgende ${new Date(r.nextRunAt).toLocaleString("nl-NL", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}` : null, r.lastRunAt ? `laatst ${ago(r.lastRunAt)}${r.lastStatus ? ` (${r.lastStatus.toLowerCase()})` : ""}` : null]
+                    .filter(Boolean)
+                    .join(" · "),
+                ),
+              ),
+            ),
+          )
+        : h("p", { class: "muted" }, "Nog geen routines. Vraag de hoofdagent om iets vast in te plannen, bijvoorbeeld: elke ochtend kijken of mijn pull requests groen zijn."),
+    );
+  }
+
+  /** Op je Claude-account: elke sessie die nu bezig is, laten stoppen met wat hij doet. */
+  private confirmStopAll(): void {
+    const busy = (this.snap?.code.sessions ?? []).filter((s) => s.account?.bucket === "working");
+    const dialog = h(
+      "div",
+      { class: "modal", role: "dialog", "aria-modal": "true" },
+      h(
+        "div",
+        { class: "modal-card" },
+        h("h2", {}, busy.length ? `🛑 ${busy.length} ${busy.length === 1 ? "sessie" : "sessies"} stoppen?` : "🛑 Niemand is bezig"),
+        h(
+          "p",
+          {},
+          busy.length
+            ? "Elke sessie die nu bezig is, stopt met wat hij doet. Er gaat niets verloren: in Claude kun je ze daarna weer verder laten gaan."
+            : "Er is nu geen sessie aan het werk, dus er is niets te stoppen.",
+        ),
+        busy.length ? h("ul", { class: "small" }, ...busy.slice(0, 8).map((s) => h("li", {}, `${s.label ?? "Claude"}: ${s.title ?? ""}`))) : null,
+        h(
+          "div",
+          { class: "buttons" },
+          h("button", { onclick: () => dialog.remove() }, busy.length ? "Annuleren" : "Sluiten"),
+          busy.length
+            ? h(
+                "button",
+                {
+                  class: "bad",
+                  onclick: () => {
+                    dialog.remove();
+                    void (async () => {
+                      let ok = 0;
+                      const failed: string[] = [];
+                      for (const s of busy) {
+                        try {
+                          await this.deps.source.stopSession!(s.id);
+                          ok += 1;
+                        } catch (err) {
+                          failed.push(err instanceof Error ? err.message : String(err));
+                        }
+                      }
+                      this.toast(failed.length ? `⚠️ ${ok} gestopt, ${failed.length} niet: ${failed[0]}` : `🛑 ${ok} ${ok === 1 ? "sessie" : "sessies"} gestopt`, failed.length ? "bad" : "good");
+                      await this.deps.refresh();
+                    })();
+                  },
+                },
+                "🛑 Stop ze",
+              )
+            : null,
+        ),
+      ),
+    );
+    this.root.appendChild(dialog);
   }
 
   private confirmHalt(): void {

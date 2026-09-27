@@ -3,6 +3,36 @@
 Reken op 1 à 2 uur. Na afloop draait alles 24/7 op een server (gratis, of ~€7 per maand), ook als je laptop uit
 staat. Je bedient het vanuit het **3D-kantoor** en Telegram, die alleen jij kunt openen (via Tailscale).
 
+## Je kantoor op claude.ai (werkt meteen, zonder server)
+Je echte kantoor is een artifact op claude.ai: *KK Kantoor* (de link staat in de chat). Het toont live alles wat je
+Claude-account doet, en daar geef je voortaan al je opdrachten. Er is geen server voor nodig.
+
+1. Open de link, ingelogd met je eigen account. claude.ai vraagt één keer of de pagina **Claude Code Remote** mag
+   gebruiken: kies **Toestaan**. Zei je per ongeluk nee, herlaad dan de pagina.
+2. **🧭 Hoofdagent:** schrijf je plan of opdracht en kies *Stuur naar de hoofdagent*. Elke opdracht start een nieuwe
+   sessie in deze repository, in de cloudomgeving die je het laatst gebruikte. Die sessie volgt de skill
+   `.claude/skills/hoofdagent/SKILL.md`: hij bekijkt je plan eerlijk, maakt er een afdeling voor en verdeelt het werk
+   over sessies. Wil je verder op een eerdere opdracht, kies dan *Vervolg op …*.
+3. **🌳 Stamboom:** jij bovenaan, daaronder de hoofdagent, dan de afdelingen met hun agents. Wat nergens onder hangt
+   (bijvoorbeeld een sessie die je zelf in een chat startte), staat los.
+4. **✋ Wacht op jou:** een sessie heeft een antwoord of toestemming nodig. Open hem in Claude (*Antwoord in Claude*).
+   **🛑 Stop alles** laat elke sessie stoppen met wat hij doet; er gaat niets verloren.
+
+Wat de pagina mag, en alleen met jouw toestemming: je sessies en routines lezen, een hoofdagent starten, een sessie
+stoppen of archiveren. Hij ziet nooit je wachtwoord of tokens. Iemand anders die de link opent, ziet zijn eigen
+sessies, niet de jouwe. Geld, experimenten, de kennisbank en de Paperclip-agents komen erbij op het kantoor van je
+server (stap 1 tot en met 13).
+
+**De hoofdagent koppelen aan je server (na stap 11).** Dan geeft de hoofdagent doorlopend werk aan Atlas en de
+agents op je server, in plaats van alles in losse sessies te doen.
+1. `setup-vps.sh` zette al een `HQ_PLAN_TOKEN` in `hq.env`. Staat hij er niet: `openssl rand -hex 24`, invullen en
+   HQ herstarten.
+2. Draai `cloud-hook.sh` (stap 11, *Claude Code in de cloud*). Het laat ook `HQ_URL` en `HQ_PLAN_TOKEN` zien.
+3. Zet die twee als omgevingsvariabelen in je cloudomgeving (het menu van de omgeving in de titelbalk van een sessie
+   → *Edit*), en zet het domein van je server bij *Network access*. Plak ze nooit in een chat.
+4. Klaar. Een plan van de hoofdagent wordt een taak voor Atlas; van elk plan krijg je een bericht in Telegram, en
+   een nieuwe tak, een experiment of een nieuwe agent vraagt altijd eerst jouw ja. Hooguit 10 plannen per dag.
+
 ## 0. Wat je nodig hebt
 
 | Wat | Waarvoor | Kosten |
@@ -136,11 +166,12 @@ Stuur `/status` naar je bot: je hoort *🟢 Alles draait* terug.
 ## 9. Eerste tak en eerste ronde
 De holding heeft nu een CEO en een analist, maar nog geen takken. Twee manieren:
 - **Zelf** (snel): `node --env-file=$HOME/.config/hq/hq.env dist/main.js branch games games "Games-studio"`
-  maakt de games-tak met 6 agents en de routines *Weekstart* (maandag) en *Ideeënraad* (woensdag).
-- **Via de CEO**: wacht op de maandelijkse kansenverkenning, of geef Atlas in Paperclip een taak
-  ("Stel een eerste tak voor op basis van ..."). Zijn voorstel komt als Telegram-bericht met knoppen.
+  maakt de games-tak met 6 agents en de routine *Weekstart* (maandag).
+- **Met je plan**: 🧭 *Plan* in het kantoor (of de hoofdagent op claude.ai). Atlas werkt het uit met de skill
+  `plan-van-kalle` en stelt de tak voor; dat voorstel komt als Telegram-bericht met knoppen.
 
-Wil je niet tot woensdag wachten? Start de routine *Ideeënraad Games-studio* met de hand in de Paperclip-UI.
+Nieuwe ideeën bedenk je zelf; de agents werken ze uit. Wil je toch richtingen van de agents, vraag Atlas dan om de
+ideeënraad (skill `ideeenraad`: vijf richtingen, twee aan twee vergeleken). Uit zichzelf draait die niet.
 
 ## 10. Testen of alles werkt
 - [ ] `/status` in Telegram geeft een overzicht

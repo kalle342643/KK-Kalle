@@ -87,6 +87,32 @@ flowchart LR
   Poppetjes en meubels zijn van Kenney (CC0, zie `hq/web/assets/CREDITS.md`). Er draait geen extra server.
 - Alleen jij komt erin (dezelfde `HQ_ADMIN_TOKEN` als de eigenaar-API, als cookie). `/demo` toont niets echts.
 
+## Het kantoor op je Claude-account (artifact)
+Hetzelfde kantoor, maar als losse pagina op claude.ai (`npm run kantoor` → `dist/kantoor/kantoor.html`, met
+`data-mode="account"`). Er draait daar geen HQ: de gegevens komen via de connector **Claude Code Remote** van
+claude.ai, met toestemming van wie de pagina opent en als die persoon (`web/office/account.ts`):
+- **Lezen:** `list_sessions` (elke 30 s), `list_triggers` (routines) en `list_environments`, via `watchTool` van de
+  mcp-capability van artifacts. `account-model.ts` maakt er een gewone momentopname van (zelfde vorm als HQ), dus het
+  3D-kantoor, de borden en de panelen werken ongewijzigd. Veranderingen (nieuwe sessie, wacht op jou, klaar, een
+  nieuwe stap) worden gebeurtenissen voor het logboek en de poppetjes.
+- **Doen:** `create_session` (de hoofdagent), `interrupt_session` (🛑) en `archive_session`. Een fout of time-out bij
+  het starten is dubbelzinnig: de pagina vraagt dan eerst te kijken of hij toch draait, en stuurt nooit vanzelf opnieuw.
+- **Tags maken de organisatie:** `hoofdagent` (gestart vanuit het kantoor), `afdeling:<slug>`, `rol:<rol>` en
+  `ouder:<sessie-id>`. Daaruit volgen de kamers (een per afdeling, plus een voor de hoofdagent; losse sessies in de
+  werkplaats) en de **stamboom** (`web/office/tree.ts`): jij → hoofdagent → afdelingen → sessies; wat nergens onder
+  hangt, staat los. Op de server bouwt dezelfde stamboom zich uit Paperclip (CEO → tak → lead → agents, via
+  `reportsTo`).
+- **Wat er niet is:** geld, experimenten, de kennisbank en de HQ-bot. Die ruimtes zeggen dat ze met de server komen;
+  niets wordt verzonnen. Declareert een artifact deze connector, dan kan het niet openbaar gedeeld worden: het blijft
+  van jou (en wie een ander het opent, ziet zijn eigen sessies).
+
+**De hoofdagent** is een gewone Claude Code-sessie in deze repository, met een korte extra systeemprompt en de skill
+`.claude/skills/hoofdagent/SKILL.md`. Hij werkt Kalles plan uit, start per rol een sessie met de tags hierboven (hooguit
+drie tegelijk) en geeft doorlopend werk aan Atlas: `POST /api/hooks/plan` met `HQ_PLAN_TOKEN` (via Tailscale Funnel,
+net als de hooks; kan niets lezen, hooguit 10 per dag, en Kalle krijgt van elk plan een bericht). Kalle zelf stuurt een
+plan aan Atlas met `POST /api/owner/plans` (🧭 *Plan* in het kantoor op de server). Atlas werkt het uit met de skill
+`plan-van-kalle`; een nieuwe tak, een experiment of een nieuwe agent blijft een goedkeuring van Kalle.
+
 ## De werkplaats (je projecten en Claude Code)
 Naast de holding bouw je zelf aan projecten met Claude Code (bijvoorbeeld een scanner-SaaS of een game). HQ volgt
 die in de werkplaats, zonder er iets aan te veranderen:

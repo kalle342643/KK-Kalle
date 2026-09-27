@@ -47,6 +47,7 @@ import { codeOverview } from "../code/overview.js";
 import { archiveCodeProject, codeProjectSchema, getCodeProject, requireCodeProject, saveCodeProject } from "../code/projects.js";
 import type { CodeWatcher } from "../code/watch.js";
 import { knowledgeAdvice } from "../knowledge/precheck.js";
+import { planSchema, sendPlanToCeo } from "../office/plans.js";
 import { giveTask, taskSchema } from "../office/tasks.js";
 import { askKnowledge, knowledgeGraph } from "../knowledge/service.js";
 import { profileSchema, setProfile } from "../office/profiles.js";
@@ -139,6 +140,18 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
     if (Date.now() - hookWindow.start > 60_000) hookWindow = { start: Date.now(), count: 0 };
     if (++hookWindow.count > 600) return c.json({ error: "Te veel meldingen" }, 429);
     return c.json(await handleHook(ctx, await body(c, hookSchema)));
+  });
+
+  // De hoofdagent op je Claude-account geeft Atlas een uitgewerkt plan. Eigen geheim (HQ_PLAN_TOKEN), dat niets kan
+  // lezen; hooguit 10 plannen per dag, en je krijgt er altijd een bericht van.
+  let planWindow = { start: Date.now(), count: 0 };
+  app.post("/api/hooks/plan", async (c) => {
+    if (!ctx.config.code.planToken) return c.json({ error: "Plannen van de hoofdagent staan uit (HQ_PLAN_TOKEN is leeg)." }, 404);
+    if (!hookTokenOk(ctx.config.code.planToken, c.req.header("authorization"))) return c.json({ error: "Niet toegestaan" }, 401);
+    if (Number(c.req.header("content-length") ?? 0) > 20_000) return c.json({ error: "Te groot" }, 413);
+    if (Date.now() - planWindow.start > 86_400_000) planWindow = { start: Date.now(), count: 0 };
+    if (++planWindow.count > 10) return c.json({ error: "Te veel plannen vandaag (hooguit 10)." }, 429);
+    return c.json(await sendPlanToCeo(ctx, await body(c, planSchema), "hoofdagent"), 201);
   });
 
   // ---------------------------------------------------------------- agents
@@ -487,6 +500,8 @@ export function createApp(ctx: AppContext, deps: AppDeps = {}): Hono<Env> {
   ownerApi.put("/agents/:agentId/profile", async (c) => c.json(await setProfile(ctx, c.req.param("agentId"), await body(c, profileSchema))));
   // Jij geeft een agent een taak (wordt een Paperclip-taak op zijn naam).
   ownerApi.post("/agents/:agentId/task", async (c) => c.json(await giveTask(ctx, c.req.param("agentId"), await body(c, taskSchema)), 201));
+  // Jij plant, Atlas werkt het uit: je plan wordt een taak voor de CEO.
+  ownerApi.post("/plans", async (c) => c.json(await sendPlanToCeo(ctx, await body(c, planSchema), "owner"), 201));
   ownerApi.post("/agents/:agentId/:action{pause|resume}", async (c) => {
     const agentId = c.req.param("agentId");
     const action = c.req.param("action") as "pause" | "resume";

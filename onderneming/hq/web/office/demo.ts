@@ -22,7 +22,7 @@ import type {
   OfficeSnapshot,
   ProjectDetail,
 } from "../../src/office/types.js";
-import type { CodeProjectInput, DataSource, RepoChoice, RevenueInput } from "./data.js";
+import type { CodeProjectInput, DataSource, PlanInput, PlanResult, RepoChoice, RevenueInput } from "./data.js";
 import { BOT_ID, OWNER_ID } from "./layout.js";
 
 const DAY = 86_400_000;
@@ -119,7 +119,7 @@ const NEW_BRANCH = {
 
 const TASKS: Record<string, string[]> = {
   ceo: ["Weekplan voor de holding schrijven", "Portfolio bekijken: waar moet het budget heen?", "Onderzoek: is e-commerce een goede nieuwe tak?", "Taken verdelen over de tak-leads"],
-  analyst: ["Lessen schrijven voor EXP-2 (gestopt)", "Voorspelling van de raad naast de uitkomst leggen", "Lessen schrijven voor afgeronde experimenten", "Metingen van EXP-1 controleren"],
+  analyst: ["Lessen schrijven voor EXP-2 (gestopt)", "Voorspelling naast de uitkomst leggen", "Lessen schrijven voor afgeronde experimenten", "Metingen van EXP-1 controleren"],
   "tak-lead": ["Weekstart: lopende experimenten nalopen", "Taken voor deze week verdelen", "Top 5 maken uit de waarnemingen van de verkenners", "Meting van dit experiment controleren"],
   "verkenner:games": ["Trending games op CrazyGames bekijken", "Reddit r/WebGames doorzoeken op wensen", "Top 20 puzzelgames vergelijken", "Wat spelen mensen deze week op Poki?"],
   "verkenner:content": ["Zoekvolume voor 'beste budget microfoon' checken", "Affiliate-programma's vergelijken", "Concurrerende vergelijkingssites bekijken"],
@@ -324,11 +324,11 @@ const DEMO_NOTES: KnowledgeHits["notes"] = [
   { id: 4, title: "Zzp'ers en facturen", excerpt: "Veel irritatie over het handmatig overtypen van bonnetjes; bestaande tools kosten € 10-25 per maand.", author: "Waal", tags: ["saas", "zzp"] },
 ];
 
-/** De ideeënraad per tak, zoals de lead hem met subtaken regelt (skill ideeenraad). */
-const COUNCIL_TASKS: Record<string, string> = {
-  "tak-lead": "Top 5 maken uit de waarnemingen van de verkenners",
-  verkenner: "Waarnemingen verzamelen uit mijn eigen bron",
-  criticus: "Pitches afschieten met live data van concurrenten",
+/** Een plan van Kalle uitwerken in een tak: de lead verdeelt het met subtaken (skill plan-van-kalle). */
+const PLAN_TASKS: Record<string, string> = {
+  "tak-lead": "Het plan van Kalle verdelen: wie doet wat",
+  verkenner: "Uitzoeken wat er al bestaat voor het plan",
+  criticus: "De riskantste aanname van het plan zoeken",
 };
 
 const TALK: Record<string, string[]> = {
@@ -680,6 +680,15 @@ export class DemoSource implements DataSource {
       a.currentTask = task.title;
       this.emit({ type: "run.started", agentId, text: task.title, data: { wakeReason: "issue_assigned" } });
     }, 6000);
+  }
+
+  /** Je plan gaat naar de CEO: die krijgt het als taak en gaat ermee aan de slag (in de demo alleen hier). */
+  async sendPlan(input: PlanInput): Promise<PlanResult> {
+    const ceo = this.agents.find((a) => a.hqRole === "ceo" && a.status !== "terminated");
+    if (!ceo) throw new Error("Er is geen CEO om het plan aan te geven.");
+    const first = input.text.trim().split(/\r?\n/)[0]!.slice(0, 80);
+    await this.giveTask(ceo.id, { title: `Plan van Kalle: ${first}`, description: input.text });
+    return { id: null, url: null, message: `${ceo.nickname || ceo.name} heeft je plan (in de demo gebeurt er verder niets echt)` };
   }
 
   async saveCodeProject(input: CodeProjectInput): Promise<void> {
@@ -1151,17 +1160,17 @@ export class DemoSource implements DataSource {
   }
 
   /**
-   * De ideeënraad van een tak: de lead zet subtaken uit voor de verkenners en de criticus, die er tegelijk aan
+   * Een plan van Kalle uitwerken: de lead zet subtaken uit voor de verkenners en de criticus, die er tegelijk aan
    * werken. Eén klus, dus in het kantoor zitten ze samen aan tafel (net als live, via de bovenliggende taak).
    */
   private council(): void {
     const branches = this.branches.filter((b) => b.slug !== "holding");
     const branch = branches[this.councils++ % branches.length];
     if (!branch) return;
-    const members = this.active().filter((a) => a.branch === branch.slug && !this.runs.has(a.id) && a.template && COUNCIL_TASKS[a.template]);
+    const members = this.active().filter((a) => a.branch === branch.slug && !this.runs.has(a.id) && a.template && PLAN_TASKS[a.template]);
     if (members.length < 2) return;
-    const job = { groupId: `council-${branch.slug}-${this.clock}`, title: `Ideeënraad ${branch.name}` };
-    for (const a of members) this.startRun(a, true, { task: COUNCIL_TASKS[a.template!]!, job });
+    const job = { groupId: `plan-${branch.slug}-${this.clock}`, title: `Plan van Kalle · ${branch.name}` };
+    for (const a of members) this.startRun(a, true, { task: PLAN_TASKS[a.template!]!, job });
   }
 
   private finishRun(a: OfficeAgent, status: "succeeded" | "failed" | "cancelled"): void {
@@ -1200,7 +1209,7 @@ export class DemoSource implements DataSource {
       if (this.clock >= run.until) this.finishRun(a, Math.random() < 0.06 ? "failed" : "succeeded");
     }
     if (this.halted) return;
-    // Om de paar minuten de ideeënraad van een tak (de eerste al vlak na binnenkomst).
+    // Om de paar minuten werkt een tak samen een plan van Kalle uit (het eerste al vlak na binnenkomst).
     if (this.clock % 200 === 25) this.council();
     // Wie aan het werk is, gaat soms het web op.
     if (this.runs.size && Math.random() < 0.22) this.webStep();
