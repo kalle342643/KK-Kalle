@@ -70,6 +70,8 @@ const envSchema = z.object({
   HQ_HEALTH_CHECK_SECONDS: z.coerce.number().int().min(60).default(300),
   /** Geheim waarmee Claude Code-hooks live meldingen sturen (alleen schrijven). Leeg = uit. */
   HQ_HOOK_TOKEN: z.string().min(16).optional(),
+  /** Geheim waarmee de hoofdagent (op je Claude-account) een uitgewerkt plan aan Atlas geeft. Kan niets lezen. Leeg = uit. */
+  HQ_PLAN_TOKEN: z.string().min(16).optional(),
   /** Hoe jij heet in backlogs ("dit ligt bij Kalle"), komma-gescheiden. */
   HQ_OWNER_NAMES: z.string().default("Kalle"),
 
@@ -170,6 +172,8 @@ export interface Config {
     /** Nieuwe repositories van het token vanzelf volgen. */
     autoFollow: boolean;
     hookToken: string | undefined;
+    /** Geheim voor plannen van de hoofdagent (POST /api/hooks/plan). */
+    planToken: string | undefined;
     ownerNames: string[];
   };
   value: {
@@ -261,6 +265,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
       healthMs: e.HQ_HEALTH_CHECK_SECONDS * 1000,
       autoFollow: !/^(uit|nee|false|0|off|no)$/i.test(e.HQ_AUTO_FOLLOW.trim()),
       hookToken: e.HQ_HOOK_TOKEN,
+      planToken: e.HQ_PLAN_TOKEN,
       ownerNames: e.HQ_OWNER_NAMES.split(",").map((n) => n.trim()).filter(Boolean),
     },
     value: {

@@ -1,7 +1,9 @@
 # Runbook: dagelijks gebruik en noodgevallen
 
 ## Je dag (±15 minuten)
-- **Het kantoor** (`http://<servernaam>:8080/`): wie werkt waaraan (klik op een poppetje), papiertjes op jouw
+- **Je kantoor op claude.ai** (het artifact *KK Kantoor*): hier geef je al je opdrachten (🧭 *Hoofdagent*) en zie je
+  live wat je Claude-account doet, met de stamboom en wie op je wacht (✋). Zie [SETUP.md](SETUP.md#je-kantoor-op-claudeai-werkt-meteen-zonder-server).
+- **Het kantoor op je server** (`http://<servernaam>:8080/`): wie werkt waaraan (klik op een poppetje), papiertjes op jouw
   bureau = verzoeken, het projectenbord in de vergaderzaal, alle cijfers in de controlekamer van de HQ-bot.
   Links onder staat het logboek met alles wat er gebeurde.
 - **08:00 dagrapport** in Telegram: omzet en kosten van gisteren, per tak, lopende experimenten, besluiten, en wat
@@ -13,7 +15,8 @@
   meestal wat tussen een project en de eerste omzet staat, dus begin daar.
 - **Taak geven:** klik op een agent → *Taak geven*; of in de werkplaats een opdracht voor Claude Code.
 - **Maandag:** het portfolio-voorstel (budget per tak) en het weekplan van CEO Atlas.
-- **Woensdag:** de ideeënraad per tak; daar komen 1 à 2 experimentvoorstellen uit (niet als er al 2 lopen of wachten).
+- **Nieuwe plannen komen van jou**: 🧭 *Plan* in het kantoor (Atlas werkt het uit) of de hoofdagent op claude.ai.
+  De ideeënraad draait alleen als je erom vraagt.
 - **Maandag 7:00, de nut-meter:** agents die 30 dagen geld kostten zonder resultaat gaan op pauze; je krijgt een
   bericht. In het kantoor zitten ze er nog, zonder naam (alleen 💤). Toch nodig? Klik erop → ▶️ Hervatten, het
   liefst met een taak erbij; dan heeft hij weer twee weken. Liever zelf beslissen: `HQ_AUTO_PAUSE=uit` in hq.env.

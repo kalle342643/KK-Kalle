@@ -20,7 +20,8 @@
     "bootstrap": "node dist/main.js bootstrap",
     "hq": "node dist/main.js",
     "build:web": "node scripts/build-web.mjs",
-    "demo": "node scripts/build-demo.mjs"
+    "demo": "node scripts/build-demo.mjs",
+    "kantoor": "node scripts/build-demo.mjs kantoor"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.1",

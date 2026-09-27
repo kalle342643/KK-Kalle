@@ -1,6 +1,8 @@
-// Bouwt het demo-kantoor als één losse HTML-pagina (dist/demo/kantoor-demo.html): code, opmaak en alle
-// 3D-modellen zitten erin. Handig om te delen of offline te bekijken; het bedrijf erin is verzonnen.
-// De modellen gaan ongecomprimeerd mee, zodat de pagina geen WebAssembly nodig heeft om ze uit te pakken.
+// Bouwt het kantoor als één losse HTML-pagina: code, opmaak en alle 3D-modellen zitten erin. De modellen gaan
+// ongecomprimeerd mee, zodat de pagina geen WebAssembly nodig heeft om ze uit te pakken.
+//   node scripts/build-demo.mjs          → dist/demo/kantoor-demo.html: het demo-kantoor (verzonnen bedrijf)
+//   node scripts/build-demo.mjs kantoor  → dist/kantoor/kantoor.html: je echte kantoor als artifact op claude.ai,
+//                                          live op je Claude-account (via de connector Claude Code Remote)
 import { NodeIO } from "@gltf-transform/core";
 import { ALL_EXTENSIONS } from "@gltf-transform/extensions";
 import { build } from "esbuild";
@@ -8,7 +10,9 @@ import { MeshoptDecoder } from "meshoptimizer";
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-const out = "dist/demo";
+const account = process.argv[2] === "kantoor";
+const out = account ? "dist/kantoor" : "dist/demo";
+const file = account ? "kantoor.html" : "kantoor-demo.html";
 mkdirSync(out, { recursive: true });
 
 const bundle = await build({
@@ -43,18 +47,18 @@ for (const dir of ["characters", "furniture"]) {
 const css = readFileSync("web/office/office.css", "utf8");
 const html = `<meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KK Holding Kantoor</title>
+<title>${account ? "KK Kantoor" : "KK Holding Kantoor"}</title>
 <style>
 ${css}
 </style>
-<div id="app" data-mode="demo" data-assets="assets/">
-  <div class="boot"><div class="boot-logo">🏢</div><p>Kantoor laden…</p><p class="boot-alt">Demo met een verzonnen bedrijf</p></div>
+<div id="app" data-mode="${account ? "account" : "demo"}" data-assets="assets/">
+  <div class="boot"><div class="boot-logo">🏢</div><p>Kantoor laden…</p><p class="boot-alt">${account ? "Live: wat je Claude-account doet" : "Demo met een verzonnen bedrijf"}</p></div>
 </div>
 <script>window.HQ_ASSET_DATA = ${JSON.stringify(assets)};</script>
 <script type="module">
 ${js}
 </script>
 `;
-writeFileSync(join(out, "kantoor-demo.html"), html);
+writeFileSync(join(out, file), html);
 const mb = (n) => (n / 1024 / 1024).toFixed(1);
-console.log(`demo gebouwd: ${out}/kantoor-demo.html (${mb(Buffer.byteLength(html))} MB, modellen ${mb(raw)} MB)`);
+console.log(`${account ? "kantoor" : "demo"} gebouwd: ${out}/${file} (${mb(Buffer.byteLength(html))} MB, modellen ${mb(raw)} MB)`);

@@ -12,7 +12,7 @@ import {
   type OmniApi,
 } from "../src/ai/gratis.js";
 import { AgentFactory } from "../src/company/factory.js";
-import { loadCompany } from "../src/company/loader.js";
+import { grokProblem, loadCompany } from "../src/company/loader.js";
 import { testConfig } from "../src/config.js";
 import type { AppContext } from "../src/domain/context.js";
 import { graphifyRuntime, semanticExtractionEnabled } from "../src/knowledge/graphify.js";
@@ -206,6 +206,20 @@ describe("gratis AI voor agents en Graphify", () => {
     const builder = factory.buildHire(ctx, factory.agentTemplate("bouwer"), { name: "Pollux", branch: null, reportsTo: null });
     expect(builder.adapterConfig).toMatchObject({ model: "claude-sonnet-5" });
     expect((builder.adapterConfig as { env: Record<string, string> }).env.ANTHROPIC_BASE_URL).toBeUndefined();
+  });
+
+  it("een Grok-agent (Grok Build-CLI van xAI) is één regel in een sjabloon, en gebruikt nooit de gratis router", () => {
+    const spec = { ...factory.agentTemplate("verkenner"), adapter: "grok_local" as const, model: "grok-build", effort: "medium" as const, maxTurnsPerRun: 30, timeoutSec: 1200 };
+    const hire = factory.buildHire(ctx, spec, { name: "Rigel", branch: null, reportsTo: null });
+    expect(hire.adapterType).toBe("grok_local");
+    expect(hire.adapterConfig).toMatchObject({ model: "grok-build", reasoningEffort: "medium", maxTurns: 30, timeoutSec: 1200, env: { HQ_URL: "http://127.0.0.1:8080" } });
+    expect(hire.adapterConfig).not.toHaveProperty("effort");
+    expect(hire.adapterConfig).not.toHaveProperty("maxTurnsPerRun");
+    expect((hire.adapterConfig as { env: Record<string, string> }).env.ANTHROPIC_BASE_URL).toBeUndefined();
+    // Alle sjablonen van nu blijven gewoon Claude Code.
+    expect(factory.buildHire(ctx, factory.agentTemplate("bouwer"), { name: "Pollux", branch: null, reportsTo: null }).adapterType).toBe("claude_local");
+    expect(grokProblem("grok-4.7")).toBeNull();
+    expect(grokProblem("claude-sonnet-5")).toContain("alleen Grok-modellen");
   });
 
   it("zonder sleutel draait niemand op gratis AI", () => {

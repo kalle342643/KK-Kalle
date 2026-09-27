@@ -123,6 +123,7 @@ if [[ ! -f ~/.config/hq/hq.env ]]; then
   # Willekeurige geheimen alvast invullen.
   sed -i "s|^HQ_ADMIN_TOKEN=.*|HQ_ADMIN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
   sed -i "s|^HQ_HOOK_TOKEN=.*|HQ_HOOK_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
+  sed -i "s|^HQ_PLAN_TOKEN=.*|HQ_PLAN_TOKEN=$(openssl rand -hex 24)|" ~/.config/hq/hq.env
 fi
 # Gratis AI-router (OmniRoute): geheimen en het wachtwoord van het dashboard, één keer willekeurig gemaakt.
 # STORAGE_ENCRYPTION_KEY versleutelt de sleutels in de database: nooit veranderen, anders is alles weg.

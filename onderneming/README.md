@@ -1,8 +1,14 @@
 # AI-onderneming
 
-Het besturingssysteem van een holding van AI-agents. Agents zoeken uit waar geld te verdienen valt, doen
-kleine experimenten, meten de resultaten en schuiven budget naar wat werkt. Jij bent de eigenaar: je keurt
-geld, publicaties en nieuwe agents goed vanaf je telefoon, en je hebt altijd een noodstop.
+Het besturingssysteem van een holding van AI-agents. Jij plant; agents werken je plan uit, doen kleine experimenten,
+meten de resultaten en schuiven budget naar wat werkt. Jij bent de eigenaar: je keurt geld, publicaties en nieuwe
+agents goed vanaf je telefoon, en je hebt altijd een noodstop.
+
+**Je kantoor op claude.ai.** Een artifact dat live laat zien wat je Claude-account doet: elke Claude Code-sessie is
+een poppetje, met een eigen kamer voor de hoofdagent en voor elke afdeling, een stamboom (jij → hoofdagent →
+afdelingen → agents) en wie op je wacht. Daar geef je al je opdrachten: de **hoofdagent** bekijkt je plan eerlijk,
+maakt er een afdeling voor en verdeelt het werk over sessies. Zodra je server draait, geeft hij doorlopend werk aan
+Atlas en de agents daar. Werkt zonder server; zie [SETUP.md](docs/SETUP.md#je-kantoor-op-claudeai-werkt-meteen-zonder-server).
 
 **Het kantoor.** Je bestuurt alles vanuit een 3D-kantoor in je browser. Elke agent is een poppetje dat echt
 werkt: typen aan het bureau als er een taak loopt, naar een collega lopen om iets te bespreken, naar de
@@ -37,8 +43,10 @@ flowchart LR
 
 ## Hoe een idee geld wordt (of stopt)
 
-1. Verkenners zoeken elk in een eigen bron waarnemingen met links, de tak-lead maakt een top 5, de criticus schiet
-   er minstens 3 af met live data. Lopen er al 2 experimenten, dan slaat de raad een week over.
+1. Het idee komt van jou: je plan gaat naar de hoofdagent (claude.ai) of Atlas (🧭 *Plan* in het kantoor). Die zoekt
+   de riskantste aanname en de goedkoopste echte test, en kiest of maakt de afdeling. Wil je richtingen van de
+   agents, vraag dan om de ideeënraad: verkenners met eigen bronnen, vijf richtingen, een criticus die er minstens 3
+   afschiet, en twee aan twee kiezen.
 2. De tak-lead dient het beste idee in als experiment: hypothese, één meetpunt met drempel, max. €20 en 14 dagen.
 3. **Jij krijgt een Telegram-bericht met ✅/❌.** Pas na ✅ maakt HQ in Paperclip een project met een
    **harde budgetstop** en een taak voor de lead.

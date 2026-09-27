@@ -56,7 +56,8 @@ describe("bootstrap naar Paperclip", () => {
     expect(first.companyCreated).toBe(true);
     expect(first.agents.created.sort()).toEqual(["Argus", "Atlas"]);
     expect(first.skills.created.length).toBe(def.skills.length);
-    expect(first.routines.created.length).toBe(2);
+    // Alleen het weekplan: nieuwe takken bedenkt Kalle zelf (de maandelijkse kansenverkenning is uit).
+    expect(first.routines.created.length).toBe(1);
     expect(first.warnings).toEqual([]);
 
     const company = env.paperclip.companies.get(first.companyId)!;
@@ -129,7 +130,9 @@ describe("Agent Factory", () => {
     expect(maas.reportsTo).toBe(ceo.id);
     expect(agents.find((a) => a.name === "Waal")!.reportsTo).toBe(maas.id);
     const routineTitles = [...env.paperclip.routines.values()].map((r) => r.title);
-    expect(routineTitles).toContain("Ideeënraad ComplyScan");
+    expect(routineTitles).toContain("Weekstart ComplyScan");
+    // Kalle plant zelf: geen wekelijkse ideeënraad meer, alleen als hij erom vraagt.
+    expect(routineTitles.some((t) => t.startsWith("Ideeënraad"))).toBe(false);
     const approvals = await listApprovals(env.db, { status: ["approved"], limit: 100 });
     expect(approvals.filter((a) => a.kind === "hire_agent").length).toBe(5);
     expect(env.notifier.last()!.text).toContain("Tak ComplyScan staat klaar");
@@ -138,6 +141,9 @@ describe("Agent Factory", () => {
   it("pauzeert routines die niet meer nodig zijn (de dagelijkse analyse doet HQ nu zelf)", async () => {
     const def = loadCompany();
     expect(def.company.retiredRoutines).toContain("Dagelijkse analyse");
+    // Nieuwe takken bedenkt Kalle zelf; Atlas werkt ze uit (skill plan-van-kalle).
+    expect(def.company.retiredRoutines).toContain("Maandelijkse kansenverkenning");
+    expect(def.company.routines.map((r) => r.title)).not.toContain("Maandelijkse kansenverkenning");
     expect(def.company.routines.map((r) => r.title)).not.toContain("Dagelijkse analyse");
     const deps = { db: env.db, config: env.ctx.config, paperclip: env.paperclip, log: env.ctx.log };
     const first = await bootstrap(deps, def);

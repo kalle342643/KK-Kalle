@@ -1,6 +1,6 @@
 # Tak-sjabloon voor alles wat (nog) geen eigen sjabloon heeft: e-commerce, digitale producten, ...
 name: Nieuwe tak
-description: Algemene opzet - ideeënraad plus één bouwer. Gebruik dit voor e-commerce, digitale producten en andere nieuwe markten.
+description: Algemene opzet - verkenners, criticus en één bouwer. Gebruik dit voor e-commerce, digitale producten en andere nieuwe markten.
 monthlyBudgetEur: 30
 agents:
   - { template: tak-lead, name: Kompas, lead: true }
@@ -13,10 +13,3 @@ routines:
     cron: "0 9 * * 1"
     priority: high
     description: Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ en plan het werk van deze week.
-  - title: "Ideeënraad {{BRANCH_NAME}}"
-    assignee: Kompas
-    cron: "0 12 * * 3"
-    priority: medium
-    description: |
-      Draai de ideeënraad (skill ideeenraad) en dien de 1-2 beste ideeën in als experiment.
-      Lopen er al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over.

@@ -17,14 +17,3 @@ routines:
     description: |
       Loop de lopende experimenten van {{BRANCH_NAME}} na in HQ ($HQ_URL/api/agent/experiments?status=running&branch={{BRANCH}}).
       Maak taken voor wat stilstaat en zorg dat elke lopende game deze week een meting krijgt.
-  - title: "Ideeënraad {{BRANCH_NAME}}"
-    assignee: Vega
-    cron: "0 9 * * 3"
-    priority: medium
-    description: |
-      Draai de ideeënraad (skill ideeenraad). Lopen er in deze tak al 2 experimenten, of wachten er 2 voorstellen op Kalle? Sla de raad dan over en
-      schrijf in één regel waarom: meer ideeën dan Kalle kan kiezen is weggegooid geld.
-      Verkenners: Rigel = trending en nieuwe games op CrazyGames/Poki (genres, tags, openbare pagina's);
-      Deneb = klachten en wensen van spelers (wat zoekmachines laten zien van r/WebGames en r/incremental_games,
-      YouTube-comments). Daarna maak jij de top 5, dan Castor (schiet ≥3 af).
-      Dien de 1-2 beste in als experiment via HQ.

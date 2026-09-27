@@ -247,6 +247,31 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   tegengestelde rol.
 - Geld is data: omzet alleen uit externe bronnen, nooit uit een agent.
 
+## Het echte kantoor op claude.ai (27 september)
+- **Een artifact kan bij je Claude-account.** Met de mcp-capability leest een pagina op claude.ai de ingebouwde
+  connector *Claude Code Remote*, als de kijker zelf en pas na zijn toestemming: sessies, routines en omgevingen, en
+  hij kan een sessie starten, stoppen of archiveren. Daardoor werkt het echte kantoor zonder server. Nadeel: zo'n
+  artifact kan niet openbaar gedeeld worden (de demo blijft daarom een aparte pagina).
+- **Tags zijn genoeg om een organisatie te tekenen.** `hoofdagent`, `afdeling:<slug>`, `rol:<rol>` en
+  `ouder:<sessie-id>` op sessies geven kamers, een stamboom en wie wie startte. Geen database nodig. Wel opletten:
+  twee sessies die elkaar als ouder noemen, mogen de stamboom niet laten vastlopen (getest).
+- **Vanuit een pagina is er geen "eigen sessie".** Geef bij `create_session` altijd `environment_id` mee (de omgeving
+  van je laatste cloudsessie), en kies nooit een Cowork-omgeving: die negeert de repository en de extra prompt.
+  `list_sessions` met `mine: true` hoort ook bij een sessie; laat het weg.
+- **Een schrijfactie met een time-out is dubbelzinnig.** De sessie kan toch gestart zijn. Het kantoor stuurt een
+  opdracht daarom nooit vanzelf opnieuw, maar vraagt eerst te kijken.
+- **Vergelijk met wat je tekende, niet met wat binnenkwam.** In de eerste proef leek er niets te veranderen, omdat de
+  oude lijst dezelfde objecten deelde als de nieuwe. Het kantoor bewaart nu de lijst zoals hij getekend is.
+- **Zelf plannen werkt beter dan agents laten verzinnen.** AI-ideeën lijken origineel, maar vallen bij uitvoering
+  vaker tegen en lijken op elkaar (de ideation-execution gap). Kalle plant daarom zelf; de hoofdagent en Atlas maken
+  het plan scherp (riskantste aanname, goedkoopste echte test) en verdelen het. De ideeënraad draait alleen op verzoek.
+- **Nog niet getest:**
+  - de vorm van het antwoord van `create_session` (een schrijfactie, dus niet "even uitgeprobeerd"; het kantoor zoekt
+    er het sessie-id in en valt anders terug op de lijst);
+  - hoe de toestemmingsvraag van claude.ai er precies uitziet;
+  - of een hoofdagent-sessie de connector zelf mag gebruiken om sessies met tags te starten (dat kan in cloudsessies
+    zoals deze wel).
+
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
   (socket-URL, back-up, env-bestand).

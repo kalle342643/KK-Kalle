@@ -542,6 +542,12 @@ button.chip:hover {
   color: #ffffff;
   border-color: transparent;
 }
+/* De ingang voor al je opdrachten: de hoofdagent (of Atlas). */
+.actions button.primary {
+  background: var(--accent);
+  color: #ffffff;
+  border-color: transparent;
+}
 
 /* Logboek. */
 .feed {
@@ -759,7 +765,8 @@ button.chip:hover {
 }
 .panel[data-kind="stats"],
 .panel[data-kind="ledger"],
-.panel[data-kind="knowledge"] {
+.panel[data-kind="knowledge"],
+.panel[data-kind="team"] {
   width: min(600px, calc(100vw - 24px));
 }
 @keyframes panel-in {
@@ -1721,6 +1728,14 @@ svg.chart {
   .actions button:not(.danger) span {
     display: none;
   }
+  /* De ingang voor je opdrachten houdt zijn naam. */
+  .actions button.primary {
+    width: auto;
+    padding: 0 12px;
+  }
+  .actions button.primary span {
+    display: inline;
+  }
 }
 
 /* ---------------------------------------------------------------- telefoon */
@@ -1752,6 +1767,13 @@ svg.chart {
   }
   .actions button span {
     display: none;
+  }
+  .actions button.primary {
+    width: auto;
+    padding: 0 10px;
+  }
+  .actions button.primary span {
+    display: inline;
   }
   .kpis {
     order: 3;
@@ -1853,4 +1875,169 @@ svg.chart {
   .agent-tag {
     transition: none;
   }
+}
+
+/* ---------------------------------------------------------------- de stamboom */
+.team-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-top: 3px solid var(--accent);
+  border-radius: 10px;
+  background: var(--card);
+  text-align: left;
+  cursor: pointer;
+}
+.team-card:hover {
+  border-color: var(--focus);
+}
+.tree,
+.tree ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.tree ul {
+  position: relative;
+  margin-left: 14px;
+  padding-left: 16px;
+  border-left: 2px dashed var(--border);
+}
+.tree li {
+  position: relative;
+  padding: 5px 0;
+}
+.tree ul > li::before {
+  content: "";
+  position: absolute;
+  left: -16px;
+  top: 26px;
+  width: 14px;
+  border-top: 2px dashed var(--border);
+}
+.tree.loose {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 8px;
+}
+.node {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  max-width: 420px;
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent, #d97757);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: var(--shadow);
+  text-align: left;
+  font-size: 13px;
+  cursor: pointer;
+}
+.node:hover {
+  border-color: var(--focus);
+}
+.node.kind-you {
+  --accent: #7c4dff;
+}
+.node.kind-boss {
+  --accent: #d4a017;
+}
+.node.kind-team {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+.node-top {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.node-role {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.node-model {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.node-name {
+  font-size: 14px;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.node-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.node-status.tone-good {
+  color: var(--good-ink);
+}
+.node-status.tone-warn {
+  color: var(--warn-ink);
+}
+.node-status.tone-bad {
+  color: var(--bad-ink);
+}
+.node-status.tone-info {
+  color: var(--info-ink);
+}
+.node-status.tone-muted {
+  color: var(--muted);
+}
+.node-detail {
+  color: var(--text);
+  font-size: 12.5px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.node-meta {
+  color: var(--muted);
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+/* ---------------------------------------------------------------- de hoofdagent */
+.plan-panel textarea {
+  width: 100%;
+  min-height: 140px;
+  resize: vertical;
+}
+.plan-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+.plan-options select {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.plan-result:empty {
+  display: none;
+}
+.person.static {
+  cursor: default;
+}
+.person.static:hover {
+  background: transparent;
 }

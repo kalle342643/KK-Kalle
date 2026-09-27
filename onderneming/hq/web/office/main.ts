@@ -5,18 +5,21 @@
  */
 import * as THREE from "three";
 import type { OfficeSnapshot } from "../../src/office/types.js";
+import { AccountSource } from "./account.js";
+import { HOOFDAGENT_ROOM } from "./account-model.js";
 import { Assets, CHARACTERS } from "./assets.js";
-import { drawCodeBoard, drawKanban, drawKpiScreen, drawVideoWall, drawWhiteboard } from "./boards.js";
+import { drawAccountKpi, drawAccountWall, drawCodeBoard, drawKanban, drawKpiScreen, drawSessionBoard, drawTeamBoard, drawVideoWall, drawWhiteboard } from "./boards.js";
 import { HttpError, LiveSource, type DataSource } from "./data.js";
 import { DemoSource } from "./demo.js";
 import { Director, type Liveliness } from "./director.js";
 import { Hologram } from "./hologram.js";
-import { buildLayout, EXTRA_SEATS, OWNER_ID, workshopSeats, type Layout, type LayoutWorkshop } from "./layout.js";
+import { BOT_ID, buildLayout, EXTRA_SEATS, OWNER_ID, workshopSeats, type Layout, type LayoutBranch, type LayoutWorkshop } from "./layout.js";
 import { savedLiveliness, Ui } from "./ui.js";
 import { World } from "./world.js";
 
 const app = document.getElementById("app")!;
-const mode = app.dataset.mode === "demo" ? "demo" : "live";
+/** live = HQ op je server, account = je Claude-account (het artifact), demo = verzonnen bedrijf. */
+const mode = app.dataset.mode === "demo" ? "demo" : app.dataset.mode === "account" ? "account" : "live";
 const assetBase = app.dataset.assets ?? "/static/assets/";
 
 function bootText(text: string, error = false): void {
@@ -40,19 +43,37 @@ const isNight = () => {
   return h < 7 || h >= 21;
 };
 
-/** De werkplaats: een bord per project, bureaus voor de sessies (in stappen van drie). */
+/** De werkplaats: een bord per project, bureaus voor de sessies zonder afdeling (in stappen van drie). */
 function workshopOf(snap: OfficeSnapshot): LayoutWorkshop | undefined {
-  const live = snap.code.sessions.filter((s) => s.state !== "done");
+  const live = snap.code.sessions.filter((s) => s.state !== "done" && !s.room);
   // Helpers (sub-agents) krijgen ook een bureau, naast hun sessie.
   const active = live.length + live.reduce((n, s) => n + (s.helpers?.length ?? 0), 0);
   if (!snap.code.projects.length && !active) return undefined;
   return { projects: snap.code.projects.map((p) => ({ key: p.key, name: p.name })), seats: workshopSeats(active) };
 }
 
+/**
+ * Het kantoor op je Claude-account: een kamer voor de hoofdagent en één per afdeling, met bureaus voor wie er nu
+ * werkt (in stappen van drie, zodat niet elke nieuwe sessie een verbouwing is).
+ */
+function accountRooms(snap: OfficeSnapshot): LayoutBranch[] {
+  if (!snap.account) return [];
+  const atDesk = (room: string) => snap.code.sessions.filter((s) => s.state !== "done" && s.room === room).length;
+  const step = (n: number) => Math.ceil(n / 3) * 3;
+  return [
+    { slug: HOOFDAGENT_ROOM, name: "Hoofdagent", template: "hoofdagent", seats: step(atDesk(HOOFDAGENT_ROOM)) },
+    ...snap.account.teams.map((t) => ({ slug: `afd-${t.slug}`, name: t.name, template: null, seats: step(atDesk(`afd-${t.slug}`)) })),
+  ];
+}
+
+const hasBot = (snap: OfficeSnapshot) => snap.people.some((p) => p.id === BOT_ID);
+
 /** Welke dingen bepalen de plattegrond? Verandert dit, dan bouwen we het kantoor opnieuw op. */
 function layoutKey(snap: OfficeSnapshot, liveliness: Liveliness): string {
   return JSON.stringify([
     snap.branches.map((b) => [b.slug, b.name, b.template]),
+    accountRooms(snap).map((b) => [b.slug, b.name, b.seats]),
+    hasBot(snap),
     snap.agents
       .filter((a) => a.status !== "terminated")
       .map((a) => [a.id, a.name, a.branch, a.hqRole, a.template, a.status === "pending_approval"])
@@ -67,7 +88,8 @@ const ownerName = (snap: OfficeSnapshot) => snap.people.find((p) => p.id === OWN
 
 function layoutFor(snap: OfficeSnapshot, liveliness: Liveliness): Layout {
   return buildLayout({
-    branches: snap.branches.map((b) => ({ slug: b.slug, name: b.name, template: b.template })),
+    branches: [...snap.branches.map((b) => ({ slug: b.slug, name: b.name, template: b.template })), ...accountRooms(snap)],
+    bot: hasBot(snap),
     agents: snap.agents.map((a) => ({ id: a.id, name: a.name, branch: a.branch, hqRole: a.hqRole, template: a.template, role: a.role, status: a.status })),
     ownerName: ownerName(snap),
     workshop: workshopOf(snap),
@@ -115,9 +137,9 @@ async function boot(): Promise<void> {
     bootText("Je browser kan geen 3D tekenen (WebGL staat uit). Het overzicht werkt wel.", true);
     return;
   }
-  const source: DataSource = mode === "demo" ? new DemoSource() : new LiveSource();
+  const source: DataSource = mode === "demo" ? new DemoSource() : mode === "account" ? new AccountSource() : new LiveSource();
   const assets = new Assets(assetBase);
-  bootText("Kantoor laden…");
+  bootText(mode === "account" ? "Verbinden met je Claude-account…" : "Kantoor laden…");
   let snap: OfficeSnapshot;
   try {
     [snap] = await Promise.all([
@@ -166,10 +188,22 @@ async function boot(): Promise<void> {
 
   const accentOf = (branch: string) => layout.rooms.find((r) => r.id === layout.roomOfBranch.get(branch))?.accent ?? "#5b6b86";
   const drawBoards = (s: OfficeSnapshot) => {
-    if (world.kanban) drawKanban(world.kanban, s.projects, accentOf);
-    for (const [slug, screen] of world.whiteboards) drawWhiteboard(screen, s.branches.find((b) => b.slug === slug), s.projects, accentOf(slug));
-    if (world.videoWall.length) drawVideoWall(world.videoWall, s, accentOf);
-    if (world.kpiScreen) drawKpiScreen(world.kpiScreen, s);
+    if (s.account) {
+      // Het kantoor op je Claude-account: de borden tonen je sessies, afdelingen en routines.
+      const current = s.code.sessions.filter((x) => x.account?.bucket !== "archived");
+      if (world.kanban) drawSessionBoard(world.kanban, current);
+      for (const [slug, screen] of world.whiteboards) {
+        const name = layout.rooms.find((r) => r.branch === slug)?.name ?? "Afdeling";
+        drawTeamBoard(screen, name, current.filter((x) => x.room === slug), accentOf(slug));
+      }
+      if (world.videoWall.length) drawAccountWall(world.videoWall, s);
+      if (world.kpiScreen) drawAccountKpi(world.kpiScreen, s);
+    } else {
+      if (world.kanban) drawKanban(world.kanban, s.projects, accentOf);
+      for (const [slug, screen] of world.whiteboards) drawWhiteboard(screen, s.branches.find((b) => b.slug === slug), s.projects, accentOf(slug));
+      if (world.videoWall.length) drawVideoWall(world.videoWall, s, accentOf);
+      if (world.kpiScreen) drawKpiScreen(world.kpiScreen, s);
+    }
     for (const [key, screen] of world.codeBoards) {
       drawCodeBoard(screen, s.code.projects.find((p) => p.key === key), s.code.sessions.filter((x) => x.projectKey === key && x.state !== "done").length);
     }
@@ -217,7 +251,7 @@ async function boot(): Promise<void> {
   let soonTimer: number | undefined;
   const soon = () => {
     clearTimeout(soonTimer);
-    soonTimer = window.setTimeout(() => void refresh(), mode === "demo" ? 300 : 1200);
+    soonTimer = window.setTimeout(() => void refresh(), mode === "live" ? 1200 : 300);
   };
 
   ui = new Ui(overlay, { source, director, world, thumbs: () => thumbs, refresh, layout: () => layout, relayout: () => apply(snap) });
@@ -258,6 +292,7 @@ async function boot(): Promise<void> {
       soon();
     },
     (ok) => ui?.setConnected(ok),
+    soon,
   );
   // Vangnet: ook zonder gebeurtenissen af en toe verversen (kosten, status uit Paperclip).
   window.setInterval(() => void refresh(), mode === "demo" ? 20_000 : 45_000);
@@ -273,6 +308,16 @@ async function boot(): Promise<void> {
   }, 600);
 
   if (mode === "demo") ui.toast("👋 Welkom in het demo-kantoor. Klik op een poppetje, een bord of je bureau.", "info");
+  if (mode === "account") {
+    let seen = false;
+    try {
+      seen = localStorage.getItem("kk-kantoor-welkom") === "1";
+      localStorage.setItem("kk-kantoor-welkom", "1");
+    } catch {
+      // geen opslag: dan zie je de uitleg elke keer
+    }
+    if (!seen) ui.toast("👋 Dit is je echte kantoor: alles wat je Claude-account doet. Opdrachten geef je aan de hoofdagent (🧭).", "info");
+  }
   // Voor wie wil meekijken in de console (en voor de tests).
   (window as unknown as { hq: unknown }).hq = { world, director, ui, source, refresh };
 }

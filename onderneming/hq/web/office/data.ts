@@ -32,11 +32,36 @@ export interface RepoChoice {
   pushedAt: string | null;
 }
 
+/** Een plan of opdracht voor de hoofdagent (in het kantoor op je server: Atlas, de CEO). */
+export interface PlanInput {
+  text: string;
+  /** Kantoor op je Claude-account: vervolg op een eerdere sessie van de hoofdagent. */
+  followUp?: { id: string; title: string | null } | null;
+  /** Kantoor op je Claude-account: in welke cloudomgeving de hoofdagent draait. */
+  environmentId?: string | null;
+}
+
+export interface PlanResult {
+  /** Wie het oppakt en waar je het terugvindt (sessie of taak), als dat bekend is. */
+  id: string | null;
+  url: string | null;
+  message: string;
+}
+
 export interface DataSource {
-  readonly mode: "live" | "demo";
+  /** live = HQ op je server, account = je Claude-account (artifact), demo = verzonnen bedrijf. */
+  readonly mode: "live" | "demo" | "account";
   snapshot(): Promise<OfficeSnapshot>;
-  /** Live gebeurtenissen; geeft een functie terug om te stoppen. */
-  subscribe(onEvent: (e: OfficeEvent) => void, onStatus: (connected: boolean) => void): () => void;
+  /**
+   * Live gebeurtenissen; geeft een functie terug om te stoppen. `onChange` = er is nieuwe informatie zonder
+   * gebeurtenis (bv. de eerste lijst van je sessies): haal dan de momentopname opnieuw op.
+   */
+  subscribe(onEvent: (e: OfficeEvent) => void, onStatus: (connected: boolean) => void, onChange?: () => void): () => void;
+  /** Je plan naar de hoofdagent: op je server Atlas (CEO), op je Claude-account een nieuwe hoofdagent-sessie. */
+  sendPlan(input: PlanInput): Promise<PlanResult>;
+  /** Alleen op je Claude-account: een sessie laten stoppen met wat hij nu doet, of archiveren. */
+  stopSession?(id: string): Promise<void>;
+  archiveSession?(id: string): Promise<void>;
   decide(approvalId: number, decision: "approve" | "reject"): Promise<void>;
   halt(reason: string): Promise<void>;
   resume(): Promise<void>;
@@ -154,6 +179,10 @@ export class LiveSource implements DataSource {
   }
   async giveTask(agentId: string, task: { title: string; description?: string; priority?: "high" | "medium" | "low" }): Promise<void> {
     await request("POST", `/api/owner/agents/${encodeURIComponent(agentId)}/task`, task);
+  }
+  async sendPlan(input: PlanInput): Promise<PlanResult> {
+    const res = await request<{ issueId: string; identifier: string | null; agentName: string }>("POST", "/api/owner/plans", { plan: input.text });
+    return { id: res.issueId, url: null, message: `${res.agentName} heeft je plan${res.identifier ? ` (${res.identifier})` : ""}` };
   }
   async saveCodeProject(input: CodeProjectInput): Promise<void> {
     await request("POST", "/api/owner/code/projects", input);

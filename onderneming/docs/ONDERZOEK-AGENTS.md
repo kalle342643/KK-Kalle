@@ -227,6 +227,10 @@ voor ons? En wat kunnen we halen uit *everything-claude-code*?
     noemt zijn riskantste aanname en de kleinste echte test.
   - De lead vergelijkt de ideeën twee aan twee, en de criticus kijkt ook of het haalbaar is.
   - Een nieuwe agent is zelf een experiment: 14 dagen proeftijd, met de nut-meter als meetbare taak.
+- **Sinds 26 september plant Kalle zelf.** Juist door de ideation-execution gap: zijn eigen plannen zijn het
+  vertrekpunt, de agents maken ze scherp (riskantste aanname, goedkoopste echte test) en voeren ze uit. De hoofdagent
+  (claude.ai) en Atlas (skill `plan-van-kalle`) werken een plan uit; de ideeënraad draait alleen als Kalle erom vraagt,
+  en de maandelijkse kansenverkenning van Atlas is uit.
 
 ### 3. Welk model voor welke rol
 Zonder `effort` kiest Claude Code zijn eigen standaard, en die staat meestal hoog. Prima voor een bouwklus, zonde voor
@@ -403,6 +407,23 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
 - Paperclip heeft ook een adapter voor Kimi (`kimi-local`, de Kimi Code-CLI), naast Claude, Codex, Gemini, Grok en
   anderen. Een agent op een ander model kan dus per agent, betaald.
 
+### 12. Grok-agents (xAI)
+Kalle vroeg (27 september) of hij later Grok-agents kan combineren. Ja.
+- **Wat het is:** *Grok Build* is de programmeer-CLI van xAI (sinds mei 2026), de tegenhanger van Claude Code en
+  Codex. Hij werkt met acht helpers tegelijk in eigen git-worktrees, een groot context-venster en een plan dat je eerst
+  goedkeurt. Je gebruikt hem met een SuperGrok-abonnement of via de API (`grok-build-0.1`, ongeveer $1 per miljoen
+  tokens in en $2 uit).
+- **In Paperclip:** er is een adapter `grok_local` die de CLI draait (`grok --single`, met `--resume` tussen runs). Hij
+  zet de instructies als `Agents.md` en de skills in `.claude/skills`, precies waar Grok ze zoekt. De modellen zijn
+  `grok-build`, `grok-4.7`, `grok-4.6` en `grok-4.5`, met een denkstand (`reasoningEffort`). Inloggen gaat met
+  `grok login` op de server, of met `XAI_API_KEY`.
+- **Bij ons:** een sjabloon kan `adapter: grok_local` krijgen, met een Grok-model. HQ vertaalt de denkstand en het
+  aantal beurten naar de velden van Grok. De gratis router blijft alleen voor Claude, en een Claude-model onder
+  `grok_local` laadt niet.
+- **Advies:** begin met één rol als **tegenstem**, bijvoorbeeld de criticus. Een ander model ziet andere fouten, en
+  daar helpt een tweede model echt (zie §6). Een tweede bouwer naast de Claude-bouwer levert vooral dubbel werk op.
+  Eerst meten met de nut-meter, dan pas meer.
+
 ### Wat er daarom veranderd is (deel 2)
 - **Sjablonen:**
   - Elke rol heeft een vaste denkstand (tabel hierboven). Argus draait op Sonnet.
@@ -468,4 +489,5 @@ agents, 292 skills, 94 commando's, plus hooks, regels en geheugen, voor Claude C
 - Jev: [TypeSafe-documentatie](https://docs.typesafe.ai/introduction), [The Register](https://www.theregister.com/ai-and-ml/2026/09/16/typesafe-ai-debuts-model-for-machines-that-plays-doom/5296711), [The Decoder](https://the-decoder.com/former-openai-researcher-builds-an-ai-model-that-judges-options-instead-of-writing-text/), [TechCrunch](https://techcrunch.com/2026/09/18/a-new-kind-of-ai-model-from-a-chatgpt-inventor-is-thrilling-developers/), [Flavio Copes](https://flaviocopes.com/jev/)
 - [everything-claude-code / ECC](https://github.com/affaan-m/everything-claude-code): de skills `loop-design-check`, `gan-style-harness`, `context-budget`, `council-multi-model`, `seo` en *the-shortform-guide*
 - Anthropic, [claude-code-setup (plugin)](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup)
+- Grok: [Paperclip-adapter `grok-local`](https://github.com/paperclipai/paperclip/tree/master/packages/adapters/grok-local), [Grok Build (CIO Dive)](https://www.ciodive.com/news/xAI-coding-agents-Grok-Build/820422/), [Grok Build CLI (Digital Applied)](https://www.digitalapplied.com/blog/xai-grok-build-cli-parallel-coding-agents)
 - Anthropic, [Ship your first Managed Agent](https://claude.com/code-with-claude/session/ldn-ext-ship-your-first-managed-agent) (Code w/ Claude, 2026) en de [workshopcode](https://github.com/anthropics/cwc-workshops/tree/main/ship-your-first-managed-agent); [Managed Agents quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart)

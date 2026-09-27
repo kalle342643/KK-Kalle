@@ -312,6 +312,8 @@ export interface CodeProject {
   /** Laatste fout bij GitHub (bv. geen toegang), zodat je weet waarom iets ontbreekt. */
   error: string | null;
   polledAt: string | null;
+  /** Waar het kantoor dit project van kent: HQ (volgt GitHub en de site) of je Claude-account (alleen de sessies). */
+  source?: "hq" | "account";
 }
 
 /** Een Claude Code-sessie die aan een project werkt (gezien via commits of hooks). */
@@ -335,6 +337,56 @@ export interface CodeSession {
   helpers: CodeHelper[];
   /** Hoeveel helpers deze sessie in totaal inzette. */
   helpersUsed: number;
+  /** Afdeling (slug) waar de sessie zit; leeg = de werkplaats. */
+  room?: string | null;
+  /** Naam op het naamkaartje (anders "Claude · project"). */
+  label?: string | null;
+  /** Wat alleen het kantoor op je Claude-account weet (sessies via de connector Claude Code Remote). */
+  account?: CodeSessionAccount;
+}
+
+/** Hoe een Claude Code-sessie ervoor staat, gezien vanuit je Claude-account. */
+export interface CodeSessionAccount {
+  /** bezig, wacht op jou, klaar om te bekijken, klaar, mislukt of gearchiveerd. */
+  bucket: "working" | "waiting" | "review" | "done" | "failed" | "archived";
+  /** hoofdagent = gestart vanuit het kantoor; afdeling = hoort bij een afdeling; los = staat nergens onder. */
+  kind: "hoofdagent" | "afdeling" | "los";
+  /** Slug en naam van de afdeling (tag `afdeling:<slug>`). */
+  team: string | null;
+  teamName: string | null;
+  /** Rol binnen de afdeling (tag `rol:<rol>`), bv. lead of bouwer. */
+  role: string | null;
+  /** De sessie die deze startte (tag `ouder:<id>`). */
+  parentId: string | null;
+  tags: string[];
+  model: string | null;
+  /** Wat het via de API gekost zou hebben (met een abonnement betaal je dit niet apart). */
+  costUsd: number | null;
+  /** Wat de sessie van jou nodig heeft, als ze wacht. */
+  needsAction: string | null;
+  /** Korte stand van zaken na de laatste beurt. */
+  statusDetail: string | null;
+  /** Waar de sessie draait: cloud, je eigen computer (Cowork/desktop) of onbekend. */
+  where: "cloud" | "computer" | "other";
+  unread: boolean;
+  repo: string | null;
+}
+
+/** Het kantoor op je Claude-account: wat de connector Claude Code Remote laat zien. */
+export interface OfficeAccount {
+  /** ok = gegevens binnen; loading = nog bezig; blocked = geen toegang (zie message); unavailable = deze weergave kan niet bij je account. */
+  state: "ok" | "loading" | "blocked" | "unavailable";
+  message: string | null;
+  /** Wanneer de sessielijst gemaakt is (ms sinds 1970), voor "bijgewerkt om". */
+  updatedAt: number | null;
+  teams: Array<{ slug: string; name: string; sessions: number; working: number; waiting: number }>;
+  routines: Array<{ id: string; name: string; cron: string | null; nextRunAt: string | null; enabled: boolean; lastRunAt: string | null; lastStatus: string | null }>;
+  /** Fout bij het ophalen van de routines (de rest werkt dan gewoon). */
+  routinesError: string | null;
+  environments: Array<{ id: string; name: string }>;
+  /** Je gebruikslimiet, zoals de laatst actieve sessie die zag. */
+  limit: { status: string; type: string | null; resetsAt: string | null } | null;
+  totals: { working: number; waiting: number; review: number; failed: number; costUsd30d: number };
 }
 
 /** Een sub-agent van een Claude Code-sessie: zoekt iets uit, maakt een plan of kijkt het werk na. */
@@ -390,4 +442,6 @@ export interface OfficeSnapshot {
   paperclipError: string | null;
   /** De werkplaats: projecten en Claude Code-sessies. */
   code: OfficeCode;
+  /** Alleen in het kantoor op je Claude-account (artifact): sessies, afdelingen, routines en je limiet. */
+  account?: OfficeAccount;
 }

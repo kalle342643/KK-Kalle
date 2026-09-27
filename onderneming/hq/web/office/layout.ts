@@ -176,6 +176,8 @@ export interface LayoutBranch {
   slug: string;
   name: string;
   template: string | null;
+  /** Bureaus voor Claude Code-sessies in deze afdeling (bovenop de agents); de regisseur zet ze erop. */
+  seats?: number;
 }
 
 /** Wat de werkplaats nodig heeft: één bord per project en genoeg bureaus voor de sessies. */
@@ -196,6 +198,7 @@ export const DEPT_COLORS: Record<string, { floor: string; accent: string }> = {
   generiek: { floor: "#fbeddd", accent: "#e0781f" },
   holding: { floor: "#f2ebe3", accent: "#a47551" },
   werkplaats: { floor: "#f6ebe3", accent: "#d97757" },
+  hoofdagent: { floor: "#f5edd8", accent: "#b8872f" },
 };
 const EXTRA_COLORS = [
   { floor: "#fbe3ea", accent: "#e0457b" },
@@ -227,6 +230,8 @@ export function buildLayout(input: {
   workshop?: LayoutWorkshop;
   /** Bureaus voor figuranten per afdeling (bovenop de echte agents en één vrij bureau). */
   extraSeats?: number;
+  /** Zit de HQ-bot in de controlekamer? Niet in het kantoor op je Claude-account (daar draait geen HQ). */
+  bot?: boolean;
 }): Layout {
   const extra = Math.max(0, Math.min(8, Math.floor(input.extraSeats ?? 0)));
   const agents = input.agents.filter((a) => a.status !== "terminated");
@@ -266,8 +271,9 @@ export function buildLayout(input: {
         x.name.localeCompare(y.name),
     );
     // In de controlekamer zit ook de HQ-bot (die jou de berichten stuurt).
-    if (b.slug === "holding") list.unshift({ id: BOT_ID, name: "HQ-bot", branch: "holding", hqRole: "bot", template: null, role: "bot", status: "idle" });
-    const seats = Math.max(2, list.length + 1 + extra); // altijd een vrij bureau voor een nieuwe collega
+    if (b.slug === "holding" && input.bot !== false) list.unshift({ id: BOT_ID, name: "HQ-bot", branch: "holding", hqRole: "bot", template: null, role: "bot", status: "idle" });
+    // Altijd een vrij bureau voor een nieuwe collega, plus een bureau per sessie die hier hoort.
+    const seats = Math.max(2, list.length + 1 + extra + Math.max(0, Math.floor(b.seats ?? 0)));
     const cols = Math.min(8, Math.max(2, Math.ceil(Math.sqrt(seats * 1.4))));
     const rows = Math.ceil(seats / cols);
     return { branch: b, list, extra, cols, rows, w: Math.max(10, 3 * cols + 2), d: 3 * rows + 3 };

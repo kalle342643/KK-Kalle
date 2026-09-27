@@ -6,26 +6,32 @@ nieuws, dan komt het erbij (regel in `CLAUDE.md`). Niets overslaan, ook niet wat
 Deze repository is openbaar. Details van zijn eigen projecten (klanten, KvK, plannen) staan daarom niet hier, maar in
 de backlog van dat project. Het kantoor toont die punten onder *Jouw beurt* zodra HQ het project volgt.
 
-Bijgewerkt: 26 september 2026 (21 berichten).
+Bijgewerkt: 27 september 2026 (24 berichten).
 
 ## 1. Nu doen (jij), in deze volgorde
 Dit vraagt jouw accounts of geld; dat doet geen agent voor je.
 
-1. [ ] **PR [#3](https://github.com/kalle342643/KK-Kalle/pull/3) mergen** (of zeg dat ik het doe).
-2. [ ] **Server** kiezen en `setup-vps.sh` draaien: Oracle Always Free, je eigen pc of Hetzner
+1. [ ] **Je kantoor openen** (het artifact *KK Kantoor*, link in de chat) en bij Claude Code Remote *Toestaan*
+   kiezen. Vanaf nu geef je daar al je opdrachten: 🧭 *Hoofdagent*. Zie [SETUP.md](SETUP.md), *Je kantoor op
+   claude.ai*.
+2. [ ] **PR #4 mergen** (het echte kantoor, de hoofdagent en de stamboom), of zeg dat ik het doe.
+3. [ ] **Server** kiezen en `setup-vps.sh` draaien: Oracle Always Free, je eigen pc of Hetzner
    ([SETUP.md](SETUP.md), stap 1–2).
-3. [ ] **Tailscale** koppelen: `tailscale up` (stap 3).
-4. [ ] **Paperclip** inrichten, met een Anthropic-sleutel met een maandlimiet in de Console (stap 4).
-5. [ ] **Board-sleutel** voor HQ (stap 5) en **Telegram-bot** (stap 6).
-6. [ ] **`hq.env`** invullen, controleren, bootstrap en starten (stap 7–8).
-7. [ ] **Eerste tak**: `dist/main.js branch games games "Games-studio"` (stap 9), en de testlijst van stap 10.
-8. [ ] **GitHub-token** met alleen leesrechten, via het vooraf ingevulde formulier (stap 11). Daarna volgt HQ je
+4. [ ] **Tailscale** koppelen: `tailscale up` (stap 3).
+5. [ ] **Paperclip** inrichten, met een Anthropic-sleutel met een maandlimiet in de Console (stap 4).
+6. [ ] **Board-sleutel** voor HQ (stap 5) en **Telegram-bot** (stap 6).
+7. [ ] **`hq.env`** invullen, controleren, bootstrap en starten (stap 7–8).
+8. [ ] **Eerste tak**: `dist/main.js branch games games "Games-studio"` (stap 9), en de testlijst van stap 10.
+9. [ ] **GitHub-token** met alleen leesrechten, via het vooraf ingevulde formulier (stap 11). Daarna volgt HQ je
    projecten vanzelf.
-9. [ ] *(Optioneel)* **Gratis AI**: een Groq-sleutel is genoeg om te beginnen (SETUP, *Gratis AI*).
-10. [ ] *(Optioneel)* **Claude Code live in het kantoor**:
+10. [ ] *(Optioneel)* **Gratis AI**: een Groq-sleutel is genoeg om te beginnen (SETUP, *Gratis AI*).
+11. [ ] *(Optioneel)* **Claude Code live in het kantoor op je server**:
     - in de cloud: `sudo bash …/deploy/claude-code/cloud-hook.sh`, dan plakken wat het toont;
     - op je computer: `install-hook.sh`.
-11. [ ] *(Optioneel)* **`claude-code-setup`** in je eigen Claude Code: `/plugin install claude-code-setup@claude-plugins-official`.
+12. [ ] *(Optioneel)* **Hoofdagent → Atlas**: zet `HQ_PLAN_TOKEN` in `hq.env`, en `HQ_URL` plus `HQ_PLAN_TOKEN` als
+    geheimen in je cloudomgeving op claude.ai. Dan geeft de hoofdagent doorlopend werk aan Atlas en de agents op je
+    server (SETUP, *Je kantoor op claude.ai*).
+13. [ ] *(Optioneel)* **`claude-code-setup`** in je eigen Claude Code: `/plugin install claude-code-setup@claude-plugins-official`.
     Vraag in elk project één keer "recommend automations for this project" (zie §4).
 
 ## 2. Je bouwplan van 23 september, per fase
@@ -35,7 +41,7 @@ Uit je onderzoek en bouwplan. Je gaat pas door als het exit-criterium gehaald is
 |---|---|---|---|
 | 1. Game-pijplijn | Fluxgrid in een repo die Claude Code met claude-code-action afwerkt; tweede game uit dezelfde template | 2 games live op CrazyGames, eerste omzet of speeldata | **Nog niet begonnen**: de Fluxgrid-repo is nog leeg. Zie de eerste stappen hieronder |
 | 2. Controlesysteem + dashboard | Server met Paperclip, kostenplafond en Telegram; database; agents met naam en rol | Een game-cyclus draait zonder je pc; jij klikt alleen "publiceren" | **Gebouwd** (HQ, Telegram, noodstop, kantoor). Wacht op de server (§1) |
-| 3. Ideeënraad + experiment-motor | Gedeeld geheugen met Graphify, verkenners, criticus, analist; 1 game per week | 6 experimenten met echte kosten en omzet, minstens 1 KEEP, voorspelling naast resultaat | **Gebouwd**. Draait zodra de games-tak staat |
+| 3. Ideeënraad + experiment-motor | Gedeeld geheugen met Graphify, verkenners, criticus, analist; 1 game per week | 6 experimenten met echte kosten en omzet, minstens 1 KEEP, voorspelling naast resultaat | **Gebouwd**. Sinds bericht 22 plan je zelf: je plannen gaan naar de hoofdagent en Atlas; de ideeënraad draait alleen als je erom vraagt |
 | 4. Tweede tak (scanner-SaaS) | Scanner-MVP, eigen ideeënraad, landingspagina en gratis scans | ≥ 10 aanmeldingen of een betalende klant | **Sjabloon `saas` klaar**. Het product zelf is je eigen project in de werkplaats |
 | 5. HQ + portfolio-agent | HQ met ROI per tak, kantoor, CEO die wekelijks budget verdeelt, Agent Factory | 4 weken voorstellen die je grotendeels goedkeurt | **Gebouwd**. Telt vanaf de eerste weken met echte cijfers |
 
@@ -54,12 +60,13 @@ voor Claude Code*.
 
 **Het eindbeeld uit je plan**, en hoe het nu werkt:
 - 08:00 dagrapport in Telegram;
-- knoppen om te publiceren en om de ideeën van de raad te kiezen;
+- knoppen om te publiceren en om experimenten goed te keuren;
 - op maandag het portfolio-voorstel;
 - per agent wat hij doet en kost (in het kantoor);
 - `/stop` en `/status`.
 
-Dat is allemaal gebouwd. Het draait zodra de server staat.
+Dat is allemaal gebouwd. Het draait zodra de server staat. Wat nu al live is: je kantoor op claude.ai, met al je
+Claude-sessies, de hoofdagent en de stamboom (bericht 22).
 
 ## 3. Alles wat je stuurde
 | # | Datum | Wat je stuurde | Wat ermee gebeurde | Stand / volgende stap |
@@ -85,9 +92,14 @@ Dat is allemaal gebouwd. Het draait zodra de server staat.
 | 19 | 25 sep | De "everything Claude"-skill | Niet bij jouw repositories gevonden; het openbare origineel bekeken. Niet installeren; 3 ideeën overgenomen | Bedoelde je een andere? Stuur de link |
 | 20 | 26 sep | `/plugin install claude-code-setup@claude-plugins-official`, en "alles in het stappenplan" | Dit stappenplan. De plugin-analyse op deze repo gedaan: `CLAUDE.md` erbij, met de regel dat alles hier komt | Jouw projecten: §1 punt 11 en §4 |
 | 21 | 26 sep | Screenshot: "Anthropic's gratis gids van 37 minuten over agents" (*Ship your first Managed Agent*, Isabella He) | Uitgezocht: Claude Managed Agents, Anthropics eigen platform dat agents in hún cloud draait (met schema's, een keurder met rubric, een budget per sessie, geheugen en een kluis). Paperclip kan het al gebruiken. De talk en de code zijn gratis: je hoeft niet te reageren | Kijk de [talk](https://claude.com/code-with-claude/session/ldn-ext-ship-your-first-managed-agent) als je wilt. Overstappen: nu niet (§4) |
+| 22 | 26–27 sep | "Zelf ideeën bedenken kan ik ook: dan zeg ik mijn plan tegen de hoofdagent, die kijkt ernaar, maakt er een afdeling voor en verdeelt het onder agents." "PR #3 mergen." "Richt alles in alsof het echt is; alles wat mijn Claude-account doet wil ik daar zien, en ik stuur geen prompts meer in een gewone chat, alleen nog in de artifact naar de hoofdagent." Daarna een foto (Valeri Does AI: de stamboom van een *creative studio*, met teams en hun agents): "dit moet sowieso, een stamboom of handig overzicht van iedereen die iets doet; wat niet verbonden is, los van elkaar". En: "alles wat ik zeg, onthouden en in het stappenplan" | PR #3 gemerged. **Het echte kantoor** als artifact op claude.ai: live al je Claude-sessies (connector Claude Code Remote), een eigen kamer voor de hoofdagent en voor elke afdeling, 🧭 *Hoofdagent* om opdrachten te geven, 🌳 *Stamboom* (jij → hoofdagent → afdelingen → agents; wat nergens onder hangt, staat los), routines en 🛑 *Stop alles*. Elke opdracht start een hoofdagent-sessie met de skill `hoofdagent`: eerlijk bekijken, afdeling maken (tags), werk verdelen over sessies. Op je server werkt Atlas je plan uit (skill `plan-van-kalle`, `POST /api/owner/plans`); de hoofdagent kan het hem geven met `HQ_PLAN_TOKEN`. De wekelijkse ideeënraad en de maandelijkse kansenverkenning zijn uit: die draaien alleen als jij erom vraagt. De stamboom zit ook in het kantoor op je server en in de demo | Open je kantoor en kies *Toestaan* (§1 punt 1). Server later vandaag (§1 punt 3) |
+| 23 | 27 sep | "Als ik ooit Grok-agents koop, kan ik dat hierin combineren?" (twee keer gestuurd) | Ja. Paperclip heeft een adapter voor Grok Build, de programmeer-CLI van xAI (`grok_local`). Een sjabloon kan nu `adapter: grok_local` krijgen; HQ vertaalt de denkstand en het aantal beurten, en de gratis router blijft voor Claude | Pas als je het koopt: §4 |
+| 24 | 27 sep | "Ga door waar je mee bezig was voordat de limiet resette", "Ga door" | Doorgegaan: berichten 22 en 23 afgemaakt, getest en in PR #4 gezet | — |
 
 **Je doelen uit bericht 2:**
-- **CEO-agent:** ✔ Atlas, met een weekplan en elke maand een kansenverkenning.
+- **CEO-agent:** ✔ Atlas, met een weekplan. Jouw plannen werkt hij uit (skill `plan-van-kalle`); zelf bedenkt hij geen
+  nieuwe takken meer.
+- **Hoofdagent:** ✔ je ingang in het kantoor op claude.ai. Elke opdracht wordt een sessie die er een afdeling voor maakt.
 - **Agent Factory:** ✔ nieuwe agents en takken uit sjablonen, met een controle van de bezetting.
 - **Takken:**
   - ✔ games, content en affiliate, SaaS/software;
@@ -104,6 +116,7 @@ Dat is allemaal gebouwd. Het draait zodra de server staat.
 ## 4. Later: wanneer het wél zin krijgt
 | Wat | Nu? | Wanneer wel |
 |---|---|---|
+| **Grok-agents (xAI)** | Nee: niet nodig, en het kost een SuperGrok-abonnement of xAI-tegoed | Als je het koopt: installeer de Grok Build-CLI op de server en log in (`grok login`, of zet `XAI_API_KEY`). Geef een sjabloon `adapter: grok_local` en `model: grok-build` (of `grok-4.7`). Begin als tegenstem, bijvoorbeeld de criticus, niet meteen als bouwer. Zie [onderzoek deel 2, §12](ONDERZOEK-AGENTS.md#12-grok-agents-xai) |
 | **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot). Paperclip heeft er ook een eigen adapter voor (`kimi-local`), per agent in te stellen |
 | **Claude Managed Agents** (Anthropic draait de agent in zijn cloud) | Nee. HQ en de agents draaien al op Paperclip; het is nog beta; je betaalt API-tarieven plus $0,08 per uur looptijd | Als de bouwer te zwaar wordt voor je gratis server, of voor je eigen producten (bv. geplande scans). Paperclip kan een agent al zo laten draaien (een "managed agent profile", nu alleen voor Sonnet 5). De keuring met een rubric en de hooguit twee rondes zitten er ook in |
 | **Elk model een eigen agent** | Nee. Meer agents kosten meer en praten langs elkaar heen | Een ander model als tegenstem bij grote beslissingen; eventueel de criticus als proef op een ander model |
