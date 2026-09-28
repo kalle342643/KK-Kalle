@@ -196,6 +196,8 @@ voor ons? En wat kunnen we halen uit *everything-claude-code*?
    je eigen computer. **Elk model een eigen agent: nee.** Wel elke rol op het goedkoopste model dat het werk aankan.
 6. **Jev: nu niet** (aanmelden staat dicht, en we hebben geen massawerk om te sorteren). **TypeScript voor de
    bouwers: ja.** **everything-claude-code: niet installeren**, wel drie ideeën overnemen.
+7. **AWS-agents: nu niet** (§13). Ze zijn gemaakt voor bedrijven die al op AWS draaien en per uur betalen. Later wel
+   Claude via Amazon Bedrock, betaald met startuptegoed van AWS.
 
 ### 1. Lange bouwklussen: de werkwijze om het model heen
 - **Anthropic, *Effective harnesses for long-running agents*.** Een eerste sessie zet de basis klaar: een lijst met
@@ -424,6 +426,44 @@ Kalle vroeg (27 september) of hij later Grok-agents kan combineren. Ja.
   daar helpt een tweede model echt (zie §6). Een tweede bouwer naast de Claude-bouwer levert vooral dubbel werk op.
   Eerst meten met de nut-meter, dan pas meer.
 
+### 13. AWS-agents (Amazon)
+Kalle vroeg (28 september) om ook naar de agents van AWS te kijken. Hij is nog klein, maar stopt later al zijn geld in
+de holding, ook dat uit andere projecten.
+
+**Het korte antwoord:** nu niet. De agents van AWS zijn gemaakt voor bedrijven die al op AWS draaien en per uur kunnen
+betalen. Eén ding wordt wel interessant zodra je een KvK-inschrijving en een website hebt: **Claude via Amazon Bedrock,
+betaald met startuptegoed van AWS.** Dat is dezelfde Claude, en je agents hoeven er niet voor te veranderen.
+
+| Wat | Wat het doet | Prijs (september 2026) | Voor ons |
+|---|---|---|---|
+| **Claude in Amazon Bedrock** | Dezelfde Claude-modellen, via je AWS-account | Gelijk aan de Claude API op de globale endpoint. Een regionale endpoint (bijvoorbeeld alleen in de EU) kost 10% meer | **Later ja**, met Activate-tegoed. Claude Code kan het gebruiken, dus onze agents in Paperclip ook |
+| **AWS Activate Founders** | Tegoed voor startups zonder investeerders | $1.000 om te beginnen, tot $5.000. Je bedrijf is jonger dan 10 jaar en heeft een website, en je AWS-account staat op het betaalde plan | **Ja, zodra je een KvK-inschrijving en een website hebt.** Het tegoed geldt ook voor Claude op Bedrock |
+| **Kiro** en zijn autonome agent | Programmeeromgeving van AWS. De autonome agent pakt GitHub-issues met het label `kiro` op, levert een PR en repareert zelf wat in CI misgaat | Gratis: 50 credits. Pro $20 (1.000 credits) tot Power $200 per maand. Extra credits $0,04 per stuk | Nee: de sessies uit je kantoor doen hetzelfde. Hooguit later als tweede bouwer, net als Grok |
+| **Bedrock AgentCore** | Hosting voor agents die je zelf programmeert: runtime, geheugen, een gateway naar tools, inloggen, een browser en code uitvoeren | Runtime $0,0895 per vCPU-uur (alleen als de CPU rekent, niet als hij op het model wacht) en $0,00945 per GB-uur. Gateway $0,005 per 1.000 aanroepen. Geheugen $0,25 per 1.000 gebeurtenissen. Modellen apart | Niet voor je eigen team: Paperclip heeft er geen adapter voor, en je server is goedkoper. Wel als je ooit agents aan klanten verkoopt |
+| **DevOps Agent** | Zoekt storingen in je AWS-omgeving uit en voorkomt ze | $0,0083 per agent-seconde (±$30 per uur). 2 maanden gratis proberen | Nee: we draaien niet op AWS |
+| **Security Agent** (nu *AWS Continuum*) | Pentests van je webapp, en reviews van je code en je ontwerp | Een pentest kost $50 per taakuur. 2 maanden gratis proberen, tot 400 taakuren per maand | **Later:** één pentest voordat je SaaS met klantgegevens live gaat. Werkt ook buiten AWS, als je bewijst dat het domein van jou is |
+| **Amazon Quick** | Assistent voor kantoorwerk: chat, onderzoek en flows | Gratis. Plus $20 of Max $100 per gebruiker. Voor organisaties $20–40 per gebruiker, plus $250 per account per maand | Nee: overlapt met Claude |
+| **Nova Act** | Agents die in een browser klikken (formulieren, UI-tests) | $4,75 per agent-uur | Nee: Playwright test gratis, en onze agents gebruiken geen ingelogde browser |
+| **Claude Platform on AWS** | De eigen API van Anthropic (met Managed Agents), betaald via je AWS-rekening | Gelijk aan de Claude API | Nee: alleen handig als je alles via AWS wilt betalen. Het Activate-tegoed geldt er waarschijnlijk niet voor: het loopt via AWS Marketplace en is geen Bedrock |
+
+**Claude op Bedrock later aanzetten (zonder nieuwe code):**
+- Paperclip draait onze agents als Claude Code (`claude_local`), en Claude Code kan via Bedrock werken. Draai op de
+  server één keer `/setup-bedrock` in Claude Code, of zet in de omgeving `CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION` en
+  een Bedrock-API-sleutel (`AWS_BEARER_TOKEN_BEDROCK`) met alleen Bedrock-rechten.
+- Leg de modellen vast met `ANTHROPIC_DEFAULT_OPUS_MODEL`, `ANTHROPIC_DEFAULT_SONNET_MODEL` en
+  `ANTHROPIC_DEFAULT_HAIKU_MODEL`. Anders kiest Claude Code op Bedrock het duurste model.
+- `WebSearch` werkt niet op Bedrock. De verkenners gebruiken dan `hq-web` en `hq-trends`, net als op de gratis router.
+- Paperclip telt de kosten die Claude Code meldt. Kijk na de eerste dag of die kloppen met *AWS Billing*.
+
+**Waar je op moet letten bij AWS:**
+- Je rekening heeft geen harde stop. Zet **AWS Budgets** met een melding aan voordat je iets gebruikt, en eventueel een
+  actie die de toegang intrekt.
+- Tegoed raakt ongemerkt op. Iemand kreeg in 2026 een rekening van ruim $30.000 voor Claude op Bedrock, nadat zijn
+  $8.000 tegoed op was. Hij kreeg geen melding, en *Cost Anomaly Detection* ziet kosten via AWS Marketplace niet.
+- Een nieuw account krijgt $100 tot $200 starttegoed, 6 maanden geldig. Volgens gebruikers werkt dat ook voor Claude,
+  maar AWS zegt dat minder duidelijk dan bij Activate. Reken er niet op.
+- Een account aanmaken en tegoed aanvragen doe je zelf.
+
 ### Wat er daarom veranderd is (deel 2)
 - **Sjablonen:**
   - Elke rol heeft een vaste denkstand (tabel hierboven). Argus draait op Sonnet.
@@ -491,3 +531,7 @@ Kalle vroeg (27 september) of hij later Grok-agents kan combineren. Ja.
 - Anthropic, [claude-code-setup (plugin)](https://github.com/anthropics/claude-plugins-official/tree/main/plugins/claude-code-setup)
 - Grok: [Paperclip-adapter `grok-local`](https://github.com/paperclipai/paperclip/tree/master/packages/adapters/grok-local), [Grok Build (CIO Dive)](https://www.ciodive.com/news/xAI-coding-agents-Grok-Build/820422/), [Grok Build CLI (Digital Applied)](https://www.digitalapplied.com/blog/xai-grok-build-cli-parallel-coding-agents)
 - Anthropic, [Ship your first Managed Agent](https://claude.com/code-with-claude/session/ldn-ext-ship-your-first-managed-agent) (Code w/ Claude, 2026) en de [workshopcode](https://github.com/anthropics/cwc-workshops/tree/main/ship-your-first-managed-agent); [Managed Agents quickstart](https://platform.claude.com/docs/en/managed-agents/quickstart)
+- AWS (28 september 2026): prijzen van [AgentCore](https://aws.amazon.com/bedrock/agentcore/pricing/), [DevOps Agent](https://aws.amazon.com/devops-agent/pricing/), [Security Agent / Continuum](https://aws.amazon.com/security-agent/pricing/), [Amazon Quick](https://aws.amazon.com/quick/pricing) en [Nova](https://aws.amazon.com/nova/pricing/); [Activate-tegoed](https://aws.amazon.com/startups/credits), [Activate-tegoed geldt voor modellen van derden op Bedrock](https://aws.amazon.com/blogs/startups/aws-activate-credits-now-accepted-for-third-party-models-on-amazon-bedrock/), [Free Tier met $200 tegoed](https://aws.amazon.com/about-aws/whats-new/2025/07/aws-free-tier-credits-month-free-plan/), [pentest-domein verifiëren](https://docs.aws.amazon.com/securityagent/latest/userguide/enable-test-domain.html), [Claude Platform on AWS](https://aws.amazon.com/claude-platform/)
+- Kiro: [prijzen](https://kiro.dev/pricing/), [autonome agent](https://kiro.dev/autonomous-agent)
+- Anthropic: [Claude in Amazon Bedrock](https://platform.claude.com/docs/en/build-with-claude/claude-in-amazon-bedrock), [Claude Code op Bedrock](https://code.claude.com/docs/en/amazon-bedrock), [prijzen](https://platform.claude.com/docs/en/about-claude/pricing)
+- The Register, [Claude op Bedrock: rekening van $30.000 na op geraakt tegoed](https://www.theregister.com/saas/2026/05/14/bedrock-and-a-hard-place-claude-adventure-leaves-aws-user-staring-down-30k-invoice/5238153) (mei 2026)

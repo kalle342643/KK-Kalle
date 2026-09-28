@@ -4,7 +4,7 @@ import { audit } from "./audit.js";
 import { getBranch, HOLDING_SLUG, listBranches, updateBranch, type Branch } from "./branches.js";
 import type { Actor, AppContext } from "./context.js";
 import { OPEN_STATUSES } from "./experiments.js";
-import { totals, totalsByBranch, type Totals } from "./ledger.js";
+import { monthlyAllowanceEur, totals, totalsByBranch, type Totals } from "./ledger.js";
 import { eurToUsdCents, formatEur, round2 } from "./money.js";
 import { addDays } from "./time.js";
 
@@ -53,7 +53,7 @@ export async function computePortfolio(ctx: AppContext): Promise<Portfolio> {
     [addDays(now, -60).toISOString()],
   );
   const empty: Totals = { revenue: 0, tokenCost: 0, spend: 0, cost: 0, profit: 0 };
-  const allowanceEur = round2(money.globalMonthlyCapEur + money.revenueShareForAi * all.revenue);
+  const allowanceEur = await monthlyAllowanceEur(ctx.db, money, now);
 
   const branches = (await listBranches(ctx.db)).filter((b) => b.slug !== HOLDING_SLUG);
   const holding = (await listBranches(ctx.db)).find((b) => b.slug === HOLDING_SLUG);

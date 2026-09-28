@@ -49,17 +49,49 @@ hoe dan ook bij de plafonds hieronder.
 
 ## De plafonds (van buiten naar binnen)
 1. **Anthropic Console:** maandlimiet op de API-sleutel. Harde stop, buiten het systeem.
-2. **Paperclip, bedrijf:** maandplafond = `HQ_GLOBAL_MONTHLY_CAP_EUR` (standaard €40) + 30% van de omzet van de
-   laatste 30 dagen. Wordt bijgewerkt als jij het portfolio-voorstel goedkeurt.
+2. **Paperclip, bedrijf:** maandplafond = `HQ_GLOBAL_MONTHLY_CAP_EUR` (standaard €40) + `HQ_REVENUE_SHARE_FOR_AI`
+   (standaard 30%) van de omzet van de laatste 30 dagen. HQ zet het bij elke `bootstrap` (ook in `update.sh`) en als
+   jij het portfolio-voorstel goedkeurt.
 3. **Paperclip, per agent:** maandbudget uit het sjabloon (CEO €15, bouwer €15, lead €10, analist €5, criticus €5
    (ook de keuring), verkenner €3).
 4. **Paperclip, per experiment:** levenslang budget (standaard €20, max. €50 per verzoek) met harde stop.
 5. **HQ:** noodstop zodra de AI-kosten van vandaag boven `HQ_DAILY_SPEND_ALARM_EUR` (standaard €15) komen.
 
-## Opschalen
-Het AI-budget groeit alleen mee met echte omzet: per tak startbudget + **30% van de omzet van de laatste
-30 dagen**, met een bonus voor takken met een ROI ≥ 2× en een recente KEEP. Van 1 naar 5 naar 20+ agents gaan
+## Opschalen: al het geld terug erin
+Het AI-budget groeit alleen mee met echt geld: per tak het startbudget + een deel van de omzet van de laatste
+30 dagen (standaard **30%**), met een bonus voor takken met een ROI ≥ 2× en een recente KEEP. Van 1 naar 5 naar 20+ agents gaan
 is in Paperclip een configuratiekwestie; economisch gebeurt het pas als de takken het betalen.
+
+Kalle stopt al het geld dat hij verdient terug in de holding, ook geld uit andere projecten, tot er veel agents voor
+hem werken (bericht 26). Zo stel je dat in:
+
+- **Omzet van de holding:** zet `HQ_REVENUE_SHARE_FOR_AI` hoger dan `0.3`, maar houd de belasting erbuiten. HQ telt de
+  omzet zoals die binnenkomt, bij Stripe dus inclusief btw en vóór transactiekosten.
+  - Reken je btw (21%)? Dan is ruim 17% van die omzet van de Belastingdienst. Ga dan niet hoger dan `0.8`.
+  - Reken je geen btw (kleineondernemersregeling)? Dan kan `0.95`.
+  - Wat aan het eind van het jaar als winst overblijft, is voor de inkomstenbelasting. Twijfel je, vraag het een
+    boekhouder.
+- **Geld uit andere projecten** (websites en zo): tel het bedrag dat je er per maand bij stopt op bij
+  `HQ_GLOBAL_MONTHLY_CAP_EUR`. Boek het niet als omzet, want dan lijkt een tak beter dan hij is en gaat het geld naar
+  de verkeerde tak.
+- **Verhoog ook de maandlimiet op je Anthropic-sleutel** (plafond 1). Anders stopt die eerder.
+- Na het aanpassen van `hq.env`: `systemctl --user restart hq` en `hq bootstrap`. Dan staat het nieuwe plafond ook in
+  Paperclip.
+
+Wat niet verandert: jij keurt elke uitgave, aanname en elk experiment goed, en de noodstop blijft. Heeft een agent
+meer nodig dan zijn eigen budget, dan vraagt hij dat aan. De nut-meter pauzeert wie niets oplevert. Zo gaat meer geld
+naar agents die iets opleveren, en niet vanzelf naar meer agents.
+
+**Waar het geld heen gaat, als het er is:**
+
+| Wanneer | Wat je doet |
+|---|---|
+| Nu (nog geen omzet) | Gratis server en €20–50 per maand aan AI. Niets op AWS |
+| De eerste omzet | `HQ_REVENUE_SHARE_FOR_AI` omhoog (zie hierboven) |
+| Je hebt een KvK-inschrijving en een website | **AWS Activate Founders** aanvragen: $1.000 tegoed, later tot $5.000. Dat mag ook naar Claude via Amazon Bedrock, dus je agents draaien daar een tijd op. Zet eerst AWS Budgets aan. Zie [onderzoek §13](ONDERZOEK-AGENTS.md#13-aws-agents-amazon) |
+| De server zit vol (agents wachten op elkaar) | Eerst een grotere server (Hetzner, ±€7–15 per maand), en pas dan meer agents |
+| Een product met klantgegevens gaat live | Eén pentest door AWS, in de gratis proefperiode van 2 maanden |
+| Je verkoopt agents aan klanten | AgentCore van AWS om ze per klant te draaien. Je eigen team blijft op je server |
 
 ## Wat al zuinig is (na de controle van september 2026)
 Zie [ONDERZOEK-AGENTS.md](ONDERZOEK-AGENTS.md). Geen aparte pitcher meer (de lead maakt de top 5), geen

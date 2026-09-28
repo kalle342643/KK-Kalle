@@ -6,7 +6,7 @@ import { audit, countRecent } from "./audit.js";
 import { DomainError, getBranch, HOLDING_SLUG, listBranches, requireBranch, type Branch } from "./branches.js";
 import type { Actor, AppContext } from "./context.js";
 import { assertNotHalted } from "./killswitch.js";
-import { totals } from "./ledger.js";
+import { monthlyAllowanceEur, totals } from "./ledger.js";
 import { safeProposalKnowledge, knowledgeSummaryLines, type ProposalKnowledge } from "../knowledge/precheck.js";
 import { experimentCode } from "./codes.js";
 import { eurToUsdCents, formatEur, round2 } from "./money.js";
@@ -186,12 +186,10 @@ export async function budgetGate(ctx: AppContext, branch: Branch): Promise<Budge
     global += num(r.total);
     if (r.branch_id === branch.id) own = num(r.total);
   }
-  const now = ctx.now();
-  const revenue30 = (await totals(ctx.db, { from: addDays(now, -30), to: now })).revenue;
   return {
     branchBudgetEur: branch.monthlyBudgetEur,
     branchCommittedEur: round2(own),
-    globalAllowanceEur: round2(ctx.config.money.globalMonthlyCapEur + ctx.config.money.revenueShareForAi * revenue30),
+    globalAllowanceEur: await monthlyAllowanceEur(ctx.db, ctx.config.money, ctx.now()),
     globalCommittedEur: round2(global),
   };
 }

@@ -2,6 +2,7 @@ import type { Config } from "../config.js";
 import type { Db } from "../db/index.js";
 import { audit } from "../domain/audit.js";
 import { errorMessage, type AppContext, type Logger } from "../domain/context.js";
+import { monthlyAllowanceEur } from "../domain/ledger.js";
 import { eurToUsdCents } from "../domain/money.js";
 import { getSetting, setSetting } from "../domain/settings.js";
 import type { PaperclipApi } from "../paperclip/client.js";
@@ -16,6 +17,8 @@ export interface BootstrapDeps {
   config: Config;
   paperclip: PaperclipApi;
   log: Logger;
+  /** Klok voor het omzetvenster van het maandplafond (standaard: nu). */
+  now?: () => Date;
 }
 
 export interface BootstrapReport {
@@ -50,24 +53,24 @@ export async function bootstrap(deps: BootstrapDeps, def: CompanyDefinition): Pr
     warnings: [],
   };
 
-  // 1. Bedrijf
+  // 1. Bedrijf. Het maandplafond rekent HQ overal hetzelfde: plafond + omzetdeel van de laatste 30 dagen.
+  // Alleen het plafond zetten zou bij elke update het omzetdeel weghalen tot het volgende portfolio-akkoord.
+  const allowanceEur = await monthlyAllowanceEur(deps.db, config.money, deps.now?.() ?? new Date());
+  const budgetMonthlyCents = eurToUsdCents(allowanceEur, config.money.usdToEur);
   let companyId = await resolveCompanyId(deps);
   if (!companyId) {
     const existing = (await paperclip.listCompanies()).find((c) => c.name === def.company.name && c.status !== "archived");
     if (existing) companyId = existing.id;
   }
   if (!companyId) {
-    const created = await paperclip.createCompany({
-      name: def.company.name,
-      budgetMonthlyCents: eurToUsdCents(config.money.globalMonthlyCapEur, config.money.usdToEur),
-    });
+    const created = await paperclip.createCompany({ name: def.company.name, budgetMonthlyCents });
     companyId = created.id;
     report.companyCreated = true;
   }
   await paperclip.updateCompany(companyId, {
     description: def.company.description,
     requireBoardApprovalForNewAgents: def.company.requireBoardApprovalForNewAgents,
-    budgetMonthlyCents: eurToUsdCents(config.money.globalMonthlyCapEur, config.money.usdToEur),
+    budgetMonthlyCents,
   });
   await setSetting(deps.db, COMPANY_ID_SETTING, companyId);
   report.companyId = companyId;
