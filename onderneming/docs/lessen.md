@@ -272,6 +272,20 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   - of een hoofdagent-sessie de connector zelf mag gebruiken om sessies met tags te starten (dat kan in cloudsessies
     zoals deze wel).
 
+## Geld terug erin en AWS (28 september)
+- **Eén geldregel, op één plek.** Het maandplafond (plafond + omzetdeel) stond op drie plekken in de code, en
+  `bootstrap` had een vierde versie: alleen het plafond. Elke `update.sh` haalde daardoor het omzetdeel weer
+  uit Paperclip, tot het volgende portfolio-akkoord. Bleven de takbudgetten gelijk, dan kwam dat akkoord niet eens.
+  Nu rekenen `bootstrap`, het portfolio en de experimentcontrole met dezelfde functie, met een test erbij. Zoek bij
+  een geldregel eerst waar hij nog meer staat.
+- **Omzet is niet wat je mag uitgeven.** HQ telt de omzet inclusief btw en vóór transactiekosten. Wie "alles terug
+  erin" wil, zet het omzetdeel dus op hooguit 0,8 als hij btw rekent, anders 0,95.
+- **Controleer prijzen bij de bron.** Een blog meldde dat Sonnet 5 sinds 1 september $3/$15 kost. Volgens Anthropic zelf
+  blijft het $2/$10: de verhoging gaat niet door.
+- **Cloud-tegoed raakt stil op.** Bij AWS stopt niets vanzelf als het tegoed op is. Iemand kreeg zo een rekening van
+  ruim $30.000 voor Claude op Bedrock, en de waarschuwing voor rare kosten (Cost Anomaly Detection) zag het niet.
+  Eerst AWS Budgets instellen, dan pas iets aanzetten.
+
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
   (socket-URL, back-up, env-bestand).

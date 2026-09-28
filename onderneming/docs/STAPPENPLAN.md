@@ -6,7 +6,7 @@ nieuws, dan komt het erbij (regel in `CLAUDE.md`). Niets overslaan, ook niet wat
 Deze repository is openbaar. Details van zijn eigen projecten (klanten, KvK, plannen) staan daarom niet hier, maar in
 de backlog van dat project. Het kantoor toont die punten onder *Jouw beurt* zodra HQ het project volgt.
 
-Bijgewerkt: 27 september 2026 (25 berichten).
+Bijgewerkt: 28 september 2026 (27 berichten).
 
 ## 1. Nu doen (jij), in deze volgorde
 Dit vraagt jouw accounts of geld; dat doet geen agent voor je.
@@ -96,6 +96,8 @@ Claude-sessies, de hoofdagent en de stamboom (bericht 22).
 | 23 | 27 sep | "Als ik ooit Grok-agents koop, kan ik dat hierin combineren?" (twee keer gestuurd) | Ja. Paperclip heeft een adapter voor Grok Build, de programmeer-CLI van xAI (`grok_local`). Een sjabloon kan nu `adapter: grok_local` krijgen; HQ vertaalt de denkstand en het aantal beurten, en de gratis router blijft voor Claude | Pas als je het koopt: §4 |
 | 24 | 27 sep | "Ga door waar je mee bezig was voordat de limiet resette", "Ga door" | Doorgegaan: berichten 22 en 23 afgemaakt, getest en in PR #4 gezet | — |
 | 25 | 27 sep | "Merge" | PR #4 gemerged: het echte kantoor, de hoofdagent-skill en de stamboom staan op main. Nieuwe hoofdagent-sessies uit je kantoor gebruiken ze meteen | Open je kantoor en geef je eerste opdracht (§1 punt 1) |
+| 26 | 28 sep | "Kijk ook naar AWS-agents. Ik ben nog klein, maar als ik ooit wat geld verdien met dit of andere projecten (websites enz.), stop ik al het geld hierin tot er heel veel agents voor me werken" | Uitgezocht in [onderzoek §13](ONDERZOEK-AGENTS.md#13-aws-agents-amazon). De agents van AWS zijn voor bedrijven die al op AWS draaien (DevOps Agent ±$30 per uur, een pentest $50 per uur): nu niet. Later wel Claude via Amazon Bedrock, betaald met AWS Activate-tegoed ($1.000, tot $5.000), zonder de agents om te bouwen. "Alles terug erin" staat in [KOSTEN.md](KOSTEN.md#opschalen-al-het-geld-terug-erin): het omzetdeel omhoog (de btw erbuiten), en geld uit andere projecten bij het plafond. Daarbij een fout gerepareerd: elke update zette het plafond in Paperclip terug naar alleen de €40, zonder omzetdeel | Nu niets. Eerste omzet: `HQ_REVENUE_SHARE_FOR_AI` omhoog. KvK-inschrijving en website: Activate Founders (§4) |
+| 27 | 28 sep | "Ga door" | Doorgegaan: bericht 26 afgemaakt, getest en in PR #5 gezet | — |
 
 **Je doelen uit bericht 2:**
 - **CEO-agent:** ✔ Atlas, met een weekplan. Jouw plannen werkt hij uit (skill `plan-van-kalle`); zelf bedenkt hij geen
@@ -113,10 +115,14 @@ Claude-sessies, de hoofdagent en de stamboom (bericht 22).
 - **Claude Code maximaal gebruiken:** ✔ werkplaats, helpers en hooks.
 - **Kosten €20–50 per maand:** ✔ zie [KOSTEN.md](KOSTEN.md).
 - **Van 1 naar 100+ agents:** technisch is dat configuratie. Economisch gebeurt het pas als de takken het betalen.
+  Jij stopt al het geld terug in de holding (bericht 26); hoe je dat in HQ instelt, staat in
+  [KOSTEN.md](KOSTEN.md#opschalen-al-het-geld-terug-erin).
 
 ## 4. Later: wanneer het wél zin krijgt
 | Wat | Nu? | Wanneer wel |
 |---|---|---|
+| **Claude via Amazon Bedrock, met AWS-tegoed** | Nee. Voor het tegoed heeft je bedrijf een KvK-inschrijving en een website nodig | Vraag dan AWS Activate Founders aan ($1.000, tot $5.000; het geldt ook voor Claude op Bedrock). Zet eerst AWS Budgets aan. Draai daarna `/setup-bedrock` op de server en leg de modellen vast; je agents draaien dan op dat tegoed. Zie [onderzoek §13](ONDERZOEK-AGENTS.md#13-aws-agents-amazon) |
+| **AWS-agents** (Kiro, AgentCore, DevOps Agent, Security Agent, Quick, Nova Act) | Nee. Ze zijn gemaakt voor bedrijven die al op AWS draaien en per uur betalen; je server en Claude doen het nu goedkoper | Een pentest (Security Agent, 2 maanden gratis) voordat een product met klantgegevens live gaat. AgentCore pas als je agents aan klanten verkoopt |
 | **Grok-agents (xAI)** | Nee: niet nodig, en het kost een SuperGrok-abonnement of xAI-tegoed | Als je het koopt: installeer de Grok Build-CLI op de server en log in (`grok login`, of zet `XAI_API_KEY`). Geef een sjabloon `adapter: grok_local` en `model: grok-build` (of `grok-4.7`). Begin als tegenstem, bijvoorbeeld de criticus, niet meteen als bouwer. Zie [onderzoek deel 2, §12](ONDERZOEK-AGENTS.md#12-grok-agents-xai) |
 | **Kimi K2.6 / K3 / Kimi Work** | Nee. Nergens meer gratis, en Kimi Work draait in jouw ingelogde browser (dat mogen agents niet) | Als de bouwkosten gaan knellen: K2.6 kost ongeveer wat Haiku kost en werkt met Claude Code (betaald, data naar Moonshot). Paperclip heeft er ook een eigen adapter voor (`kimi-local`), per agent in te stellen |
 | **Claude Managed Agents** (Anthropic draait de agent in zijn cloud) | Nee. HQ en de agents draaien al op Paperclip; het is nog beta; je betaalt API-tarieven plus $0,08 per uur looptijd | Als de bouwer te zwaar wordt voor je gratis server, of voor je eigen producten (bv. geplande scans). Paperclip kan een agent al zo laten draaien (een "managed agent profile", nu alleen voor Sonnet 5). De keuring met een rubric en de hooguit twee rondes zitten er ook in |

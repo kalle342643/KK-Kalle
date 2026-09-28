@@ -1,6 +1,7 @@
 import { num, type Db } from "../db/index.js";
 import type { AppContext } from "./context.js";
 import { round2 } from "./money.js";
+import { addDays } from "./time.js";
 
 export type LedgerKind = "token_cost" | "spend" | "revenue";
 
@@ -122,6 +123,19 @@ export async function totals(
     params,
   );
   return totalsFrom(rows);
+}
+
+/**
+ * Het AI-budget van de hele holding voor een maand: het plafond plus een deel van de omzet van de laatste
+ * 30 dagen. Zo groeit het mee met wat er binnenkomt.
+ */
+export async function monthlyAllowanceEur(
+  db: Db,
+  money: { globalMonthlyCapEur: number; revenueShareForAi: number },
+  now: Date,
+): Promise<number> {
+  const revenue30 = (await totals(db, { from: addDays(now, -30), to: now })).revenue;
+  return round2(money.globalMonthlyCapEur + money.revenueShareForAi * revenue30);
 }
 
 export async function totalsByBranch(db: Db, from: Date, to: Date): Promise<Map<number | null, Totals>> {

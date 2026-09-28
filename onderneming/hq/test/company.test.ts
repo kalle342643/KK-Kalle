@@ -7,7 +7,10 @@ import { AgentFactory } from "../src/company/factory.js";
 import { defaultCompanyDir, loadCompany, render } from "../src/company/loader.js";
 import { listApprovals } from "../src/domain/approvals.js";
 import { getBranchBySlug } from "../src/domain/branches.js";
+import { recordLedger } from "../src/domain/ledger.js";
+import { eurToUsdCents } from "../src/domain/money.js";
 import { getSetting } from "../src/domain/settings.js";
+import { addDays } from "../src/domain/time.js";
 import { decide, proposeBranch, registerWorkflowHooks } from "../src/domain/workflows.js";
 import { createTestEnv, type TestEnv } from "./helpers/context.js";
 
@@ -91,6 +94,23 @@ describe("bootstrap naar Paperclip", () => {
     const third = await bootstrap(deps, changed);
     expect(third.agents.updated).toEqual(["Atlas"]);
     expect(env.paperclip.agents.get(atlas.id)!.budgetMonthlyCents).toBe(9999);
+  });
+
+  it("zet het bedrijfsplafond op het plafond plus het omzetdeel, ook bij een update", async () => {
+    const def = loadCompany();
+    const deps = { db: env.db, config: env.ctx.config, paperclip: env.paperclip, log: env.ctx.log, now: env.ctx.now };
+    const { globalMonthlyCapEur, revenueShareForAi, usdToEur } = env.ctx.config.money;
+    const first = await bootstrap(deps, def);
+    const company = env.paperclip.companies.get(first.companyId)!;
+    expect(company.budgetMonthlyCents).toBe(eurToUsdCents(globalMonthlyCapEur, usdToEur));
+
+    // Er komt omzet binnen. Die van de laatste 30 dagen telt mee, oudere niet.
+    await recordLedger(env.db, { kind: "revenue", amountEur: 100, source: "owner", externalId: "t-1", occurredAt: addDays(env.clock.now, -3) });
+    await recordLedger(env.db, { kind: "revenue", amountEur: 500, source: "owner", externalId: "t-2", occurredAt: addDays(env.clock.now, -40) });
+    // Een update (update.sh draait bootstrap) mag het omzetdeel niet weghalen.
+    const second = await bootstrap(deps, def);
+    expect(second.companyCreated).toBe(false);
+    expect(company.budgetMonthlyCents).toBe(eurToUsdCents(globalMonthlyCapEur + revenueShareForAi * 100, usdToEur));
   });
 });
 
