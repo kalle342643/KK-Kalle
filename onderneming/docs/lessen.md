@@ -272,6 +272,16 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   - of een hoofdagent-sessie de connector zelf mag gebruiken om sessies met tags te starten (dat kan in cloudsessies
     zoals deze wel).
 
+## Een game bouwen (6 oktober)
+- **Een nieuwe repo kan ik niet zelf aanmaken** (GitHub 403 voor de integratie). Vraag Kalle eerst een lege repo te
+  maken, of bouw lokaal en stuur een zip als vangnet: een cloud-container kan verdwijnen.
+- **Puzzelgenerator: de dader mag zichzelf niet tegenspreken.** Anders hoef je maar één verdachte te lezen en is elke
+  zaak triviaal.
+- **Screenshots op echte maten vinden wat tests missen**: op 360x640 was de kaart te klein en overlapten de klokken.
+- **CrazyGames**: nieuwe spelers direct in gameplay (max. 1 klik); iframe vanaf 800x450; covers 1920x1080, 800x1200,
+  800x800; preview-video 15-20 s zonder geluid. De SDK-modules zijn getters: niet te bespioneren door ze te vervangen,
+  lees in een test het SDK-log.
+
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
   (socket-URL, back-up, env-bestand).
