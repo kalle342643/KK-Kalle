@@ -280,6 +280,13 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   zoekopdrachten en laat agents echte pagina's lezen met WebFetch. Daar geldt die limiet niet, en het levert letterlijke
   citaten op in plaats van parafrases.
 - **Reken het zoekbudget uit vóór de start:** agents × zoekopdrachten per agent moet per beurt onder 200 blijven.
+- **Een hoge lat haal je niet met bureauonderzoek.** Bij 23 dossiers kwam niets boven de 5,2. Snelheid, bereik en
+  economie zijn vooraf alleen aannames, en "zonder bron hoogstens 5" houdt ze daar. Gebruik twee latten: een testlat om
+  twee weken te toetsen, en de bouwlat pas na een test met echte betalingen.
+- **Zoek de concurrent vóór het dossier.** Het rode team vond bij 5 van de 6 topideeën een concurrent die het dossier
+  miste. "Niet gevonden" is geen bron.
+- **Een rood team op alleen de top maakt de ranglijst daaronder scheef:** de ideeën die niet zijn aangevallen, schuiven
+  vanzelf omhoog.
 
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
