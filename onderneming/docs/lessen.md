@@ -272,6 +272,15 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   - of een hoofdagent-sessie de connector zelf mag gebruiken om sessies met tags te starten (dat kan in cloudsessies
     zoals deze wel).
 
+## Grote onderzoeken met veel agents (25 november)
+- **WebSearch heeft een harde limiet van 200 zoekopdrachten per beurt, gedeeld door alle agents in die beurt.** Een
+  workflow die in één beurt start, deelt die 200. In het eerste grote onderzoek gebruikten 25 verkenners ze allemaal,
+  waardoor elk diepteonderzoek erna zonder zoekresultaten bleef en vastliep op "minder dan 3 bronnen". Oplossing:
+  verdeel het zoekwerk over aparte beurten (een nieuwe workflow per fase), geef elke agent een vast aantal
+  zoekopdrachten en laat agents echte pagina's lezen met WebFetch. Daar geldt die limiet niet, en het levert letterlijke
+  citaten op in plaats van parafrases.
+- **Reken het zoekbudget uit vóór de start:** agents × zoekopdrachten per agent moet per beurt onder 200 blijven.
+
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
   (socket-URL, back-up, env-bestand).
