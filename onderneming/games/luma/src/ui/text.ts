@@ -2,23 +2,12 @@
 import type { DeathCause } from "../sim/types";
 import { zoneTheme } from "../theme";
 
-/** Engelse ondertitels per zone (theme.ts heeft Nederlandse). */
-const TAGLINES: Readonly<Record<string, string>> = {
-  Aurora: "where the light begins",
-  "Ember Reach": "stars that still glow",
-  "Glass Sea": "still, clear, deep",
-  "Violet Deep": "the night beneath the night",
-  "Solar Choir": "everyone sings along",
-  "The Hush": "beyond the last star",
-};
-
 export function zoneName(zone: number): string {
   return zoneTheme(zone).name;
 }
 
 export function zoneTagline(zone: number): string {
-  const theme = zoneTheme(zone);
-  return TAGLINES[theme.name] ?? theme.tagline;
+  return zoneTheme(zone).tagline;
 }
 
 export function causeLine(cause: DeathCause, zone: number): string {

@@ -3,7 +3,7 @@
 export interface ZoneTheme {
   /** Naam die groot in beeld komt bij binnenkomst. */
   name: string;
-  /** Korte ondertitel. */
+  /** Korte ondertitel (Engels, staat in beeld). */
   tagline: string;
   /** Kleuren als hex-getal (0xRRGGBB). */
   colors: {
@@ -34,7 +34,7 @@ export interface ZoneTheme {
 export const ZONES: readonly ZoneTheme[] = [
   {
     name: "Aurora",
-    tagline: "waar het licht begint",
+    tagline: "where the light begins",
     colors: {
       void: 0x03040c,
       nebulaA: 0x0b3a4a,
@@ -48,7 +48,7 @@ export const ZONES: readonly ZoneTheme[] = [
   },
   {
     name: "Ember Reach",
-    tagline: "sterren die nog gloeien",
+    tagline: "stars that still glow",
     colors: {
       void: 0x0a0306,
       nebulaA: 0x4a1408,
@@ -62,7 +62,7 @@ export const ZONES: readonly ZoneTheme[] = [
   },
   {
     name: "Glass Sea",
-    tagline: "stil, helder, diep",
+    tagline: "still, clear, deep",
     colors: {
       void: 0x02060a,
       nebulaA: 0x0a2f3f,
@@ -76,7 +76,7 @@ export const ZONES: readonly ZoneTheme[] = [
   },
   {
     name: "Violet Deep",
-    tagline: "de nacht onder de nacht",
+    tagline: "the night beneath the night",
     colors: {
       void: 0x05020b,
       nebulaA: 0x2d0b52,
@@ -90,7 +90,7 @@ export const ZONES: readonly ZoneTheme[] = [
   },
   {
     name: "Solar Choir",
-    tagline: "iedereen zingt mee",
+    tagline: "everyone sings along",
     colors: {
       void: 0x0a0702,
       nebulaA: 0x4a3208,
@@ -104,7 +104,7 @@ export const ZONES: readonly ZoneTheme[] = [
   },
   {
     name: "The Hush",
-    tagline: "voorbij de laatste ster",
+    tagline: "beyond the last star",
     colors: {
       void: 0x000000,
       nebulaA: 0x101828,

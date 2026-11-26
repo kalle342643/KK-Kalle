@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { SIM, autopilotTap, createWorld, drainEvents, findStar, hashSeed, step } from "../src/sim/index";
-import type { SimEvent, World } from "../src/sim/index";
+import type { CometState, SimEvent, World } from "../src/sim/index";
 
 const DT = SIM.dt;
 
@@ -124,7 +124,7 @@ describe("banen en vluchten", () => {
     w.comet.vel = { x: 0, y: w.speed };
     w.comet.state = { mode: "fly", leftStarId: null, time: 0, nearIds: [] };
     run(w, 1.2, () => false);
-    const st = w.comet.state;
+    const st = w.comet.state as CometState;
     if (st.mode !== "orbit") throw new Error("niet gevangen");
     // Rechts van de ster omhoog vliegen = tegen de klok in.
     expect(st.dir).toBe(1);
@@ -193,7 +193,7 @@ describe("richtlijn", () => {
               perfect = cap.perfect;
               break;
             }
-            if (w.comet.state.mode === "dead") break;
+            if ((w.comet.state as CometState).mode === "dead") break;
           }
           // Zonder zwarte gaten in de buurt is de voorspelling exact (movers schuiven: die slaan we over).
           const star = w.stars.find((s) => s.id === p.starId);
