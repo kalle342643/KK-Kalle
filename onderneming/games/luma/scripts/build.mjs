@@ -34,6 +34,17 @@ async function emit(result) {
   await writeFile(out, html);
   const { size } = await stat(out);
   console.log(`dist/luma.html  ${(size / 1024).toFixed(0)} KB`);
+
+  // Versie voor een artifact op claude.ai: dat zet zelf doctype, head en body eromheen.
+  const artifact = html
+    .replace(/<!doctype html>\s*/i, "")
+    .replace(/<html[^>]*>\s*/i, "")
+    .replace(/<\/?head>\s*/gi, "")
+    .replace(/<\/?body>\s*/gi, "")
+    .replace(/<\/html>\s*/i, "")
+    .replace(/<meta charset="utf-8">\s*/i, "")
+    .replace(/<meta name="viewport"[^>]*>\s*/i, "");
+  await writeFile(join(root, "dist/luma-artifact.html"), artifact);
 }
 
 if (watch) {

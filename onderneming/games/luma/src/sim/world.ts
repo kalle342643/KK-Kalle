@@ -95,6 +95,8 @@ function makeStar(world: World, rng: Rng, kind: StarKind, pos: Vec2, index: numb
     case "normal":
       break;
   }
+  // De eerste sterren zijn ruimer: wie net begint, moet snel een vangst voelen.
+  if (kind !== "blackhole" && index < 6) ring += 0.8 * (1 - index / 6);
   const phase = rng.range(0, Math.PI * 2);
   const base = { x: pos.x, y: pos.y };
   const star: Star = {

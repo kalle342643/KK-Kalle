@@ -4,3 +4,4 @@ export { createWorld, difficulty, findStar } from "./world";
 export { step, drainEvents, heatLife } from "./step";
 export { hashSeed, dayKey } from "./rng";
 export { autopilotTap, nextTarget } from "./autopilot";
+export { aimPreview, type AimPreview } from "./aim";

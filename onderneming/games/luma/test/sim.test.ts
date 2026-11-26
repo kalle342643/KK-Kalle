@@ -166,3 +166,50 @@ describe("haalbaarheid", () => {
     });
   });
 });
+
+describe("richtlijn", () => {
+  it("klopt met wat er echt gebeurt bij loslaten", async () => {
+    const { aimPreview } = await import("../src/sim/index");
+    let checked = 0;
+    for (let seed = 1; seed <= 15; seed++) {
+      const w = createWorld(hashSeed(`aim-${seed}`));
+      for (let i = 0; i < 120 * 40 && w.comet.state.mode !== "dead"; i++) {
+        const tap = autopilotTap(w);
+        if (tap) {
+          const p = aimPreview(w);
+          step(w, DT, { tap: true });
+          drainEvents(w);
+          // Vlieg tot vangst of dood en vergelijk.
+          let caught: number | null = null;
+          let caughtKind = "";
+          let perfect = false;
+          for (let j = 0; j < 120 * 5; j++) {
+            step(w, DT, { tap: false });
+            const ev = drainEvents(w);
+            const cap = ev.find((e) => e.type === "capture");
+            if (cap && cap.type === "capture") {
+              caught = cap.starId;
+              caughtKind = cap.kind;
+              perfect = cap.perfect;
+              break;
+            }
+            if (w.comet.state.mode === "dead") break;
+          }
+          // Zonder zwarte gaten in de buurt is de voorspelling exact (movers schuiven: die slaan we over).
+          const star = w.stars.find((s) => s.id === p.starId);
+          const nearHole = w.stars.some((s) => s.kind === "blackhole");
+          const moving = (k: string) => k === "mover" || k === "pulse";
+          if (star && !moving(star.kind) && !moving(caughtKind) && !nearHole) {
+            expect(caught).toBe(p.starId);
+            expect(perfect).toBe(p.perfect);
+            checked++;
+          }
+        } else {
+          step(w, DT, { tap: false });
+          drainEvents(w);
+        }
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+});
