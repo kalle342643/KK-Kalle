@@ -272,6 +272,20 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   - of een hoofdagent-sessie de connector zelf mag gebruiken om sessies met tags te starten (dat kan in cloudsessies
     zoals deze wel).
 
+## LUMA, een game in één nacht met agents (26 november)
+- **Eerst het contract, dan de agents.** Eerst `contracts.ts`, de sim-types en de thema's geschreven, daarna drie agents
+  tegelijk (beeld, geluid, UI), elk in een eigen map. Ze konden niet botsen en waren binnen 20 minuten klaar. Zonder vast
+  contract gaan parallelle agents elk hun eigen aannames maken.
+- **Een pure simulatie maakt een game testbaar.** Vaste stap, eigen random-generator in de toestand, geen DOM. Een
+  autopiloot speelt in de tests 40 werelden: zo zie je of elke wereld haalbaar is, zonder zelf te spelen.
+- **Loslaten moet doen wat de speler zag.** Eerst draaide de baan een stap verder en liet dan pas los. Dat ene stapje
+  (0,04 rad) liet de autopiloot op sterren knallen. Na de fix kwam hij van mediaan 19 naar 90+ sterren.
+- **Zwarte gaten naast het pad, niet erop.** Met een te grote trekstraal was elke vlucht krom en voelde vangen als
+  geluk. Kleinere invloed, verder van het pad: nu een keuze in plaats van pech.
+- **Lees de platformregels vóór je toetsen kiest.** CrazyGames verbiedt Escape (sluit volledig scherm). Pauze werd P.
+- **Geluid meten, niet gokken.** De compressor van Chrome geeft zelf extra versterking: het echte plafond moet je
+  meten in een offline render (hier -2 dBFS).
+
 ## Nog niet in het echt getest
 - Het installatiescript op een echte VPS: wel gecontroleerd met shellcheck, en losse onderdelen getest
   (socket-URL, back-up, env-bestand).
@@ -310,3 +324,5 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
   netjes zonder geheim). Echte Funnel-toegang is niet getest.
 - **De helpers `onderzoeker` en `reviewer` in echt werk:** Claude Code laadt ze (getest), maar hoe vaak hij ze uit
   zichzelf inzet en of dat tokens bespaart, moet in de praktijk blijken. Vraag er eventueel zelf om.
+- **LUMA op echte telefoons:** getest in headless Chromium (software-WebGL) en met een offline geluidsrender. Safari
+  op iPhone en de framerate op een goedkope Android zijn niet getest.
