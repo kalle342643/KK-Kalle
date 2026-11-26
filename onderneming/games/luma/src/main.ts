@@ -274,7 +274,8 @@ function frame(now: number): void {
   }
 
   handleEvents(events, now);
-  audio.events(events, world);
+  // Op het titelscherm zingt de autopiloot zacht mee, maar zonder start- en valgeluiden.
+  audio.events(phase === "title" ? events.filter((e) => e.type !== "start" && e.type !== "death") : events, world);
   audio.update(realDt, world, phase);
 
   const alpha = simulate ? Math.min(1, accumulator / SIM.dt) : 1;

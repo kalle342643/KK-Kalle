@@ -73,10 +73,13 @@ export class Motion {
     const frames = this.reduced ? calm : full;
     if (!frames) return null;
     try {
-      return el.animate(frames, opts);
+      return el.animate(frames, { easing: "linear", ...opts });
     } catch {
-      // Oude browser zonder linear(): zelfde beweging met een gewone easing.
-      return el.animate(frames, { ...opts, easing: this.out });
+      // Oude browser zonder linear(): zelfde beweging met een gewone easing per stap.
+      return el.animate(
+        frames.map((f) => ({ ...f, easing: this.out })),
+        { ...opts, easing: "linear" },
+      );
     }
   }
 }
