@@ -1,0 +1,39 @@
+# Controleert de game LUMA bij elke PR en push naar main: typecheck, tests en build.
+name: LUMA
+
+on:
+  pull_request:
+    paths:
+      - "onderneming/games/luma/**"
+      - ".github/workflows/luma.yml"
+  push:
+    branches: [main]
+    paths:
+      - "onderneming/games/luma/**"
+      - ".github/workflows/luma.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: onderneming/games/luma
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: onderneming/games/luma/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: luma
+          path: onderneming/games/luma/dist/luma.html

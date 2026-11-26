@@ -1,0 +1,24 @@
+{
+  "name": "@onderneming/luma",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LUMA: een komeet die zingt. One-tap orbit-game, elke baan is een noot.",
+  "type": "module",
+  "engines": {
+    "node": ">=22.12"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "speeltest": "node scripts/speeltest.mjs"
+  },
+  "devDependencies": {
+    "@types/three": "^0.186.0",
+    "esbuild": "^0.28.2",
+    "three": "^0.186.0",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.1"
+  }
+}
