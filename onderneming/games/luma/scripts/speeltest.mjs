@@ -1,10 +1,13 @@
 // Speeltest in een echte browser: bouwt niets, opent dist/luma.html met de autopiloot,
 // speelt een run, maakt screenshots en faalt bij fouten in de console of een te lage framerate.
 // Gebruik: node scripts/speeltest.mjs [seconden] [uitvoermap]
-import { chromium } from "playwright";
+import { createRequire } from "node:module";
 import { mkdir } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+
+// Playwright staat globaal in de sandbox; require() vindt hem via NODE_PATH, een ESM-import niet.
+const { chromium } = createRequire(import.meta.url)("playwright");
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const seconds = Number(process.argv[2] ?? 20);

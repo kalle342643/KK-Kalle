@@ -14,6 +14,9 @@ import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
 import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 
+/** Sterkte van de bloom (de pass vermenigvuldigt intern nog met 3 en telt vijf mips op). */
+const BLOOM = 0.28;
+
 /** Bloom die op een lagere resolutie kan draaien. */
 class ScaledBloomPass extends UnrealBloomPass {
   scale = 1;
@@ -110,11 +113,11 @@ export class Post {
     this.low = low;
     this.composer = new EffectComposer(renderer, this.makeTarget(low));
     this.composer.addPass(new RenderPass(scene, camera));
-    this.bloom = new ScaledBloomPass(new Vector2(256, 256), 0.7, 0.12, 0.9);
+    this.bloom = new ScaledBloomPass(new Vector2(256, 256), BLOOM, 0, 0.85);
     this.composer.addPass(this.bloom);
     // Strakkere bloom: de brede mips wegen minder mee.
     const factors = this.bloom.compositeMaterial.uniforms["bloomFactors"];
-    if (factors) factors.value = [1.0, 0.75, 0.42, 0.22, 0.12];
+    if (factors) factors.value = [1.0, 0.7, 0.45, 0.25, 0.12];
     const mat = new ShaderMaterial({
       uniforms: this.u,
       vertexShader: FINAL_VERT,
