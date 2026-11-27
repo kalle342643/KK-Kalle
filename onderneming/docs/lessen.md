@@ -283,6 +283,11 @@ Uitleg en bronnen: [ONDERZOEK-AGENTS.md, deel 2](ONDERZOEK-AGENTS.md#deel-2-de-i
 - **Zwarte gaten naast het pad, niet erop.** Met een te grote trekstraal was elke vlucht krom en voelde vangen als
   geluk. Kleinere invloed, verder van het pad: nu een keuze in plaats van pech.
 - **Lees de platformregels vóór je toetsen kiest.** CrazyGames verbiedt Escape (sluit volledig scherm). Pauze werd P.
+- **Wekkers stapelen op tijdens een limiet.** De weeklimiet viel om ±23:00; de wekkers van 01:51 en 04:51 kwamen pas
+  na de reset (07:00 UTC), alle drie tegelijk. Zet een wekker dus net ná het resetmoment dat de foutmelding noemt, en
+  commit vaak: daardoor ging er niets verloren, ook niet van de agent die halverwege stopte.
+- **Bloom in three.js vermenigvuldigt intern met 3** en telt vijf vervaagde lagen op. Een sterkte van ±0,3 is genoeg;
+  hoger maakt alles mistig.
 - **Geluid meten, niet gokken.** De compressor van Chrome geeft zelf extra versterking: het echte plafond moet je
   meten in een offline render (hier -2 dBFS).
 
