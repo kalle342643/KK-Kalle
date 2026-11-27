@@ -18,7 +18,7 @@ export interface CameraFrame {
 }
 
 const TILT = (24 * Math.PI) / 180;
-const TITLE_TILT = (34 * Math.PI) / 180;
+const TITLE_TILT = (42 * Math.PI) / 180;
 
 export class CameraRig {
   readonly camera = new PerspectiveCamera(50, 1, 0.5, 900);
@@ -73,7 +73,7 @@ export class CameraRig {
     const dt = f.dt;
     const halfFov = (this.camera.fov * Math.PI) / 360;
     // Benodigde halve hoogte: genoeg breedte op een telefoon, genoeg vooruit op een breed scherm.
-    const halfH = Math.max(12, 8.6 / this.aspect);
+    const halfH = Math.max(10.5, 8.6 / this.aspect);
     let wantDist = halfH / Math.tan(halfFov);
     // Komeet in het onderste deel van beeld, zodat de volgende ster ruim zichtbaar is.
     const bias = halfH * (this.aspect < 1 ? 0.3 : 0.2);
@@ -98,11 +98,12 @@ export class CameraRig {
     let wantTilt = TILT;
     if (f.title) {
       // Titelscherm: verder weg, langzaam zweven.
-      wantDist *= 1.3;
+      wantDist *= 1.6;
       wantTilt = TITLE_TILT;
       const r = this.reducedMotion ? 0.3 : 1;
-      tx = f.x * 0.5 + Math.sin(f.time * 0.071) * 3.2 * r;
-      ty = f.y + 4 + Math.sin(f.time * 0.053 + 1.3) * 2.2 * r;
+      // Kijk langs het pad heen: de sterren lopen schuin door een hoek, het midden blijft vrij voor het logo.
+      tx = f.x + 6.5 + Math.sin(f.time * 0.071) * 3.2 * r;
+      ty = f.y + 14 + Math.sin(f.time * 0.053 + 1.3) * 2.2 * r;
     }
 
     if (this.snapNext) {

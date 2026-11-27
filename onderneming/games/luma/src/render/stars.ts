@@ -46,6 +46,7 @@ uniform float uTime;
 uniform float uHeat;
 uniform float uFlash;
 uniform float uSeed;
+uniform float uDim;
 varying vec3 vN;
 varying vec3 vV;
 varying vec3 vO;
@@ -60,7 +61,7 @@ void main() {
   col += uColor * pow(1.0 - mu, 2.5) * 0.8;
   float flare = uHeat * uHeat * (0.75 + 0.25 * sin(uTime * (6.0 + uHeat * 20.0)));
   col = mix(col, vec3(1.0, 0.42, 0.22) * 4.0 * (0.7 + g * 0.6), flare * 0.7);
-  col *= 1.0 + uFlash * 1.5 + flare * 1.2;
+  col *= (1.0 + uFlash * 1.5 + flare * 1.2) * uDim;
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -74,6 +75,7 @@ uniform float uHeat;
 uniform float uFlash;
 uniform float uGiant;
 uniform float uSeed;
+uniform float uDim;
 uniform vec2 uSize;
 varying vec2 vP;
 ${NOISE_GLSL}
@@ -85,13 +87,13 @@ void main() {
   // Corona: stralen uit ruis in poolcoördinaten zonder naad (richting als invoer).
   float rays = fbm(dir * (2.2 + uGiant * 1.5) + vec2(uSeed) + vec2(0.0, -r * 0.35 + uTime * 0.12));
   rays = pow(rays, 2.0) * 2.2;
-  float halo = exp(-o * 3.2) * 0.55 + exp(-o * 0.9) * 0.07;
-  float corona = rays * exp(-o * (1.7 - uGiant * 0.6)) * 0.45;
+  float halo = exp(-o * 4.6) * 0.5 + exp(-o * 1.3) * 0.05;
+  float corona = rays * exp(-o * (2.4 - uGiant * 0.8)) * 0.4;
   vec3 c = mix(uColor, uAccent, uGiant * 0.35 * smoothstep(0.3, 2.5, o));
   float heat = uHeat * uHeat;
   c = mix(c, vec3(1.0, 0.35, 0.15), heat * 0.6);
   vec3 col = c * (halo + corona * (0.55 + uGiant * 0.5)) * (1.0 + uFlash * 1.2 + heat * 1.5);
-  gl_FragColor = vec4(col * edge, 1.0);
+  gl_FragColor = vec4(col * edge * uDim, 1.0);
 }
 `;
 
@@ -112,6 +114,9 @@ uniform float uVisited;
 uniform float uFlash;
 uniform float uDir;
 uniform float uDashes;
+uniform float uNext;
+uniform float uActive;
+uniform float uDim;
 varying vec2 vP;
 const float TAU = 6.2831853;
 float arc(float a, float head, float width) {
@@ -129,10 +134,11 @@ void main() {
   col = mix(col, uAccent, uPerfect * uLock);
   col = mix(col, vec3(1.0, 0.18, 0.12), uDanger * uLock);
 
-  float w = mix(0.03, 0.07, uLock) + uHeat * 0.035;
+  // Rustige ringen zijn dun; het volgende doel en de vastgeklikte ring zijn dikker.
+  float w = mix(0.012, 0.03, max(uNext, uActive)) + 0.04 * uLock + uHeat * 0.035;
   float d = abs(r - uR);
   float line = 1.0 - smoothstep(w - aa, w + aa, d);
-  float glow = exp(-d * d / (0.05 + 0.1 * uLock + 0.08 * uHeat));
+  float glow = exp(-d * d / (0.04 + 0.1 * uLock + 0.08 * uHeat)) * (0.35 + 0.65 * max(max(uNext, uActive), uLock));
 
   // Streepjes net buiten de ring, die langzaam draaien en bij het vastklikken naar binnen schuiven.
   float dashR = uR + mix(0.36, 0.17, uLock);
@@ -159,12 +165,14 @@ void main() {
   float spark = 0.55 + 0.45 * sin(a * 14.0 - uTime * 9.0);
   float pband = exp(-pd * pd / 0.006) * uPerfect * uLock * spark;
 
-  float inten = (0.85 + 0.9 * uApproach + 1.3 * uLock) * mix(1.0, 0.42, uVisited) * (1.0 + uFlash * 2.5);
+  float focus = max(uNext, uActive);
+  float inten = (0.26 + 0.5 * focus + 0.5 * uApproach + 1.1 * uLock) * mix(1.0, 0.6, uVisited) * (1.0 + uFlash * 2.5);
   inten *= mix(1.0, 0.55 + 0.9 * hp, smoothstep(0.08, 0.45, uHeat));
-  vec3 outc = col * (line * 1.7 + glow * 0.32 + dash * (0.45 + 0.9 * uLock) + fill) * inten;
+  float dashK = 0.04 + 0.45 * focus + 0.9 * uLock;
+  vec3 outc = col * (line * 1.7 + glow * 0.32 + dash * dashK + fill) * inten;
   outc += col * sh * 3.0;
   outc += uAccent * pband * 2.6;
-  gl_FragColor = vec4(outc, 1.0);
+  gl_FragColor = vec4(outc * uDim, 1.0);
 }
 `;
 
@@ -172,6 +180,7 @@ const TRACK_FRAG = /* glsl */ `
 uniform vec3 uColor;
 uniform vec2 uSize;
 uniform float uTime;
+uniform float uDim;
 varying vec2 vP;
 void main() {
   float aa = fwidth(vP.y) + 1e-4;
@@ -182,7 +191,7 @@ void main() {
   // Eindstreepjes.
   float cap = (1.0 - smoothstep(0.02, 0.02 + aa * 1.5, abs(abs(vP.x) - len))) * (1.0 - smoothstep(0.12, 0.14, abs(vP.y)));
   float glow = exp(-vP.y * vP.y * 60.0) * inside * 0.12;
-  gl_FragColor = vec4(uColor * (line * 0.45 + cap * 0.7 + glow), 1.0);
+  gl_FragColor = vec4(uColor * (line * 0.45 + cap * 0.7 + glow) * uDim, 1.0);
 }
 `;
 
@@ -195,6 +204,7 @@ uniform float uPull;
 uniform float uTime;
 uniform float uNear;
 uniform float uSeed;
+uniform float uDim;
 varying vec2 vP;
 ${NOISE_GLSL}
 void main() {
@@ -230,7 +240,7 @@ void main() {
   col *= 1.0 + uNear * 2.5;
   col *= 1.0 - hor;
   float alpha = max(hor, dark);
-  gl_FragColor = vec4(col, alpha);
+  gl_FragColor = vec4(col * uDim, alpha);
 }
 `;
 
@@ -311,6 +321,7 @@ interface StarVis {
     uHeat: { value: number };
     uFlash: { value: number };
     uSeed: { value: number };
+    uDim: { value: number };
   };
   gu: {
     uColor: { value: Color };
@@ -321,6 +332,7 @@ interface StarVis {
     uGiant: { value: number };
     uSeed: { value: number };
     uSize: { value: Vector2 };
+    uDim: { value: number };
   };
   ru: {
     uColor: { value: Color };
@@ -340,8 +352,11 @@ interface StarVis {
     uFlash: { value: number };
     uDir: { value: number };
     uDashes: { value: number };
+    uNext: { value: number };
+    uActive: { value: number };
+    uDim: { value: number };
   };
-  tu: { uColor: { value: Color }; uSize: { value: Vector2 }; uTime: { value: number } };
+  tu: { uColor: { value: Color }; uSize: { value: Vector2 }; uTime: { value: number }; uDim: { value: number } };
   approach: number;
   lock: number;
   locked: boolean;
@@ -351,6 +366,8 @@ interface StarVis {
   flash: number;
   perfect: number;
   visited: number;
+  next: number;
+  active: number;
 }
 
 interface HoleVis {
@@ -366,6 +383,7 @@ interface HoleVis {
     uNear: { value: number };
     uSeed: { value: number };
     uSize: { value: Vector2 };
+    uDim: { value: number };
   };
 }
 
@@ -381,13 +399,17 @@ export interface StarFrame {
   aimStarId: number | null;
   aimPerfect: boolean;
   aimDanger: boolean;
+  /** Id van de volgende ster op het pad (-1 als er geen is). */
+  nextId: number;
+  /** Helderheid van de wereld (lager op het titelscherm). */
+  dim: number;
   camera: PerspectiveCamera;
   scale: number;
 }
 
 const SHARD_MAX = 96;
-const GLOW_K = 7.5;
-const GIANT_GLOW_K = 9.5;
+const GLOW_K = 5.3;
+const GIANT_GLOW_K = 6.8;
 
 export class Stars {
   private readonly scene: Scene;
@@ -412,6 +434,7 @@ export class Stars {
   private readonly glintAttrs: BufferAttribute[];
   private readonly glintU = { uTime: { value: 0 }, uScale: { value: 400 } };
   private readonly shardU = { uTime: { value: 0 } };
+  private readonly dimU = { value: 1 };
   private readonly dummy = new Object3D();
   private readonly tmpColor = new Color();
 
@@ -483,6 +506,7 @@ export class Stars {
 
   update(world: World, f: StarFrame): void {
     this.frameNo++;
+    this.dimU.value = f.dim;
     const stars = world.stars;
     for (let i = 0; i < stars.length; i++) {
       const s = stars[i];
@@ -539,6 +563,8 @@ export class Stars {
     else v.perfect = damp(v.perfect, 0, 8, dt);
 
     const orbiting = f.orbitStarId === s.id;
+    v.next = damp(v.next, f.nextId === s.id ? 1 : 0, 5, dt);
+    v.active = damp(v.active, orbiting ? 1 : 0, 6, dt);
     v.heat = damp(v.heat, orbiting ? f.heat : 0, orbiting ? 10 : 3, dt);
     v.flash = damp(v.flash, 0, 4.5, dt);
     v.visited = damp(v.visited, s.visited && !orbiting ? 1 : 0, 2, dt);
@@ -573,6 +599,8 @@ export class Stars {
     ru.uDanger.value = isAim && f.aimDanger ? 1 : 0;
     ru.uVisited.value = v.visited;
     ru.uFlash.value = v.flash;
+    ru.uNext.value = v.next;
+    ru.uActive.value = v.active;
 
     if (s.kind === "mover") {
       v.track.visible = true;
@@ -593,6 +621,8 @@ export class Stars {
     v.flash = 0;
     v.perfect = 0;
     v.visited = s.visited ? 1 : 0;
+    v.next = 0;
+    v.active = 0;
     const zc = zoneColors(s.zone);
     const giant = s.kind === "giant";
     v.cu.uColor.value.copy(zc.star);
@@ -634,6 +664,7 @@ export class Stars {
       uHeat: { value: 0 },
       uFlash: { value: 0 },
       uSeed: { value: 0 },
+      uDim: this.dimU,
     };
     const gu = {
       uColor: { value: new Color() },
@@ -644,6 +675,7 @@ export class Stars {
       uGiant: { value: 0 },
       uSeed: { value: 0 },
       uSize: { value: new Vector2(GLOW_K, GLOW_K) },
+      uDim: this.dimU,
     };
     const ru = {
       uColor: { value: new Color() },
@@ -663,8 +695,16 @@ export class Stars {
       uFlash: { value: 0 },
       uDir: { value: 1 },
       uDashes: { value: 40 },
+      uNext: { value: 0 },
+      uActive: { value: 0 },
+      uDim: this.dimU,
     };
-    const tu = { uColor: { value: new Color() }, uSize: { value: new Vector2(1, 0.2) }, uTime: { value: 0 } };
+    const tu = {
+      uColor: { value: new Color() },
+      uSize: { value: new Vector2(1, 0.2) },
+      uTime: { value: 0 },
+      uDim: this.dimU,
+    };
     const additive = { blending: AdditiveBlending, transparent: true, depthTest: false, depthWrite: false };
     const core = new Mesh(
       this.sphere,
@@ -711,6 +751,8 @@ export class Stars {
       flash: 0,
       perfect: 0,
       visited: 0,
+      next: 0,
+      active: 0,
     };
   }
 
@@ -749,6 +791,7 @@ export class Stars {
       uNear: { value: 0 },
       uSeed: { value: 0 },
       uSize: { value: new Vector2(1, 1) },
+      uDim: this.dimU,
     };
     const mat = new ShaderMaterial({
       uniforms: u,

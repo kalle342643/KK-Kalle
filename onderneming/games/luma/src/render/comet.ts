@@ -5,6 +5,7 @@ import {
   BufferGeometry,
   Color,
   CustomBlending,
+  DoubleSide,
   DynamicDrawUsage,
   Mesh,
   OneFactor,
@@ -21,7 +22,7 @@ import { NOISE_GLSL, QUAD_VERT, damp } from "./util";
 
 const MAX_SAMPLES = 220;
 const TRAIL_LIFE = 1.25;
-const TRAIL_WIDTH = 0.42;
+const TRAIL_WIDTH = 0.62;
 
 /** Vonkjes per seconde per stijl. */
 const SPARK_RATE: readonly number[] = [26, 90, 46, 70, 34];
@@ -56,7 +57,7 @@ vec3 hsv(float h, float s, float v) {
 }
 void main() {
   float s = abs(vSide);
-  float core = exp(-s * s * 22.0);
+  float core = exp(-s * s * 30.0);
   float body = exp(-s * s * 3.2) * (1.0 - s * s);
   float life = 1.0 - vAge;
   float fade = life * life * (0.4 + 0.6 * life);
@@ -70,7 +71,7 @@ void main() {
     white = 0.15;
     body *= 0.8 + 0.6 * s;
   }
-  vec3 col = c * body * 1.5 + mix(vec3(1.0), c, 0.35) * core * (1.3 - vAge) * white;
+  vec3 col = c * body * 2.1 + mix(vec3(1.0), c, 0.4) * core * (1.1 - vAge) * white;
   if (uStyle > 0.5 && uStyle < 1.5) {
     // Glitter in de staart.
     float g = hash12(vec2(floor(vAge * 160.0), floor(uTime * 20.0) + floor(vSide * 3.0)));
@@ -128,7 +129,7 @@ void main() {
   float len = uSize.x * 2.0;
   float t = clamp((vP.x + uSize.x) / len, 0.0, 1.0);
   float aa = fwidth(vP.y) + 1e-4;
-  float w = mix(0.055, 0.012, t) * (1.0 + 0.4 * uLock);
+  float w = mix(0.065, 0.014, t) * (1.0 + 0.4 * uLock);
   float band = 1.0 - smoothstep(w - aa, w + aa, abs(vP.y));
   float n = mix(7.0, 11.0, uPerfect);
   float ph = t * n - uTime * mix(1.6, 3.2, uLock);
@@ -140,7 +141,7 @@ void main() {
   float fade = pow(1.0 - t, 1.4) * smoothstep(0.0, 0.07, t);
   float glow = exp(-vP.y * vP.y / (0.004 + 0.006 * uLock)) * 0.25 * (1.0 - t);
   float jitter = 1.0 + uDanger * 0.35 * sin(uTime * 40.0);
-  vec3 col = uColor * (band * dots * sparkle * 1.4 + glow) * fade * uShow * jitter;
+  vec3 col = uColor * (band * dots * sparkle * 1.9 + glow) * fade * uShow * jitter;
   gl_FragColor = vec4(col, 1.0);
 }
 `;
@@ -249,6 +250,7 @@ export class Comet {
       vertexShader: TRAIL_VERT,
       fragmentShader: TRAIL_FRAG,
       defines: { FBM_OCT: 1 },
+      side: DoubleSide,
       blending: AdditiveBlending,
       transparent: true,
       depthTest: false,

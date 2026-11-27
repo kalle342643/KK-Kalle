@@ -93,7 +93,6 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const particles = new Particles(PARTICLES);
   scene.add(particles.points);
   const post = new Post(renderer, scene, rig.camera, false);
-  (window as unknown as { __dbg: unknown }).__dbg = { scene, post }; // DEBUG-REMOVE
 
   // Klokken: fx staat stil tijdens pauze, de achtergrond leeft altijd.
   let fxTime = 0;
@@ -107,6 +106,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
   const zoneMix = makeZoneColors();
   copyZone(zoneMix, zoneColors(0));
   let zonePulse = 0;
+  // 1 op het titelscherm: wereld gedimd, nevel is de held.
+  let titleMix = 1;
 
   // Schermeffecten.
   const flash = new Color(0, 0, 0);
@@ -136,6 +137,8 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     aimStarId: null,
     aimPerfect: false,
     aimDanger: false,
+    nextId: -1,
+    dim: 1,
     camera: rig.camera,
     scale: 400,
   };
@@ -227,7 +230,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
           effects.wave(sx, sy, core * 0.5, ring * 1.5, 0.6, 0.18, white, 1.6);
           particles.burst(ev.pos.x, ev.pos.y, 90, 3, 13, 1.1, zc.accent, 2.6, 0.26, P_GLINT, 2.4);
           particles.burst(sx, sy, 40, 1, 6, 1.4, zc.star, 2, 0.2, P_FLICKER, 1.6);
-          addFlash(zc.accent, 0.16);
+          addFlash(zc.accent, 0.1);
           caKick = Math.max(caKick, 1);
           stars.flashStar(ev.starId, 1);
           comet.pulse(0.9);
@@ -385,7 +388,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     camFrame.vx = c.vel.x;
     camFrame.vy = c.vel.y;
     camFrame.mode = state.mode;
-    const target = orbiting ? nextTarget(world) : undefined;
+    const target = orbiting && alive ? nextTarget(world) : undefined;
     camFrame.hasTarget = target !== undefined;
     camFrame.targetX = target ? target.pos.x : 0;
     camFrame.targetY = target ? target.pos.y : 0;
@@ -404,6 +407,9 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     starFrame.aimPerfect = aim ? aim.perfect : false;
     starFrame.aimDanger = aim ? aim.danger : false;
     starFrame.scale = scale;
+    starFrame.nextId = target ? target.id : -1;
+    titleMix = damp(titleMix, info.phase === "title" ? 1 : 0, 1.5, realDt);
+    starFrame.dim = 1 - 0.5 * titleMix;
     stars.update(world, starFrame);
 
     // Komeet.
@@ -428,7 +434,7 @@ export function createRenderer(canvas: HTMLCanvasElement): Renderer {
     particles.flush();
 
     // Achtergrond.
-    background.setColors(zoneMix, zonePulse);
+    background.setColors(zoneMix, zonePulse, titleMix);
     background.update(rig.camera, bgTime, scale);
 
     // Schermeffecten.

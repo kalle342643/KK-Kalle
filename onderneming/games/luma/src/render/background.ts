@@ -30,6 +30,7 @@ uniform vec3 uA;
 uniform vec3 uB;
 uniform vec3 uAccent;
 uniform float uPulse;
+uniform float uHero;
 ${NOISE_GLSL}
 void main() {
   vec2 uv = (gl_FragCoord.xy - 0.5 * uRes) / uRes.y;
@@ -51,6 +52,8 @@ void main() {
   col += uAccent * wisp * uPulse * 1.5;
   // Iets lichter boven in beeld: het licht komt van voren.
   col *= 0.8 + 0.35 * smoothstep(-0.6, 0.7, uv.y);
+  // Titelscherm: de nevel mag meer stralen.
+  col *= 1.0 + 0.55 * uHero;
   gl_FragColor = vec4(max(col, uVoid), 1.0);
 }
 `;
@@ -130,6 +133,7 @@ export class Background {
     uB: { value: new Color() },
     uAccent: { value: new Color() },
     uPulse: { value: 0 },
+    uHero: { value: 0 },
   };
   private readonly dir = new Vector3();
 
@@ -200,7 +204,8 @@ export class Background {
   }
 
   /** Kleuren van de huidige (overvloeiende) zone. */
-  setColors(c: ZoneColors, pulse: number): void {
+  setColors(c: ZoneColors, pulse: number, hero: number): void {
+    this.nu.uHero.value = hero;
     this.nu.uVoid.value.copy(c.void);
     this.nu.uA.value.copy(c.nebulaA);
     this.nu.uB.value.copy(c.nebulaB);
